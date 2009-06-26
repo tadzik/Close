@@ -1,0 +1,383 @@
+grammar close::Grammar is PCT::Grammar;
+
+rule TOP {
+	{{
+		$P0 = box 1
+		set_global '$Top_of_file', $P0
+	}}
+	{*} #= start
+	<hll_block>+
+	[ $ || <panic: 'Syntax error'> ]
+	{*} #= finish
+}
+
+rule hll_block {
+	[ 'hll' <hllname=short_ident> ';'
+	|| <?{{
+		$P0 = get_global '$Top_of_file'
+		.return ($P0)
+		}}>
+	]
+	{{
+		$P0 = box 1
+		set_global '$Top_of_hll_block', $P0
+		$P0 = box 0
+		set_global '$Top_of_file', $P0
+	}}
+	{*} #= open
+	<namespace_block>+
+	{*} #= close
+}
+
+rule namespace_block {
+	[ 'namespace' <namespace_name>  ';'
+	|| <?{{
+		$P0 = get_global '$Top_of_hll_block'
+		.return ($P0)
+		}}>
+	]
+	{{
+		$P0 = box 0
+		set_global '$Top_of_hll_block', $P0
+	}}
+	{*} #= open
+	<declaration>*
+	{*} #= close
+}
+
+# Note that a namespace_name is not the same as a long_ident.
+# Namespace names are "that part of the long_ident before the
+# trailing identifier." That means that '::' is a valid namespace
+# name, but not a valid long_ident.
+#
+
+token namespace_name {
+	[ [ $<root>='::' ]? <part=bareword> :: [ '::' <part=bareword> ]*
+	| [ $<root>='::' ]
+	| '[' ::  [$<root>='::' ]? [ <part=string_lit> [ ';' <part=string_lit> ]* ]?
+		[ ']' || <panic: 'Missing "]" in namespace name'> ]
+	]
+	{*}
+}
+
+# A long identifier is a variable, function, or class name that is qualified
+# with namespace information. Valid forms are Foo::Bar::baz (Perl-style),
+# and [ 'Foo' ; 'Bar' ; 'baz' ] (Parrot-style) for names whose namespaces are
+# within their HLL tree. For rooted names (names which may refer to
+# other HLL namespaces), valid forms are ::perl6::Foo::Bar::baz and
+# [ :: 'perl6' ; 'Foo' ; 'Bar' ; 'baz' ].
+#
+# Note that the form ::x is considered to be a name at the top of the HLL
+# namespace tree. That is, ::x is the same as ::close::x. There is no syntax
+# for specifying symbol names at the top level. (Note that namespace
+# names are not long identifiers.)
+#
+token long_ident {
+	[ [ $<root>='::' ]?
+		<part=bareword> :: [ '::' <part=bareword> ]*
+	| '[' ::
+		[ $<root>='::' ]?
+		<part=string_lit> [ ';' <part=string_lit> ]*
+		[ ']'
+		|| <panic: 'Missing "]" in long identifier'>
+		]
+	]
+	{*}
+}
+
+# Declarations can have different flavors.
+# 1- External declarations can be of (namespace-) global variables, or functions.
+#	Functions may be declared (prototype) or defined.
+#
+#	This mode allows a {...} block for code to follow function declarations.
+#	The void keyword only applies to functions.
+#
+#	<?decl_mode_is: 'extern'>
+#
+# 2- Local declarations in compound statements. These are variable definitions,
+#	or external variable declarations, or external function declarations.
+#
+#	This mode prohibits the {...} block for function definitions. (There's
+#	an argument to be made for nesting functions, because of scopes. Maybe
+#	in release 3...)
+#
+#	<?decl_mode_is: 'local'>
+#
+# 3- Class member declarations of "class" functions (extern), "class" data
+# 	(extern again) or "attribute" data.
+#
+#	This mode is the only one that allows the 'attribute' keyword.
+#
+#	<?decl_mode_is: 'class'>
+#
+# 4- Parameter declarations in function prototypes.
+#
+#	This mode allows only the "lexical" and "register" storage specifiers.
+#
+token DECL_MODE_CLASS {
+	<?{{
+		$P0 = get_hll_global [ 'close' ; 'Grammar' ; 'Actions' ], '@Decl_mode_stack'
+		$S0 = $P0[0]
+		if 'class' == $S0 goto yes
+		.return (0)
+	yes:
+		.return (1)
+	}}>
+}
+
+token DECL_MODE_EXTERN {
+	<?{{
+		$P0 = get_hll_global [ 'close' ; 'Grammar' ; 'Actions' ], '@Decl_mode_stack'
+		$S0 = $P0[0]
+		if 'extern' == $S0 goto yes
+		.return (0)
+	yes:
+		.return (1)
+	}}>
+}
+
+token DECL_MODE_LOCAL {
+	<?{{
+		$P0 = get_hll_global [ 'close' ; 'Grammar' ; 'Actions' ], '@Decl_mode_stack'
+		$S0 = $P0[0]
+		if 'local' == $S0 goto yes
+		.return (0)
+	yes:
+		.return (1)
+	}}>
+}
+
+token DECL_MODE_PARAM {
+	<?{{
+		$P0 = get_hll_global [ 'close' ; 'Grammar' ; 'Actions' ], '@Decl_mode_stack'
+		$S0 = $P0[0]
+		if 'parameter' == $S0 goto yes
+		.return (0)
+	yes:
+		.return (1)
+	}}>
+}
+
+rule declaration {
+	[ <.DECL_MODE_PARAM> [ <!before ')' > || <.fail> ] ]?
+	<decl_specifiers>
+	<declarator>
+	[ <adverb> ]*			# NB: [ ]* is to allow <ws> in between
+	[ [ <.DECL_MODE_EXTERN> || <.DECL_MODE_CLASS> ]
+		<?before '{'>
+		{*} #= body_open
+		<compound_stmt>
+		{*} #= body_close
+	| [ '=' <initializer> ]?
+		[ <!DECL_MODE_PARAM>
+			[ ';' || <panic: "Missing ';' after declaration"> ]
+		]?
+	]
+	{*} #= done
+}
+
+rule decl_specifiers {
+	[ <!DECL_MODE_PARAM> <storage_spec>? ]?
+	<type_qualifier>*
+	<type_spec>
+	{*}
+}
+
+token storage_spec {
+	<?before  'attribute' | 'extern' | 'lexical' | 'register' | 'static' >
+	[
+		[ <.DECL_MODE_CLASS>		'attribute'
+		| <!DECL_MODE_PARAM>	'extern'
+		| <.DECL_MODE_LOCAL>	'lexical'
+		| <.DECL_MODE_LOCAL>	'register'
+		| <.DECL_MODE_EXTERN>	'static'
+		]
+	||	<panic: "Illegal storage specifier in current context">
+	]
+}
+
+token type_qualifier {
+	'const'
+	# | 'inline'
+}
+
+token type_spec {
+	| <builtin_type>
+}
+
+token builtin_type {
+	[ 'class' | 'int' | 'num' | 'pmc' | 'str' | 'void' ]
+}
+
+rule declarator {
+	<name=long_ident>
+	<decl_suffix>*
+	{*}
+}
+
+rule decl_suffix {
+	| '(' <parameter_decl_list>
+		[ ')' || <panic: "Missing ')' to close parameter list"> ]
+		{*} #= parameter_decl_list
+#	| '[' <array_or_hash_decl>
+#		[ ']' || <panic: "Missing ']' to close array or hash declaration" >  ]
+#		{*} #= array_or_hash_decl
+}
+
+# foo(a, b)
+# foo()
+# foo(a, b, rest ...)
+# foo(a, "b", "c" ..., rest ...)
+rule parameter_decl_list {
+	{*} #= open
+	[ <declaration> [ ',' <declaration> ]* ]?
+	{*} #= close
+}
+
+rule array_or_hash_decl {
+	[ '%'				{*} #= hash
+	| <expression>	{*} #= fixed_array
+	| 				{*} #= resizable_array
+	]
+}
+
+token adverb {
+	[ ':anon'
+	| ':init'
+	| ':load'
+	| ':main'
+	| ':method'
+	| ':multi(' <.string_literal: ')' > ')'
+	#| ':multi'				# Is this legal? No, per jonathan@#parrot, 5/26/09
+	| ':named'
+	| ':optional'
+	| ':opt_flag'
+	| ':slurpy' | '...'
+	| ':vtable' | ':vtable(' <.string_literal: ')' > ')'
+	]
+	{*}
+}
+
+rule initializer {
+	<assign_expr>                   {*} #= assign_expr
+}
+
+token ws {
+	| <?{{								# Cache ws results.
+		$P0 = get_global '$!ws'
+		if null $P0 goto noshort
+		$P1 = $P0.'to'()
+		$P2 = match.'to'()
+		if $P1 != $P2 goto noshort
+		.return(1)
+	  noshort:
+		set_global '$!ws', match
+		.return(0)
+	}}>
+	| <!ww> <.ws_all>+
+	| <.ws_all>*
+}
+
+token ws_all {
+	[ \s+
+	| '#' \N* [ \n | $ ]
+	| <.pod_comment>
+	]
+}
+
+regex pod_comment {
+	^^ '='	[ [ 'cut' \h*: | 'end' [\h\N*]? ]
+			| 'for' [ \h \N+: ] \n [ \N+\n ]*:
+			| \w\N*: \n .*? \n '=' [ 'cut' \h*: | 'end' [\h\N*]? ]
+			]
+			[\n|$]
+}
+
+token constant {
+	| <string_lit>                 {*} #= string_lit
+	| <float_lit>                {*} #= float_lit
+	| <integer_lit>                {*} #= integer_lit
+}
+
+token string_lit {
+	[ '\'' <string_literal: '\''> '\''
+	| '"' <string_literal: '"'> '"'
+	]
+	{*}
+}
+
+token integer_lit {
+	[
+	| 0	[ 'b' <[01]>+	[ _ <[01]>+ ]*
+		| 'o' <[0..7]>+	[ _ <[0..7]>+ ]*
+		| 'd' \d+			[ _ \d+ ]*
+		| 'x' <xdigit>+	[ _ <xdigit>+ ]*
+		]
+	| \d+ [ _ \d+ ]*
+	]
+	{*}
+	<.integer_u_or_l_suffix>?
+}
+
+token integer_u_or_l_suffix {
+	| <[Uu]> [ <[Ll]> <[Ll]>? ]?
+	| <[Ll]> <[Ll>? <[Uu]>?
+}
+
+token float_lit {
+	[				'.' \d+[_\d+]*	<.Escale>?
+	| \d+[_\d+]*	'.' \d+[_\d+]*	<.Escale>?
+	| \d+[_\d+]*					<.Escale>
+	]
+	{*} #= float_lit
+}
+
+token Escale {
+	<[Ee]> <[ + \- ]>? \d+[_\d+]*
+}
+
+token short_ident {
+	[ <id=bareword> | <id=string_lit> ]
+	{*}
+}
+
+token bareword {
+	<!reserved_word>
+	<.ident>
+}
+
+token reserved_word {
+	<.keyword>
+}
+
+token keyword {
+	| <.language_element>
+	| <.builtin_function>
+}
+
+token language_element {
+	[ 'asm'
+	| 'const'
+	| 'else'
+	| 'extern'
+	| 'for'
+	| 'foreach'
+	| 'if'
+	| 'lexical'
+	| 'register'
+	| 'return'
+	| 'self'
+	| 'sub'
+	| 'tailcall'
+	| 'unless'
+	| 'void'
+	] >>
+}
+
+token builtin_function {
+	[ 'null'
+	] >>
+}
+
+# rule expression is defined in expressions.pg
+# rule built_in is defined in builtins.pg

@@ -1,0 +1,58 @@
+=item C<_onload>
+
+Initializes the test counter (to 0) for cases where the user neglects to
+call C<plan()>.
+
+=cut
+
+sub _onload
+    :init
+    :load
+{
+    test_counter :int :global = 0;
+}
+
+=item C<ok(...)>
+
+Internal implementation of the Test::More 'ok'.  It increments
+the internal test counter and handles making test output.
+
+=cut
+
+sub ok(test, description)
+    :int
+    test            :pmc;
+    description     :string :optional;
+    has_desc        :int :opt_flag;
+{
+    test_counter    :int :global;
+
+    unless (test) {
+        print "not ";
+    }
+
+    print "ok ", test_counter++;
+
+    if (has_desc) {
+        print " # ", description;
+    }
+
+    print "\n";
+    1;
+}
+
+=item C<plan(...)>
+
+Internal implementation of the Test::More 'plan'.  It sets the internal
+test counter to 0 and outputs the TAP plan line.
+
+=cut
+
+sub plan(how_many)
+    how_many        :int;
+{
+    test_counter    :int :global = 0;
+
+    print "1..", how_many, "\n";
+}
+

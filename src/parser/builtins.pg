@@ -1,0 +1,50 @@
+# Defines builtin functions/operators/terms for close.
+
+rule built_in {
+	| <builtin_concat>	{*} #= builtin_concat
+	| <builtin_isa>		{*} #= builtin_isa
+	| <builtin_isnull>	{*} #= builtin_isnull
+	| <builtin_new>	{*} #= builtin_new
+	| <builtin_null>	{*} #= builtin_null
+	| <builtin_pop>		{*} #= builtin_pop
+	| <builtin_push>	{*} #= builtin_push
+	| <builtin_shift>	{*} #= builtin_shift
+	| <builtin_unshift>	{*} #= builtin_unshift
+}
+
+# if ( isa x, Class ) {... }
+rule builtin_isa { <.t_isa> <obj=expression> ',' <class=expression> {*} }
+token t_isa { 'isa' >> <!before '('> }
+
+# if ( isnull x ) {...}
+rule builtin_isnull { <.t_isnull> <expression> {*} }
+token t_isnull { 'isnull' >> <!before '(' > }
+
+# x = new Iterator, foo
+# FIXME: Add "new expression" support.
+rule builtin_new { <.t_new> <classname=long_ident> [ ',' <args1=expression> ]? {*} }
+token t_new { 'new' >> <!before '(' > }
+
+# null
+token builtin_null { 'null' >> {*} }
+
+# x = pop array;
+rule builtin_pop { <.t_pop> <arr=expression> {*} }
+token t_pop { 'pop' >> <!before '(' > }
+
+# push array, x, y, z;
+rule builtin_push { <.t_push> <arr=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
+token t_push { 'push' >> <!before '(' > }
+
+# x = shift array
+rule builtin_shift { <.t_shift> <arr=expression> {*} }
+token t_shift { 'shift' >> <!before '(' > }
+
+# unshift array, x, y, z;
+rule builtin_unshift { <.t_unshift> <arr=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
+token t_unshift { 'unshift' >> <!before '(' > }
+
+# x = concat s0, s1, s2, ... , sn;
+rule builtin_concat { <.t_concat> <str=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
+token t_concat { 'concat' >> <!before '(' > }
+

@@ -1,0 +1,5 @@
+Language 'close' was created with tools/dev/mk_language_shell.pl, r38364.
+
+See doc/close.pod for the documentation, and
+doc/running.pod for the command-line options.
+

@@ -1,0 +1,163 @@
+
+rule expression {
+	<assign_expr>                {*} #= assign_expr
+}
+
+rule primary_expr {
+	| '('
+		<expression>
+		[ ')'
+		|| <panic: "Missing ')' in expression" >
+		]
+		{*} #= expression
+	| <asm_expr>
+		{*} #= asm_expr
+	| <constant>
+		{*} #= constant
+	| <long_ident>
+		{*} #= long_ident
+}
+
+rule asm_expr {
+	'asm'
+	[ '('
+		<arg_list>
+		[ ')'
+		|| <panic: "Missing ')' in argument list" >
+		]
+	]?
+        <asm=asm_contents>
+	{*} #= asm
+}
+
+token asm_contents {
+    '{{' .*? '}}'
+    {*}
+}
+
+rule arg_list {
+    [ <arg=arg_expr> [ ',' <arg=arg_expr> ]* ]?
+    {*}
+}
+
+rule arg_expr {
+	[ <argname=short_ident> ':' ]? <expression>
+	{*}
+}
+
+rule postfix_expr {
+	<primary_expr>
+	[ <postfix=postfix_xcrement>
+	| <postfix=postfix_member>
+	| <postfix=postfix_call>
+	| <postfix=postfix_index>
+	# short if method-ptr, long if any-var
+	#| $<op>='.*' <identifier>
+	]*
+	{*}
+}
+
+token postfix_xcrement {
+	$<op>=[ '++' | '--' ]	{*}
+}
+
+rule postfix_member {
+	'.' <member=short_ident> {*}
+}
+
+rule postfix_call {
+	'(' <arg_list> ')'		{*}
+}
+
+rule postfix_index {
+	'[' <index=expression> ']' {*}
+}
+
+rule prefix_expr {
+    | <prefix_op> <prefix_expr>         {*} #= prefix_expr
+    | <built_in>                        {*} #= built_in
+    | <postfix_expr>                    {*} #= postfix_expr
+}
+
+token prefix_op {
+    [ '++' | '--' | '+' | '-' | '!' | 'not' >> ]
+}
+
+# rule built_in is defined in builtins.pg
+
+rule mult_expr {
+    <term=prefix_expr>
+    [ <op=mult_op>
+        <term=mult_expr>
+    ]*                                  {*} #= prefix_expr
+}
+
+token mult_op {
+    [ '*' | '/' | '%' ]
+}
+
+rule additive_expr {
+    <term=mult_expr>
+    [ <op=additive_op>
+        <term=mult_expr>
+    ]*                                  {*} #= mult_expr
+}
+
+token additive_op {
+    [ '+'| '-' ]
+}
+
+rule bitwise_expr {
+    <term=additive_expr>
+    [ <op=bitwise_op>
+        <term=additive_expr>
+    ]*                                  {*} #= additive_expr
+}
+
+token bitwise_op {
+    [ '&' | 'band' | '|' | 'bor' | '^' | 'bxor' | '<<' | '>>' ]
+}
+
+rule compare_expr {
+    <term=bitwise_expr> [ <op=compare_op> <term=bitwise_expr> ]*
+    {*}
+}
+
+token compare_op {
+	[ '<=' |'<' |  '==' | '!=' | '>=' | '>' ]
+}
+
+rule logical_expr {
+    <term=compare_expr> [ <op=logical_op> <term=compare_expr> ]*
+    {*}
+}
+
+token logical_op {
+	[ 'and' | '&&' | 'or' | '||' | 'xor' ]
+}
+
+rule conditional_expr {
+	<test=logical_expr>
+	[	'?' <if=expression>
+		':' <else=conditional_expr>
+	]*
+	{*}
+}
+
+rule assign_expr {
+	| <lhs=prefix_expr>
+		<op=assign_op>
+		<rhs=assign_expr>
+		{*} #= assign_expr
+	| <single=conditional_expr>
+		{*} #= single
+}
+
+token assign_op {
+	[ '='
+	| '+=' | '-='
+	| '*=' | '/=' | '%='
+	| '<<=' | '>>=' | '&=' | '|=' | '^='
+	]
+}
+

@@ -1,0 +1,291 @@
+# $Id$
+
+method expression($/, $key)				{ PASSTHRU($/, $key); }
+
+method primary_expr($/, $key)     {
+	my $past := $/{$key}.ast;
+
+	if $key eq 'long_ident' {
+		# Warn if not in scope.
+		my $def := symbol_defined_anywhere($past);
+
+		unless $def<decl> {
+			#$/.panic("Symbol '" ~ $past.name() ~ "' not defined in current scope");
+			say("Warning: Symbol '" ~ $past.name() ~ "' not defined in current scope");
+		}
+
+	}
+
+	#DUMP($past, "primary-expr");
+	make $past;
+}
+
+method arg_list($/) {
+	my $past := PAST::Op.new(:pasttype('call'), :node($/));
+
+	for $<arg> {
+		$past.push($_.ast);
+	}
+
+	make $past;
+}
+
+method arg_expr($/) {
+	my $past := $<expression>.ast;
+	$past.node($/);
+
+	if $<argname> {
+		#say("Got argname: ", ($<argname>[0]).ast.name());
+		$past.named(~$<argname>[0].ast.name());
+	}
+
+	#DUMP($past, "arg_expr");
+	make $past;
+}
+
+method asm_expr($/, $key) {
+	my $past;
+
+    if $<arg_list> {
+        $past := $<arg_list>[0].ast;
+    }
+    else {
+        $past := PAST::Op.new(:node($/));
+    }
+
+    $past.pasttype('inline');
+    $past.inline($<asm>.ast.value());
+
+	#DUMP($past, "inline asm");
+	make $past;
+}
+
+method asm_contents($/) {
+	my $past := PAST::Val.new(:returns('String'), :value(substr(~$/, 2, -2)));
+	make $past;
+}
+
+method postfix_expr($/) {
+	my $past := $<primary_expr>.ast;
+
+	# TODO: Am I doing anything with this? Yes, :flat.
+	for $<adjective> {
+		#DUMP($past, "postfix");
+		say("Got adjective: ", $_.ast.name(), ", what to do?");
+	}
+
+	my $lhs;
+
+	for $<postfix> {
+		$lhs	:= $past;
+		$past	:= $_.ast;
+
+		$past.unshift($lhs);
+		postfixup($past);
+	}
+
+	#DUMP($past, "postfix_expr");
+	make $past;
+}
+
+# Fixup postfix-op PAST tree
+# 1- f() isn't a lookup of the contents of the 'f' symbol, then a call to those
+# 	contents. (That'd be *f). It's a call to function 'f'.
+# 2- a.b() isn't a "call", it's a "callmethod". Rewrite it.
+#
+sub postfixup($past) {
+	#say("Fixup: ", $past.WHAT, ": ", $past.name());
+
+	if $past.isa('PAST::Op') and $past.pasttype() eq 'call' {
+		#DUMP($past, "needs-fixup");
+		my $func := $past[0];
+
+		if $func.isa('PAST::Var') {
+			if $func.scope() eq 'attribute' {
+				# a.method() call. fix it up (case #2)
+				$past.pasttype('callmethod');
+				$past.name($func.name());
+				$past.shift();
+				$past.unshift($func[0]);
+			}
+			else {
+				unless $func<decl> {
+					die("No decl info stored for symbol '" ~ $func.name() ~ "'");
+				}
+
+				if is_local_function($func) {
+					$past.name($func.name());
+					$past.shift();
+				}
+				# TODO: Need to fix up aliases, etc. here. For now, leave it be.
+			}
+		}
+		#DUMP($past, "fixed-up");
+	}
+}
+
+# a++ or a--
+# Leads to: Op.inline. Need [0]=a
+method postfix_xcrement($/) {
+	my $x_crement := "    inc %0\n";
+
+	if ~$<op> eq '--' {
+		$x_crement := "    dec %0\n";
+	}
+
+	my $past := PAST::Op.new(
+		:name('postfix:' ~ $<op>),
+		:node($/),
+		:pasttype('inline'),
+		:inline("    ## inline postfix:" ~ $<op> ~ "\n"
+			~   "    clone %r, %0\n"
+			~   $x_crement));
+	$past.lvalue(1);
+	#DUMP($past, "postfix:" ~ $<op>);
+	make $past;
+}
+
+# a.b
+# Leads to: var(b).scope(attribute). Need [0]=a
+method postfix_member($/) {
+	my $past := $<member>.ast;
+	$past.isdecl(0);
+	$past.node($/);
+	$past.scope('attribute');
+	#DUMP($past, "postfix member");
+	make $past;
+}
+
+# a(b,c) or a()
+# Leads to: Op.call(b,c). Need unshift [0]=a
+method postfix_call($/) {
+	my $past := $<arg_list>.ast;
+	$past.node($/);
+	#DUMP($past, "postfix call");
+	make $past;
+}
+
+# a[x]
+# Leads to Var.keyed(x). Need unshift [0]=a
+method postfix_index($/) {
+	my $past := PAST::Var.new(
+		:name('indexed lookup'),
+		:node($/),
+		:scope('keyed'));
+	$past.push($<index>.ast);
+	#DUMP($past, "postfix index");
+	make $past;
+}
+
+
+our %prefix_opcode;
+%prefix_opcode{'++'} := 'inc';
+%prefix_opcode{'--'} := 'dec';
+%prefix_opcode{'-'} := 'neg';
+%prefix_opcode{'!'} := 'not';
+%prefix_opcode{'not'} := 'not';
+
+our %prefix_lvalue;
+%prefix_lvalue{'++'} := 1;
+%prefix_lvalue{'--'} := 1;
+
+method prefix_expr($/, $key)      {
+	my $past := $/{$key}.ast;
+
+	if $key eq 'prefix_expr' {
+		my $op := ~$<prefix_op>;
+
+		if $op ne '+' {
+			my $oppast := PAST::Op.new(
+				:name('prefix:' ~ $op),
+				:node($<prefix_op>),
+				:pasttype('pirop'));
+			$oppast.pirop(%prefix_opcode{$op});
+			$oppast.push($past);
+			$past := $oppast;
+		}
+
+		if %prefix_lvalue{$op} {
+			$past.lvalue(%prefix_lvalue{$op});
+		}
+	}
+
+	make $past;
+}
+
+method mult_expr($/, $key) { binary_expr_l2r($/); }
+#method mult_op($/, $key) { binary_op($/, ~$/); }
+method additive_expr($/, $key) { binary_expr_l2r($/); }
+#method additive_op($/, $key) { binary_op($/, ~$/); }
+method bitwise_expr($/, $key) { binary_expr_l2r($/); }
+#method bitwise_op($/, $key) { binary_op($/, $key); }
+method compare_expr($/) { binary_expr_l2r($/); }
+method logical_expr($/) { binary_expr_l2r($/); }
+
+method conditional_expr($/) {
+	my $past;
+
+	if $<if> {
+		$past := PAST::Op.new(
+			:name('? :'),
+			:node($/),
+			:pasttype('if'),
+			$<test>.ast,
+			$<if>[0].ast,
+			$<else>[0].ast);
+	}
+	else {
+		$past := $<test>.ast;
+	}
+
+	make $past;
+}
+
+our %assign_opcodes;
+%assign_opcodes{'+='}	:= 'add';
+%assign_opcodes{'-='}	:= 'sub';
+%assign_opcodes{'<<='}	:= 'shl';
+%assign_opcodes{'>>='}	:= 'shr';
+%assign_opcodes{'*='}	:= 'mul';
+%assign_opcodes{'/='}	:= 'div';
+%assign_opcodes{'%='}	:= 'mod';
+%assign_opcodes{'&='}	:= 'band';
+%assign_opcodes{'|='}	:= 'bor';
+%assign_opcodes{'^='}	:= 'bxor';
+
+method assign_expr($/, $key) {
+	if $key eq 'single' {
+		#DUMP($<single>.ast, "assg.rvalue");
+		PASSTHRU($/, $key);
+	}
+	else {
+		my $lhpast	:= $<lhs>.ast;
+		my $rhpast	:= $<rhs>.ast;
+		my $op		:= ~$<op>;
+		my $past		:= PAST::Op.new(
+			:name($op),
+			:node($/),
+			:pasttype('bind'));
+		$lhpast.lvalue(1);
+		$past.push($lhpast);
+
+		if $op ne '=' {
+			my $opname := %assign_opcodes{$op};
+
+			my $oppast := PAST::Op.new(
+				:name($opname ~ " (compute)"),
+				:node($/),
+				:pasttype('pirop'),
+				:pirop($opname));
+			$oppast.push($lhpast);
+			$oppast.push($rhpast);
+
+			$rhpast := $oppast;
+		}
+
+		$past.push($rhpast);
+
+		#DUMP($past, ~$<op>);
+		make $past;
+	}
+}

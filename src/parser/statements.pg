@@ -1,0 +1,118 @@
+rule statement {
+	[ <labeled_stmt>	{*} #= labeled_stmt
+	| <null_stmt>		{*} #= null_stmt
+	| <compound_stmt>	{*} #= compound_stmt
+	| <conditional_stmt>	{*} #= conditional_stmt
+	| <iteration_stmt>	{*} #= iteration_stmt
+	| <jump_stmt>		{*} #= jump_stmt
+	| <expression_stmt>	{*} #= expression_stmt
+	]
+	|| [ <!before '}' > <.panic: "Statement expected"> ]
+}
+
+rule null_stmt {
+	';'
+	{*}
+}
+
+=head4 Expression Statement
+
+Expression statement represent most of your programs. Any expression, defined above, followed by a
+semi-colon[;] is an expression statement.
+
+=cut
+
+rule expression_stmt {
+	<expression>
+	[ ';' || <panic: "Missing ';' at end of expression statement" > ]
+	{*}
+}
+
+rule compound_stmt {
+	'{'
+		[ $<item>=<declaration>
+		| $<item>=<statement>
+		]*
+	[ '}' || <panic: "Missing closing '}' in compound block" > ]
+	{*}
+}
+
+rule conditional_stmt {
+	$<kw>=[ 'if' | 'unless' ]
+	[ '(' || <panic: "if/unless statements must have '(' ')' around test expression" > ]
+	<expression>
+	[ ')' || <panic: "missing ')' at end of test expression" > ]
+	$<then>=<statement>
+	[ 'else' $<else>=<statement> ]?
+	{*}
+}
+
+rule labeled_stmt {
+	| [ <label> ]+
+		[ <statement>		{*} #= label
+		|| <panic: "A statement label must be followed by a statement" >
+		]
+
+	# | 'case' <label=expression> ':' <statement> {*} #= case
+	# | 'default' ':' <statement>       {*} #= default
+}
+
+token label {
+	<bareword> ':' <!before ':'>
+	{*}
+}
+
+rule iteration_stmt {
+	| <do_while_stmt>	{*} #= do_while_stmt
+	| <while_do_stmt>	{*} #= while_do_stmt
+	| <foreach_stmt>	{*} #= foreach_stmt
+}
+
+rule foreach_stmt {
+	<.t_foreach>
+		[ '(' || <panic: "Missing opening '(' in foreach statement" > ]
+		{*} #= index
+		[	[ <index=declaration> ::
+			| <index=short_ident> ::
+			]
+		|| <panic: "foreach (item: list) iterations must use a local variable" >
+		]
+		[ ':' || <panic: "Missing ':' in foreach (item: list) statement" > ]
+		<list=expression>
+		[ ')' || <panic: "Missing closing ')' in foreach statement" > ]
+	{*} #= open
+	<statement>
+	{*} #= close
+}
+
+token t_foreach { 'foreach' >> }
+
+rule do_while_stmt {
+	'do' <statement>
+	$<kw>=[ 'while' | 'until' ]
+	[ '(' || <panic: "do...while/until statements must have '(' ')' around test expression" > ]
+	<expression>
+	[ ')' || <panic: "missing ')' at end of test expression" > ]
+	[ ';' || <panic: "Missing ';' at end of do...while/until statement" > ]
+	{*}
+}
+
+rule while_do_stmt {
+	$<kw>=[ 'while' | 'until' ]
+	[ '(' || <panic: "while/until ... statements must have '(' ')' around test expression" > ]
+	<expression>
+	[ ')' || <panic: "missing ')' at end of test expression" > ]
+	<statement>
+	{*}
+}
+
+rule jump_stmt {
+	[ 'goto' <label=bareword>
+		[ ';' || <panic: "Missing ';' at end of goto statement" > ]
+		{*}	#= goto
+	| 'return' <retval=expression>? ';'   {*} #= return
+	| 'tailcall' <retval=expression> ';'  {*} #= tailcall
+	# | continue [ <loop> ]? ';'         {*} #= continue
+	# | break [ <loop> ]? ';'             {*} #= break
+	]
+}

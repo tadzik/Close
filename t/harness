@@ -1,0 +1,37 @@
+#! perl
+
+# $Id$
+
+# pragmata
+use strict;
+use warnings;
+use Getopt::Long;
+use 5.008;
+
+our %harness_args = (
+    language  => 'close',
+    verbosity => 100,
+);
+
+GetOptions(
+        'verbosity=i'       => \$harness_args{verbosity},
+        'bindir=s'          => \my $bindir,
+        # A sensible default is num_cores + 1.
+        # Many people have two cores these days.
+        'jobs:3'            => \$harness_args{jobs},
+);
+
+if ($bindir) {
+    $harness_args{exec} = [
+        $bindir.'/parrot',
+            '-Llibrary/close',
+            'close.pbc',
+            '--combine',
+            'library/close/crt0.cl'
+        ];
+}
+#else {
+#    $harness_args{compiler} = 'close.pbc';
+#}
+
+eval 'use Parrot::Test::Harness %harness_args';

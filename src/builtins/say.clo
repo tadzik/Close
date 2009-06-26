@@ -1,0 +1,69 @@
+=head1 Basic Output Operations
+
+=head2 Version
+
+$Id$
+
+=head2 Abstract
+
+Contains code for writing simple expressions to stdout.
+
+=head3 C<print> eventual code
+
+sub print(args ...)
+    args            :pmc :slurpy;
+{
+    for iter :pmc in (args) {
+        asm(iter) {{ print %0 }}
+    }
+}
+
+was:
+
+        .local pmc iter
+        iter = new 'Iterator', args
+
+    iter_loop:
+        unless iter goto iter_end
+        $P0 = shift iter
+        print $P0
+        goto iter_loop
+    iter_end:
+
+=cut
+
+sub print(args ...)
+    args        :pmc :slurpy;
+{
+    iter        :pmc = new Iterator(args);
+
+  :iter_loop
+    unless (iter)
+        goto iter_end;
+
+    asm(iter) {{
+        $P0 = shift %0
+        print $P0
+    }};
+
+    goto iter_loop;
+
+  :iter_end
+    return 1;
+}
+
+=head3 C<say> eventual code
+
+sub say(args ...)
+    args            :slurpy;
+{
+    tailcall print(args :flat, "\n");
+}
+
+=cut
+
+sub say(args ...)
+    args            :slurpy :register;
+{
+    tailcall print(args :flat, "\n");
+}
