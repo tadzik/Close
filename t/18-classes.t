@@ -3,7 +3,7 @@
 extern void ok();
 
 class C {
-	int meth1(int x)
+	int meth1(int x) :method
 	{
 		return x + x;
 	}

@@ -7,7 +7,7 @@
 .HLL "close"
 
 .namespace []
-.sub "_init_namespace_close" :anon :init :load :subid("10_1244173560")
+.sub "_init_namespace_" :anon :init :load :subid("10_1246047235")
 .annotate "line", 82
     get_hll_global $P12, "test_counter"
     unless_null $P12, vivify_20
@@ -23,7 +23,7 @@
 .HLL "close"
 
 .namespace []
-.sub "load"  :subid("11_1244173560")
+.sub "load"  :subid("11_1246047235")
     .param pmc param_14
 .annotate "line", 4
     .lex "filename", param_14
@@ -46,7 +46,7 @@
 .HLL "close"
 
 .namespace []
-.sub "print"  :subid("12_1244173560")
+.sub "print"  :subid("12_1246047235")
     .param pmc param_17 :slurpy
 .annotate "line", 58
     .lex "args", param_17
@@ -87,7 +87,7 @@
 .HLL "close"
 
 .namespace []
-.sub "say"  :subid("13_1244173560")
+.sub "say"  :subid("13_1246047235")
     .param pmc param_26 :slurpy
 .annotate "line", 67
     .lex "args", param_26
@@ -95,7 +95,7 @@
     find_lex $P27, "args"
     new $P28, "String"
     assign $P28, "\n"
-    push $P27, $P28
+	push $P27, $P28
 .annotate "line", 70
     .local pmc list
     new $P29, "String"
@@ -133,7 +133,7 @@
 .HLL "close"
 
 .namespace []
-.sub "ok"  :multi(_,_) :subid("14_1244173560")
+.sub "ok"  :multi(_,_) :subid("14_1246047235")
     .param pmc param_37
     .param pmc param_38
 .annotate "line", 84
@@ -172,7 +172,7 @@
 .HLL "close"
 
 .namespace []
-.sub "ok"  :multi(_,_,_) :subid("15_1244173560")
+.sub "ok"  :multi(_,_,_) :subid("15_1246047235")
     .param pmc param_49
     .param pmc param_50
     .param pmc param_51
@@ -211,7 +211,7 @@
 .HLL "close"
 
 .namespace []
-.sub "plan"  :subid("16_1244173560")
+.sub "plan"  :subid("16_1246047235")
     .param pmc param_62 :optional
     .param int has_param_62 :opt_flag
 .annotate "line", 110
@@ -245,7 +245,7 @@
 .HLL "close"
 
 .namespace []
-.sub "length"  :subid("17_1244173560")
+.sub "length"  :subid("17_1246047235")
     .param pmc param_71
 .annotate "line", 122
     .lex "s", param_71
@@ -269,7 +269,7 @@
 .HLL "close"
 
 .namespace []
-.sub "index"  :subid("18_1244173560")
+.sub "index"  :subid("18_1246047235")
     .param pmc param_75
     .param pmc param_76
 .annotate "line", 135

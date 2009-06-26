@@ -1509,7 +1509,13 @@ sub make_init_class_sub_p6object($class) {
 	my $init_class_sub := get_class_init_of_path(@path);
 	$init_class_sub.node($ns_block);
 
+	my $hll := @path.shift();
+	if $hll ne 'close' {
+		die("I don't know what to do about classes in a different HLL");
+	}
+
 	my $class_name := join('::', @path);
+	@path.unshift($hll);
 	my $parent_class := "";
 
 	if $class<parent> {
@@ -1531,7 +1537,8 @@ sub make_init_class_sub_p6object($class) {
 		}
 	}
 
-	my $inline_code := "\t" ~	".local pmc p6meta, cproto\n"
+	my $inline_code := "\tload_bytecode 'P6object.pbc'\n"
+		~ "\t.local pmc p6meta, cproto\n"
 		~ "\tp6meta = new 'P6metaclass'\n"
 		~ "\tcproto = p6meta.'new_class'("
 			~ "'" ~ $class_name ~ "'"
