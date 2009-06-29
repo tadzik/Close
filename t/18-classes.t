@@ -5,6 +5,7 @@ extern void plan();
 
 class C 
 	:phylum('p6object')
+
 {
 	int meth1(int x) :method
 	{
@@ -25,4 +26,6 @@ void test()
 	ok(obj.meth1(100), 200, "Method calls work");
 }
 
-void _runner() :main { test(); }
+namespace Z;
+
+void _runner() :init :load { ::test(); }

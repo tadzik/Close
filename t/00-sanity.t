@@ -1,6 +1,6 @@
 extern int print();
 
-extern void test_sanity()
+void test()
 {
     print("1..4\n");
 
@@ -13,4 +13,4 @@ extern void test_sanity()
     print("ok ", 4, " - print numbers, too\n");
 }
 
-extern void _runner() :init { test_sanity(); }
+void _runner() :init :load { test(); }

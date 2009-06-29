@@ -118,35 +118,35 @@ method long_ident($/) {
 		@parts.push(~$_);
 	}
 
-	unless +@parts {
-		die("long_ident found with no parts. How is this possible?");
-	}
-
 	# Last part is the variable/class/function name. ::part1::name
 	my $name := @parts.pop();
 	$past.name($name);
 
-	# Was the name rooted? (i.e., ::hll::part::name)
 	$past<is_rooted> := 0;
 	$past<hll> := current_hll_block().name();
-	$past.namespace(@parts);
-
-	unless +$<root> or +@parts {
-		# Unrooted, w/ no namespace: looks like "foo"
-		$past.namespace(current_namespace_block().namespace());
+	
+	if +$<root> {
+		if +@parts {
+			$past<is_rooted> := 1;
+			$past<hll> := @parts.shift();
+		}
+		# else ::foo is just a ref to hll's empty nsp
+		
+		$past.namespace(@parts);
+		$past.scope('package');
 	}
-
-	if +$<root> and +@parts {
-		# Really rooted. Get hll part.
-		$past<hll> := @parts.shift();
-		$past<is_rooted> := 1;
+	else {
+		if +@parts {
+			$past.namespace(@parts);
+			$past.scope('package');
+		}
+		else {
+			# Unrooted, w/ no namespace: looks like "foo"
+			$past.namespace(current_namespace_block().namespace());
+		}
 	}
 
 	# Look up symbol, set scope accordingly if seen.
-	if $past<is_rooted> or +@parts {
-		$past.scope('package');
-	}
-
 	my $info := symbol_defined_anywhere($past);
 
 	if $info and $info<decl> {
