@@ -1,8 +1,11 @@
 # Test class syntax
 
 extern void ok();
+extern void plan();
 
-class C {
+class C 
+	:phylum('p6object')
+{
 	int meth1(int x) :method
 	{
 		return x + x;
@@ -12,6 +15,8 @@ class C {
 
 void test()
 {
+	plan(2);
+
 	#pmc obj = new C;
 	pmc obj = C.new();
 

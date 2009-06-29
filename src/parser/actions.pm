@@ -468,49 +468,113 @@ method decl_suffix($/, $key) { PASSTHRU($/, $key); }
 #~ 	]
 #~ }
 
+our %adverb_arg_info;
+# For each adverb, check args: min #args, errormsg, max #args, errormsg.
+# If #args is below/above limit, print errormessage.
+%adverb_arg_info<anon>	:= (0,	"", 0,	":anon takes no args");
+%adverb_arg_info<init>	:= (0,	"", 0,	":init takes no args");
+%adverb_arg_info<load>	:= (0,	"", 0,	":load takes no args");
+%adverb_arg_info<main>	:= (0,	"", 0,	":main takes no args");
+%adverb_arg_info<method> := (0,	"", 0,	":method takes no args");
+%adverb_arg_info<multi>	:= (1,	"You must provide a signature for :multi(...)", 
+	1, ":multi(...) requires an unquoted signature");
+%adverb_arg_info<named> := (1,	"You must provide a name for :named(...) arguments",
+	1,	"Too many arguments for adverb :named(str)");
+%adverb_arg_info<optional> := (0,	"", 0,	":optional takes no args");
+%adverb_arg_info<opt_flag> := (0,	"", 0,	":opt_flag takes no args");
+%adverb_arg_info<phylum> := (1,	"You must provide a phylum named for :phylum(str)",
+	1, "Too many args for adverb :phylum(str)");
+%adverb_arg_info<slurpy>	:= (0,	"", 0,	":slurpy takes no args");
+%adverb_arg_info<vtable>	:= (0,	"", 1, "Too many args for adverb :vtable(str)");
+
+sub check_adverb_args($/, $adverb, $num) {
+	unless %adverb_arg_info{$adverb} {
+		$/.panic("Unknown adverb: " ~ $adverb);
+	}
+	
+	my $arg_info := %adverb_arg_info{$adverb};
+	
+	if $num < $arg_info[0] {
+		$/.panic($arg_info[1]);
+	}
+	
+	if $num > $arg_info[2] {
+		$/.panic($arg_info[3]);
+	}
+}
+
+our %adverb_aliases;
+%adverb_aliases{'...'} := 'slurpy';
+%adverb_aliases{'?'} := 'optional';
+
+our %append_adverb_to_pirflags;
+%append_adverb_to_pirflags<anon> := 1;
+%append_adverb_to_pirflags<init> := 1;
+%append_adverb_to_pirflags<load> := 1;
+%append_adverb_to_pirflags<main> := 1;
+%append_adverb_to_pirflags<method> := 1;
+%append_adverb_to_pirflags<optional> := 1;
+%append_adverb_to_pirflags<opt_flag> := 1;
+
 method adverb($/) {
 	my $decl := current_declaration();
-	my $adv  := ~$/;
+	my $adverb := ~$<t_adverb><ident>;
 
-	#say("Saw adverb -> ", $adv);
+	#say("Saw adverb -> ", $adverb);
 
-	if $adv eq '...' {
-		$adv := ':slurpy';
+	# Maybe rewrite adverb
+	if %adverb_aliases{$adverb} {
+		$adverb := %adverb_aliases{$adverb};
 	}
 
-	# Do this for all adverbs
-	$decl<adverbs>{$adv} := 1;
+	my @args := new_array();
+	
+	if $<signature> {
+		@args.push(~$<signature>[0]);
+	} 
+	else {
+		for $<args> {
+			@args.push($_.ast<value>);
+		}
+	}
 
-	if $adv eq ':anon'
-		or $adv eq ':init'
-		or $adv eq ':load'
-		or $adv eq ':main'
-		or $adv eq ':method'
-		or substr($adv, 0, 6) eq ':multi' {
-		# valid
-		$decl<pirflags> := $decl<pirflags> ~ ' ' ~ $adv;
-	}
-	elsif  $adv eq ':named' {
-		# No mechanism yet for separate name.
-		$decl.named($decl.name());
-	}
-	elsif $adv eq ':slurpy' {
-		$decl.slurpy(1);
-	}
-	elsif $adv eq ':optional'
-		or $adv eq ':opt_flag' {
-		# valid
-		$decl<pirflags> := $decl<pirflags> ~ ' ' ~ $adv;
-	}
-	elsif substr($adv, 0, 7) eq ':vtable' {
-		$decl<is_vtable> := 1;
-		$decl<pirflags> := $decl<pirflags> ~ ' ' ~ $adv;
+	if +@args {
+		$decl<adverbs>{$adverb} := @args;
 	}
 	else {
-		$/.panic("Unanticipated adverb: " ~ $adv);
+		$decl<adverbs>{$adverb} := 1;
 	}
 
-	#DUMP($decl, "current_declaration[adverb]");
+	check_adverb_args($/, $adverb, +@args);
+	
+	if %append_adverb_to_pirflags{$adverb} {
+		$decl<pirflags> := $decl<pirflags> ~ ' :' ~ $adverb;
+	}
+	elsif  $adverb eq 'named' {
+		$decl.named(@args[0]);
+	}
+	elsif $adverb eq 'phylum' {
+		$decl<phylum> := @args[0];
+	}
+	elsif $adverb eq 'slurpy' {
+		$decl.slurpy(1);
+	}
+	elsif $adverb eq 'vtable' {
+		$decl<is_vtable> := 1;
+		my $vtable_name;
+		
+		if +@args {
+			$vtable_name := @args[0];
+		}
+		else {
+			$vtable_name := $decl.name();
+		}
+		
+		$decl<pirflags> := $decl<pirflags> 
+			~ ' :' ~ $adverb ~ "('" ~ $vtable_name ~ "')";
+	}
+
+	#DUMP($decl, "current_declaration[w/ adverb]");
 }
 
 method initializer($/, $key) { PASSTHRU($/, $key); }
@@ -1274,7 +1338,7 @@ sub _find_block_of_path(@_path) {
 
 sub _get_namespaces_below($block, @results) {
 	for $block<symtable> {
-		say("Child: ", $_);
+		#say("Child: ", $_);
 		my $child := $block.symbol($_);
 
 		if $child<past> {
@@ -1352,7 +1416,7 @@ sub get_class_info_of_path(@path) {
 		$class.blocktype('declaration');
 		$class.pirflags(":init :load");
 		$class<is_class> := 1;
-		$class<phylum> := 'p6object';
+		$class<phylum> := 'close';
 		$class<init_done> := 1;
 		#DUMP($class, "class");
 	}
@@ -1416,7 +1480,7 @@ sub is_local_function($fdecl) {
 
 =head4 Class handling
 
-Classes can be part of different phylums. (Aka Meta-Object-Protocols.) These will
+Classes can be part of different phyla. (Aka Meta-Object-Protocols.) These will
 have different behaviors wrt namespace pollution, etc.
 
 =cut

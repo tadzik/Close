@@ -241,21 +241,20 @@ rule array_or_hash_decl {
 	]
 }
 
-token adverb {
-	[ ':anon'
-	| ':init'
-	| ':load'
-	| ':main'
-	| ':method'
-	| ':multi(' <.string_literal: ')' > ')'
-	#| ':multi'				# Is this legal? No, per jonathan@#parrot, 5/26/09
-	| ':named'
-	| ':optional'
-	| ':opt_flag'
-	| ':slurpy' | '...'
-	| ':vtable' | ':vtable(' <.string_literal: ')' > ')'
-	]
+rule adverb {
+	<t_adverb>		# matches ":something", with no space inside
+	[ '(' 
+		[ <args=string_lit> [ ',' <args=string_lit> ]* 
+		| <signature=string_literal: ')' >	# Support :multi(_, A)
+		]?
+	')' ]?
 	{*}
+}
+
+token t_adverb {
+	| ':' <ident> 
+	| '...'			# An alias for slurpy
+	| '?'			# An alias for optional:  func(a, b, c? = 1)
 }
 
 rule initializer {
