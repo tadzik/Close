@@ -247,6 +247,11 @@ doc2wiki:
 		sudo trac-admin "$(TRAC_PATH)" wiki import "$$wfile" "$$wfile" ; \
 	done < INDEX
 
+TARGET := pir
+node:
+	$(RM_F) src/PCT/Node.pir
+	cl --target=$(TARGET) --output=src/PCT/Node.pir src/PCT/Node.c=
+
 # Local variables:
 #   mode: makefile
 # End:
