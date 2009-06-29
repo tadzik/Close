@@ -478,8 +478,7 @@ our %adverb_arg_info;
 %adverb_arg_info<method> := (0,	"", 0,	":method takes no args");
 %adverb_arg_info<multi>	:= (1,	"You must provide a signature for :multi(...)", 
 	1, ":multi(...) requires an unquoted signature");
-%adverb_arg_info<named> := (1,	"You must provide a name for :named(...) arguments",
-	1,	"Too many arguments for adverb :named(str)");
+%adverb_arg_info<named> := (0, "",	1,	"Too many arguments for adverb :named(str)");
 %adverb_arg_info<optional> := (0,	"", 0,	":optional takes no args");
 %adverb_arg_info<opt_flag> := (0,	"", 0,	":opt_flag takes no args");
 %adverb_arg_info<phylum> := (1,	"You must provide a phylum named for :phylum(str)",
@@ -550,8 +549,17 @@ method adverb($/) {
 	if %append_adverb_to_pirflags{$adverb} {
 		$decl<pirflags> := $decl<pirflags> ~ ' :' ~ $adverb;
 	}
+	elsif $adverb eq 'multi' {
+		$decl<pirflags> := $decl<pirflags> ~ ' :' ~ $adverb
+			~ '(' ~ @args[0] ~ ')';
+	}
 	elsif  $adverb eq 'named' {
-		$decl.named(@args[0]);
+		if +@args {
+			$decl.named(@args[0]);
+		}
+		else {
+			$decl<pirflags> := $decl<pirflags> ~ ' :' ~ $adverb;
+		}
 	}
 	elsif $adverb eq 'phylum' {
 		$decl<phylum> := @args[0];

@@ -253,8 +253,8 @@ rule adverb {
 
 token t_adverb {
 	| ':' <ident> 
-	| '...'			# An alias for slurpy
-	| '?'			# An alias for optional:  func(a, b, c? = 1)
+	| $<ident>='...'	# An alias for slurpy
+	| $<ident>='?'	# An alias for optional:  func(a, b, c? = 1)
 }
 
 rule initializer {
