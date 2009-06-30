@@ -248,7 +248,7 @@ doc2wiki:
 	done < INDEX
 
 TARGET := pir
-node:
+node: build
 	$(RM_F) src/PCT/Node.pir
 	cl --target=$(TARGET) --output=src/PCT/Node.pir src/PCT/Node.c=
 

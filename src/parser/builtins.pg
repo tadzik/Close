@@ -1,50 +1,77 @@
 # Defines builtin functions/operators/terms for close.
 
 rule built_in {
-	| <builtin_concat>	{*} #= builtin_concat
-	| <builtin_isa>		{*} #= builtin_isa
-	| <builtin_isnull>	{*} #= builtin_isnull
-	| <builtin_new>	{*} #= builtin_new
-	| <builtin_null>	{*} #= builtin_null
-	| <builtin_pop>		{*} #= builtin_pop
-	| <builtin_push>	{*} #= builtin_push
-	| <builtin_shift>	{*} #= builtin_shift
-	| <builtin_unshift>	{*} #= builtin_unshift
+	[ <?before <t_builtin> >  
+	|| <.fail> 
+	]
+	
+	# This brace required because otherwise the paragraph above is
+	# considered part of the || expression below, and when <fail>
+	# happens, the ||panic kicks in.
+	[ 
+		[ <builtin_concat>	{*} #= builtin_concat
+		| <builtin_isa>	{*} #= builtin_isa
+		| <builtin_isnull>	{*} #= builtin_isnull
+		| <builtin_new>	{*} #= builtin_new
+		| <builtin_null>	{*} #= builtin_null
+		| <builtin_pop>	{*} #= builtin_pop
+		| <builtin_push>	{*} #= builtin_push
+		| <builtin_shift>	{*} #= builtin_shift
+		| <builtin_unshift>	{*} #= builtin_unshift
+		] 
+	|| <.panic: "Invalid syntax for builtin expression">
+	]
+}
+
+# Hoist the constant strings up for a quickie check of all builtins.
+token t_builtin {
+	[ 'concat'
+	| 'isa'
+	| 'isnull'
+	| 'new'
+	| 'null'
+	| 'pop'
+	| 'push'
+	| 'shift'
+	| 'unshift'
+	] 
+	>>		# End of word
+	<!before '('>	# Not a function call
 }
 
 # if ( isa x, Class ) {... }
-rule builtin_isa { <.t_isa> <obj=expression> ',' <class=expression> {*} }
-token t_isa { 'isa' >> <!before '('> }
+rule builtin_isa { 'isa' <obj=expression> ',' <class=expression> {*} }
 
 # if ( isnull x ) {...}
-rule builtin_isnull { <.t_isnull> <expression> {*} }
-token t_isnull { 'isnull' >> <!before '(' > }
+rule builtin_isnull { 'isnull' <expression> {*} }
 
 # x = new Iterator, foo
 # FIXME: Add "new expression" support.
-rule builtin_new { <.t_new> <classname=long_ident> [ ',' <args1=expression> ]? {*} }
-token t_new { 'new' >> <!before '(' > }
+rule builtin_new { 'new' <classname=long_ident> [ ',' <args1=expression> ]? {*} }
 
 # null
-token builtin_null { 'null' >> {*} }
+token builtin_null { 'null' {*} }
 
 # x = pop array;
-rule builtin_pop { <.t_pop> <arr=expression> {*} }
-token t_pop { 'pop' >> <!before '(' > }
+rule builtin_pop { 'pop' <arr=expression> {*} }
 
 # push array, x, y, z;
-rule builtin_push { <.t_push> <arr=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
-token t_push { 'push' >> <!before '(' > }
+rule builtin_push {  
+	'push'
+	[ <arr=expression>
+	|| <.panic: "First argument to built-in 'push' must be an array expression" > 
+	]
+	[ ',' <val=expression>  [ ',' <val=expression> ]* {*} 
+	|| <.panic: "Invalid number of arguments to built-in 'push': minimum is 2" > 
+	]
+}
 
 # x = shift array
-rule builtin_shift { <.t_shift> <arr=expression> {*} }
-token t_shift { 'shift' >> <!before '(' > }
+rule builtin_shift { 'shift' <arr=expression> {*} }
 
 # unshift array, x, y, z;
-rule builtin_unshift { <.t_unshift> <arr=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
-token t_unshift { 'unshift' >> <!before '(' > }
+rule builtin_unshift { 'unshift' <arr=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
 
 # x = concat s0, s1, s2, ... , sn;
-rule builtin_concat { <.t_concat> <str=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
-token t_concat { 'concat' >> <!before '(' > }
+rule builtin_concat { 'concat' <str=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
 

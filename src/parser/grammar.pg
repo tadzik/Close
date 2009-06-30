@@ -365,7 +365,7 @@ token language_element {
 	| 'lexical'
 	| 'register'
 	| 'return'
-	| 'self'
+	#| 'self' Can't be prohibited, else it were a function. 
 	| 'sub'
 	| 'tailcall'
 	| 'unless'

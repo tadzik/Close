@@ -45,7 +45,7 @@ rule arg_expr {
 	{*}
 }
 
-rule postfix_expr {
+rule postfix_expr { 
 	<primary_expr>
 	[ <postfix=postfix_xcrement>
 	| <postfix=postfix_member>
@@ -74,13 +74,13 @@ rule postfix_index {
 }
 
 rule prefix_expr {
-    | <prefix_op> <prefix_expr>         {*} #= prefix_expr
-    | <built_in>                        {*} #= built_in
-    | <postfix_expr>                    {*} #= postfix_expr
+	| <prefix_op> <prefix_expr>	{*} #= prefix_expr
+	| <built_in>				{*} #= built_in
+	| <postfix_expr>			{*} #= postfix_expr
 }
 
 token prefix_op {
-    [ '++' | '--' | '+' | '-' | '!' | 'not' >> ]
+	[ '++' | '--' | '+' | '-' | '!' | 'not' >> ]
 }
 
 # rule built_in is defined in builtins.pg
@@ -160,4 +160,3 @@ token assign_op {
 	| '<<=' | '>>=' | '&=' | '|=' | '^='
 	]
 }
-

@@ -45,6 +45,8 @@ method builtin_isa($/) {
 	# (Probably for PMCs, maybe for some kind of 'a::b' paths?)
 	$past.push($<obj>.ast);
 	$past.push($<class>.ast);
+	
+	#DUMP($past, "expr: isa");
 	make $past;
 }
 
@@ -56,7 +58,7 @@ method builtin_isnull($/) {
 		:pirop('isnull'));
 
 	$past.push($<expression>.ast);
-
+	#DUMP($past, "expr: isnull");
 	make $past;
 }
 
@@ -144,26 +146,27 @@ method builtin_shift($/) {
 }
 
 method builtin_unshift($/) {
-    my $arr := $<arr>.ast;
-    my $past := PAST::Stmts.new(
-        :name('unshift-multiple'),
-        :node($/));
+	my $arr := $<arr>.ast;
+	my $past := PAST::Stmts.new(
+		:name('unshift-multiple'),
+		:node($/));
 
-    for $<val> {
-        my $op := PAST::Op.new(
-            :name('builtin-unshift'),
-            :node($/),
-            :pasttype('inline'),
-            :inline('    unshift %0, %1'));
-        $op.push($arr, $_.ast);
-        $past.push($op);
-    }
+	for $<val> {
+		my $op := PAST::Op.new(
+			:name('builtin-unshift'),
+			:node($/),
+			:pasttype('inline'),
+			:inline('    unshift %0, %1'),
+			$arr,
+			$_.ast);
+		$past.push($op);
+	}
 
-    if +$arr == 1 {
-        $past := $past.pop();
-    }
+	if +@($past) == 1 {
+		$past := $past.pop();
+	}
 
-    #DUMP($past, "builtin-unshift");
-    make $past;
+	#DUMP($past, "builtin-unshift");
+	make $past;
 }
 

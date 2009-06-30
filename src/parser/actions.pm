@@ -199,16 +199,17 @@ method declaration($/, $key) {
 			$lstype := 'function body';
 			$decl_mode := 'local';
 
-			if $block<adverbs> && $block<adverbs><:method>
+			if $block<adverbs> && $block<adverbs><method>
 				or $block<is_vtable> {
 				# Create a 'self' lexical automatically.
 				my $auto_self := PAST::Var.new(
 					:isdecl(1),
 					:name('self'),
 					:node($/),
-					:scope('lexical'),
-					:viviself( PAST::Var.new(:name('self'), :scope('register')) ));
-				$block[0].push($auto_self);
+					:scope('register'));
+				add_local_symbol($auto_self);
+				# Don't lexify it. Just remember that it was declared.
+				#$block[0].push($auto_self);
 			}
 		}
 		elsif $block<is_class> {
@@ -445,12 +446,10 @@ method declarator($/) {
 	$decl.name($symbol.name());
 	$decl.namespace($symbol.namespace());
 
-
+	# FIXME: I think this is wrong for pkg vars. Test?
 	unless $decl<is_class> {
-		#say("Saw declarator for ", $decl.name());
-		# This is wrong if name is rooted, etc.
-		my $scope			:= current_lexical_scope();
-		$scope.symbol($decl.name(), :decl($decl));
+		# say("Saw declarator for ", $decl.name());
+		add_local_symbol($decl);
 	}
 
 	make $decl;
@@ -554,12 +553,13 @@ method adverb($/) {
 			~ '(' ~ @args[0] ~ ')';
 	}
 	elsif  $adverb eq 'named' {
+		my $named := $decl.name();
+		
 		if +@args {
-			$decl.named(@args[0]);
+			$named := @args[0];
 		}
-		else {
-			$decl<pirflags> := $decl<pirflags> ~ ' :' ~ $adverb;
-		}
+		
+		$decl.named($named);
 	}
 	elsif $adverb eq 'phylum' {
 		$decl<phylum> := @args[0];
@@ -956,6 +956,12 @@ sub get_default_storage_spec() {
 	return %default_storage_spec{$mode};
 }
 
+our %valid_decl_mode;
+%valid_decl_mode<class> := 1;
+%valid_decl_mode<extern> := 1;
+%valid_decl_mode<local> := 1;
+%valid_decl_mode<parameter> := 1;
+
 sub open_decl_mode($mode) {
 	our @Decl_mode_stack;
 
@@ -963,11 +969,8 @@ sub open_decl_mode($mode) {
 		@Decl_mode_stack := new_array();
 	}
 
-	if $mode ne 'class'
-		and $mode ne 'extern'
-		and $mode ne 'local'
-		and $mode ne 'parameter' {
-		die("Invalid decl mode: " ~ $mode);
+	unless %valid_decl_mode{$mode} {
+		die("Invalid decl_mode: " ~ $mode);
 	}
 
 	@Decl_mode_stack.unshift($mode);
@@ -977,7 +980,15 @@ sub open_decl_mode($mode) {
 	return $mode;
 }
 
-### Track what object is being declared.
+##################################################################
+
+=head4 Declaration tracking
+
+There is a stack used to track the symbol currently being declared. This is needed for
+nested declarations -- functions within classes, complex parameters inside a 
+function parameter list.
+
+=cut 
 
 sub close_declaration() {
 	our @Declaration_stack;
@@ -1519,7 +1530,7 @@ sub add_class_attribute($attr) {
 
 # A class has been declared. So what?
 sub add_class_decl($class) {
-	if $class<phylum> eq 'p6object' {
+	if $class<phylum> eq 'P6object' {
 		add_class_decl_p6object($class);
 	}
 	else {
@@ -1563,7 +1574,7 @@ sub add_class_init_code($class) {
 sub make_init_class_sub($class) {
 	my $init_class_sub;
 
-	if $class<phylum> eq 'p6object' {
+	if $class<phylum> eq 'P6object' {
 		$init_class_sub := make_init_class_sub_p6object($class);
 	}
 	else {
@@ -1582,9 +1593,9 @@ sub make_init_class_sub_p6object($class) {
 	$init_class_sub.node($ns_block);
 
 	my $hll := @path.shift();
-	if $hll ne 'close' {
-		die("I don't know what to do about classes in a different HLL");
-	}
+	#if $hll ne 'close' {
+	#	die("I don't know what to do about classes in a different HLL");
+	#}
 
 	my $class_name := join('::', @path);
 	@path.unshift($hll);

@@ -9,66 +9,70 @@ class PCT::Node
 	pmc init(pmc children ..., pmc adverbs ... :named)
 		:method
 	{
-		foreach (pmc child : children) {
+		foreach (pmc child: children) {
 			push self, child;
 		}
 
-		pmc value;
-		pmc key;
-		pmc iter = new Iterator, adverbs;
-
-		while (iter) {
-			key = shift iter;
-			value = iter[key];
-			# Does this work?
-			self.(find_method self, key)(value);
-			asm {{
-				$P0 = find_method self, key
-				self.$P0(value);
+		pmc meth;
+		foreach (pmc adverb: adverbs) {
+			#meth = find_method self, adverb;
+			meth = asm(self, adverb) {{
+				$S0 = %1
+				%r = find_method %0, $S0
 			}};
+			
+			unless (isnull meth) {
+				asm(self, meth, adverbs[adverb]) {{
+					$P0 = %1
+					%0.$P0(%2)
+				}};
+			}
 		}
-
+		
 		return self;
 	}
-
-	pmc new(pmc children ..., pmc adverbs ... :named)
+	
+	#pmc new(pmc children ..., pmc adverbs ... :named)
+	#	:method
+	#{
+	#	pmc obj = new self.HOW().parrotclass;
+	#	obj.init(children :flat, adverbs :flat :named);
+	#	return obj;
+	#}
+	
+	pmc clone() 
 		:method
 	{
-		pmc obj = new self.HOW().parrotclass;
-		obj.init(children :flat, adverbs :flat :named);
-		return obj;
+	#	return clone self;
+		return asm(self) {{ %r = clone %0 }};
 	}
-
-	pmc clone()
-		:method()
-	{
-		return clone self;
-	}
-
-	void unshift(pmc value)
+	
+	pmc unshift(pmc value)
 		:method
 	{
 		unshift self, value;
+		return self;
 	}
-
+	
 	pmc shift()
 		:method
 	{
 		return shift self;
 	}
 
-	void push(pmc value)
+	pmc push(pmc value)
 		:method
 	{
 		push self, value;
+		return self;
 	}
-
+	
 	pmc pop()
 		:method
 	{
 		return pop self;
 	}
-
+	
 	pmc iterator()
 		:method
 	{
@@ -76,7 +80,7 @@ class PCT::Node
 		iter = 0;
 		return iter;
 	}
-
+	
 	void node(pmc node)
 		:method
 	{
@@ -94,42 +98,50 @@ class PCT::Node
 			}
 		}
 	}
-
+	
 	pmc name(pmc value :optional)
 		:method
 	{
-		tailcall self.attr('name', value, has_value);
-	}
-
-	pmc attr(str attrname, pmc value, int has_value, pmc default = new Undef)
-		:method
-	{
-		if (has_value) {
-			return self[attrname] = value;
-		}
-		else {
-			value = self[attrname];
-			return value == null ? default : value;
-		}
-	}
-
-	str unique(str fmt = '')
-		:method
-	{
-		return concat fmt, serno++;
-	}
-
-	int isa(pmc type)
-		:method
-	{
- 		return self.HOW().isa(self, type);
- 	}
-
-	int get_bool()
-		:method
-		:vtable('get_bool')
-	{
-		# Maybe: asm {{ .return (1) }};
-		return 1;
+		#tailcall
+		self.attr('name', value, has_value);
 	}
 }
+#~
+#~	pmc name(pmc value :optional)
+#~		:method
+#~	{
+#~		tailcall self.attr('name', value, has_value);
+#~	}
+#~
+#~	pmc attr(str attrname, pmc value, int has_value, pmc default = new Undef)
+#~		:method
+#~	{
+#~		if (has_value) {
+#~			return self[attrname] = value;
+#~		}
+#~		else {
+#~			value = self[attrname];
+#~			return value == null ? default : value;
+#~		}
+#~	}
+#~
+#~	str unique(str fmt = '')
+#~		:method
+#~	{
+#~		return concat fmt, serno++;
+#~	}
+#~
+#~	int isa(pmc type)
+#~		:method
+#~	{
+#~ 		return self.HOW().isa(self, type);
+#~ 	}
+#~
+#~	int get_bool()
+#~		:method
+#~		:vtable('get_bool')
+#~	{
+#~		# Maybe: asm {{ .return (1) }};
+#~		return 1;
+#~	}
+#~}
