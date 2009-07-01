@@ -108,6 +108,18 @@ method builtin_null($/) {
 	make $past;
 }
 
+method builtin_pop($/) {
+	my $past := PAST::Op.new(
+		:name('builtin-pop'),
+		:node($/),
+		:pasttype('inline'),
+		:inline('    %r = pop %0'));
+	$past.push($<arr>.ast);
+
+	#DUMP($past, "builtin-pop");
+	make $past;
+}
+
 method builtin_push($/) {
 	my $past := PAST::Op.new(
 		:name('builtin-push'),

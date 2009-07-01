@@ -4,7 +4,7 @@ extern void ok();
 extern void plan();
 
 class C 
-	:phylum('p6object')
+	:phylum('P6object')
 
 {
 	int meth1(int x) :method

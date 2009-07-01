@@ -47,6 +47,17 @@ rule conditional_stmt {
 	{*}
 }
 
+rule jump_stmt {
+	[ 'goto' <label=bareword>
+		[ ';' || <panic: "Missing ';' at end of goto statement" > ]
+		{*}	#= goto
+	| 'return' <retval=expression>? ';'   {*} #= return
+	| 'tailcall' <retval=expression> ';'  {*} #= tailcall
+	# | continue [ <loop> ]? ';'         {*} #= continue
+	# | break [ <loop> ]? ';'             {*} #= break
+	]
+}
+
 rule labeled_stmt {
 	| [ <label> ]+
 		[ <statement>		{*} #= label
@@ -106,13 +117,3 @@ rule while_do_stmt {
 	{*}
 }
 
-rule jump_stmt {
-	[ 'goto' <label=bareword>
-		[ ';' || <panic: "Missing ';' at end of goto statement" > ]
-		{*}	#= goto
-	| 'return' <retval=expression>? ';'   {*} #= return
-	| 'tailcall' <retval=expression> ';'  {*} #= tailcall
-	# | continue [ <loop> ]? ';'         {*} #= continue
-	# | break [ <loop> ]? ';'             {*} #= break
-	]
-}
