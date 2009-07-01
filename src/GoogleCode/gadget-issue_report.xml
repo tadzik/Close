@@ -15,7 +15,7 @@
 	<UserPref
 		name		= "page_query"
 		display_name	= "Page to Fetch"
-		default_value	= "issues/list?can=2&q=Milestone%3AWishList+OR+Priority%3ALow&colspec=ID+Summary&cells=tiles"
+		default_value	= "issues/list?can=2&amp;q=Milestone%3AWishList+OR+Priority%3ALow&colspec=ID+Summary&amp;cells=tiles"
 		required	= "true"
 		/>
 	<Content
