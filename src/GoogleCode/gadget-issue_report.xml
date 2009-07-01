@@ -43,7 +43,7 @@
 	function response_callback(obj) {
 		var response_data = obj.data;
 		var report_text = response_data.getElementById("colcontrol");
-		document.getElementById('content_GCIQ').innerHTML = report_text;
+		document.getElementById('content_GCIQ').appendChild(report_text);
 	}
 
 	gadgets.util.registerOnLoadHandler(fetch_query_page);
