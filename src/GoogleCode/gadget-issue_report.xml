@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Module>
+	<ModulePrefs
+		author		= "Austin Hastings" 
+		author_email	= "Austin_Hastings@yahoo.com" 
+		title		= "GoogleCode Issue Query" 
+		/> 
+	<UserPref
+		name		= "project_url"
+		display_name	= "GoogleCode Project URL"
+		default_value	= "http://code.google.com/p/close"
+		required	= "true"
+		/>
+	<Content
+		type="html">
+		<![CDATA[ 
+<div id="content_div"></div>
+<script type="text/javascript">
+	// Fetch the query:
+	function fetch_query_page() {
+		var params = {};
+		params[gadgets.io.RequestParameters.CONTENT_TYPE]
+			= gadgets.io.ContentType.TEXT;  
+		
+		//var url = "http://code.google.com/p/close/etc.";
+		var url = "http://code.google.com/p/close/issues/list?can=2&q=Milestone%3AWishList+OR+Priority%3ALow&colspec=ID+Summary&cells=tiles";
+		gadgets.io.makeRequest(url, response_callback, params);
+	}
+
+	function response_callback(obj) {
+		var response_data = obj.data;
+		var report_text = response_data.getElementById("colcontrol");
+		document.getElementById('content_div').innerHTML = report_text;
+	}
+
+	gadgets.util.registerOnLoadHandler(fetch_query_page);
+
+</script>
+		]]> 
+	</Content>
+</Module>

@@ -5,6 +5,112 @@ hll parrot;
 class Test 
 	:phylum(P6object)
 {
+	pmc init(pmc children ..., pmc adverbs ... :named)
+		:method
+	{
+		foreach (pmc child: children) {
+			push self, child;
+		}
+
+		pmc meth;
+		foreach (pmc adverb: adverbs) {
+			#meth = find_method self, adverb;
+			meth = asm(self, adverb) {{
+				$S0 = %1
+				%r = find_method %0, $S0
+			}};
+			
+			unless (isnull meth) {
+				asm(self, meth, adverbs[adverb]) {{
+					$P0 = %1
+					%0.$P0(%2)
+				}};
+			}
+		}
+		
+		return self;
+	}
+	
+	pmc new(pmc children ..., pmc adverbs ... :named)
+		:method
+	{
+		pmc obj = obj.HOW().parrotclass;
+	}
+	#pmc new(pmc children ..., pmc adverbs ... :named)
+	#	:method
+	#{
+	#	pmc obj = new self.HOW().parrotclass;
+	#	obj.init(children :flat, adverbs :flat :named);
+	#	return obj;
+	#}
+	
+	pmc clone() 
+		:method
+	{
+	#	return clone self;
+		return asm(self) {{ %r = clone %0 }};
+	}
+	
+	pmc unshift(pmc value)
+		:method
+	{
+		unshift self, value;
+		return self;
+	}
+	
+	pmc shift()
+		:method
+	{
+		return shift self;
+	}
+
+	pmc push(pmc value)
+		:method
+	{
+		push self, value;
+		return self;
+	}
+	
+	pmc pop()
+		:method
+	{
+		return pop self;
+	}
+	
+	pmc iterator()
+		:method
+	{
+		pmc iter = new Iterator, self.list();
+		iter = 0;
+		return iter;
+	}
+	
+	# FIXME: 'isa' still not working right.
+	void node(pmc node)
+		:method
+	{
+	#	if (node) {
+	#		if (isa node, PCT::Node) {
+	#			self.source = node.source;
+	#			self.pos = node.pos;
+	#		}
+	#		else if (isa node, PGE::Match) {
+	#			self.source = node.'$.target';
+	#			self.pos = node.from();
+	#		}
+	#		else {
+	#			die(concat "Don't know how to save info from node of type ", typeof node);
+	#		}
+	#	}
+	}
+	
+	# FIXME: Need a good syntax for optionals
+	#pmc name(pmc value :optional)
+	#	:method
+	#{
+	#	#tailcall
+	#	self.attr('name', value, has_value);
+	#}
 	pmc name(pmc value = null)
 		:method
 	{
