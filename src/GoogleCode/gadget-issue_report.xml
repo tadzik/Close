@@ -3,6 +3,7 @@
 	<ModulePrefs
 		author		= "Austin Hastings" 
 		author_email	= "Austin_Hastings@yahoo.com" 
+		scrolling	= "true"
 		title		= "GoogleCode Issue Query" 
 		/> 
 	<UserPref
@@ -11,11 +12,20 @@
 		default_value	= "http://code.google.com/p/close"
 		required	= "true"
 		/>
+	<UserPref
+		name		= "page_query"
+		display_name	= "Page to Fetch"
+		default_value	= "issues/list?can=2&q=Milestone%3AWishList+OR+Priority%3ALow&colspec=ID+Summary&cells=tiles"
+		required	= "true"
+		/>
 	<Content
-		type="html">
+		type="html"
+		>
 		<![CDATA[ 
-<div id="content_div"></div>
+<div id="content_GCIQ"></div>
 <script type="text/javascript">
+	// Get the prefs
+	var Prefs = new gadgets.Prefs();
 	// Fetch the query:
 	function fetch_query_page() {
 		var params = {};
@@ -23,18 +33,20 @@
 			= gadgets.io.ContentType.TEXT;  
 		
 		//var url = "http://code.google.com/p/close/etc.";
-		var url = "http://code.google.com/p/close/issues/list?can=2&q=Milestone%3AWishList+OR+Priority%3ALow&colspec=ID+Summary&cells=tiles";
+		var url = Prefs.getString("project_url")
+			+ "/"
+			+ Prefs.getString("page_query");
+
 		gadgets.io.makeRequest(url, response_callback, params);
 	}
 
 	function response_callback(obj) {
 		var response_data = obj.data;
 		var report_text = response_data.getElementById("colcontrol");
-		document.getElementById('content_div').innerHTML = report_text;
+		document.getElementById('content_GCIQ').innerHTML = report_text;
 	}
 
 	gadgets.util.registerOnLoadHandler(fetch_query_page);
-
 </script>
 		]]> 
 	</Content>
