@@ -22,7 +22,7 @@
 		type="html"
 		>
 		<![CDATA[ 
-<div id="content_GCIQ"></div>
+<div id="content_GCIQ">Content goes here.</div>
 <script type="text/javascript">
 	// Get the prefs
 	var Prefs = new gadgets.Prefs();
