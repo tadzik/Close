@@ -1,5 +1,94 @@
 # Defines builtin functions/operators/terms for close.
 
+=head3 Builtin Functions
+
+One objective of Close is to enable programming in PIR without having to program
+in PIR. One logical conclusion from this is that PIR ops that are not replaced by 
+Close syntactic elements should be available somehow. And generally, that somehow
+probably should I<not> require an in-line assembly block.
+
+The PIR opcodes fall into four categories. The first category, and easiest to
+understand, is those opcodes that are superseded by the syntax of Close. This 
+category includes the C<if> and C<unless> opcodes, plus the mathematical ops
+that have syntax equivalents -- +, *, >>, etc. 
+
+=over 4
+
+=item * Ops replaced by syntax:
+
+C<add>,		C<and>,		C<assign>,		C<band>,	
+C<bands>,		C<bnot>,		C<bnots>,		C<bor>,
+C<bors>,		C<box>,		C<branch>,		C<bsr>,
+C<bxor>,		C<bxors>,		C<callmethod>,	C<callmethodcc>,
+C<class>,		C<cmod>,		C<cmp>,		C<cmp_num>,
+C<cmp_pmc>,	C<cmp_str>,		C<dec>,		C<div>,
+C<eq>,		C<eq_num>,		C<eq_str>,		C<find_lex>,		
+C<ge>,		C<ge_num>,		C<ge_str>,		C<get_params>,		
+C<get_results>,	C<getattribute>,	C<gt>,		C<gt_num>,		
+C<gt_str>,		C<if>,			C<if_null>,		C<inc>,		
+C<invokecc>,		C<iseq>,		C<isge>,		C<isgt>,		
+C<isle>,		C<islt>,		C<isne>,		C<iter>,		
+C<jsr>,		C<jump>,		C<le>,			C<le_num>,		
+C<le_str>,		C<local_branch>,	C<local_return>,	C<lt>,		
+C<lt_num>,		C<lt_str>,		C<mod>,		C<mul>,		
+C<ne>,		C<ne_num>,		C<ne_str>,		C<neg>,		
+C<newclass>,		C<not>,		C<or>,		C<set>,		
+C<set_args>,		C<set_returns>,	C<shl>,		C<shr>,
+C<store_lex>,	C<sub>,		C<tailcall>,		C<tailcallmethod>,		
+C<unless>,		C<unless_null>,	C<xor>
+
+=back
+
+The next category of ops are those which you don't need. I admit that I don't know
+exactly what your circumstance is, but I'm making the decision anyway. If there 
+is a C<HALT-AND-CATCH-FIRE> opcode, you don't need easy access to it from Close. 
+(Write an C<asm> block if you want to run it.)
+
+=over 4
+
+=item * Ops which you don't need:
+
+C<check_events__>,	C<cpu_ret>,			C<pic_callr__>,
+C<pic_get_params__>,	C<pic_infix__>,		C<pic_inline_sub__>,
+C<pic_set_returns__>,	C<prederef__>,		C<reserved>,
+C<seti_ind>,			C<setn_ind>,			C<setp_ind>,
+C<sets_ind>,			C<wrapper__>
+
+=back
+
+The third category of ops are those which I<have> been made into built-in 
+functions. (This is the good stuff.)
+
+=over 4
+
+=item * Ops available as built-in functions:
+
+C<clone>,		C<concat>,		C<isa>,
+C<isnull>,		C<new>,		C<new>,
+C<null>,		C<pop>,		C<push>,
+C<shift>,		C<unshift>,
+
+=back
+
+=cut
+
+# Hoist the constant strings up for a quickie check of all builtins.
+token t_builtin {
+	[ 'clone'
+	| 'concat'
+	| 'isa'
+	| 'isnull'
+	| 'new'
+	| 'null'
+	| 'pop'
+	| 'push'
+	| 'shift'
+	| 'unshift'
+	] 
+	>>		# End of word
+	<!before '('>	# Not a function call
+}
+
 rule built_in {
 	[ <?before <t_builtin> >  
 	|| <.fail> 
@@ -9,7 +98,8 @@ rule built_in {
 	# considered part of the || expression below, and when <fail>
 	# happens, the ||panic kicks in.
 	[ 
-		[ <builtin_concat>	{*} #= builtin_concat
+		[ <builtin_clone>	{*} #= builtin_clone
+		| <builtin_concat>	{*} #= builtin_concat
 		| <builtin_isa>	{*} #= builtin_isa
 		| <builtin_isnull>	{*} #= builtin_isnull
 		| <builtin_new>	{*} #= builtin_new
@@ -23,21 +113,106 @@ rule built_in {
 	]
 }
 
-# Hoist the constant strings up for a quickie check of all builtins.
-token t_builtin {
-	[ 'concat'
-	| 'isa'
-	| 'isnull'
-	| 'new'
-	| 'null'
-	| 'pop'
-	| 'push'
-	| 'shift'
-	| 'unshift'
-	] 
-	>>		# End of word
-	<!before '('>	# Not a function call
-}
+=begin
+
+And finally, there are those ops that have I<not> been made into built-in 
+functions. At least, not yet. These are ops that maybe should become 
+built-ins, but nobody has wanted them bad enough. If you want to push one
+across the bridge, feel free!
+
+=over 4
+
+=item * Ops not available as built-ins, yet.
+
+C<abs>,		C<acos>,		C<add_multi>,		
+C<addattribute>,	C<addhandler>,	C<addmethod>,		
+C<addparent>,	C<addrole>,		C<annotations>,		
+C<asec>,		C<asin>,		C<atan>,		
+C<bounds>,		C<bytelength>,	C<can>,		
+C<capture_lex>,	C<ceil>,		C<charset>,		
+C<charsetname>,	C<check_events>,	C<chopn>,		
+C<chr>,		C<class>,		C<clone>,		
+C<close>,		C<cmod>,		C<cmp>,		
+C<cmp_num>,	C<cmp_pmc>,	C<cmp_str>,		
+C<compose>,		C<compreg>,		C<concat>,		
+C<copy>,		C<cos>,		C<cosh>,		
+C<count_eh>,	C<debug>,		C<debug_break>,		
+C<debug_init>,	C<debug_load>,	C<debug_print>,		
+C<decodelocaltime>, C<decodetime>,	C<defined>,		
+C<delete>,		C<delprop>,		C<deref>,		
+C<die>,		C<dlfunc>,		C<dlvar>,		
+C<does>,		C<downcase>,	C<elements>,		
+C<encoding>,	C<encodingname>,	C<eq_addr>,		
+C<eq_num>,		C<eq_str>,		C<err>,		
+C<errorsoff>,		C<errorson>,		C<escape>,		
+C<exchange>,	C<exists>,		C<exit>,		
+C<exp>,		C<fact>,		C<fdiv>,		
+C<fdopen>,		C<find_caller_lex>,	C<find_cclass>,		
+C<find_charset>,	C<find_encoding>,	C<find_lex>,		
+C<find_method>,	C<find_multi>,	C<find_name>,		
+C<find_not_cclass>,	C<find_sub_not_null>, C<floor>,		
+C<freeze>,		C<gc_debug>,	C<gcd>,		
+C<ge_num>,		C<ge_str>,		C<get_addr>,		
+C<get_class>,	C<get_global>,	C<get_hll_global>,		
+C<get_hll_namespace>, C<get_namespace>, C<get_params>,		
+C<get_repr>,		C<get_results>,	C<get_root_global>,		
+C<get_root_namespace>, C<getattribute>, C<getfile>,		
+C<getinterp>,	C<getline>,		C<getprop>,		
+C<getstderr>,	C<getstdin>,		C<getstdout>,		
+C<gmtime>,		C<gt_num>,		C<gt_str>,		
+C<index>,		C<inspect>,		C<interpinfo>,		
+C<invoke>,		C<invokecc>,		C<is_cclass>,		
+C<isa>,		C<isfalse>,		
+C<isntsame>,		C<isnull>,		C<issame>,		
+C<istrue>,		C<iter>,		C<join>,		
+C<lcm>,		C<le_num>,		C<le_str>,		
+C<length>,		C<ln>,			C<load_bytecode>,		
+C<load_language>,	C<loadlib>,		C<local_branch>,		
+C<local_return>,	C<localtime>,	C<lsr>,		
+C<lt_num>,		C<lt_str>,		
+C<morph>,		C<ne_addr>,		C<ne_num>,		
+C<ne_str>,		C<needs_destroy>,	C<new>,		
+C<new_callback>,	C<newclass>,		C<newclosure>,		
+C<open>,		C<ord>,		C<peek>,		
+C<pin>,		C<pop>,		C<pop_eh>,		
+C<popmark>,	C<pow>,		C<print>,		
+C<printerr>,		C<profile>,		C<prophash>,		
+C<push>,		C<push_eh>,		C<pushaction>,		
+C<pushmark>,	C<read>,		C<readline>,		
+C<register>,		C<removeattribute>, C<removeparent>,		
+C<repeat>,		C<reserved>,		C<result_info>,		
+C<rethrow>,		C<root_new>,	C<rot>,		
+C<runinterp>,	C<say>,		C<schedule>,		
+C<sec>,		C<sech>,		C<seek>,		
+C<set>,		C<set_addr>,		C<set_args>,		
+C<set_global>,	C<set_hll_global>,	C<set_returns>,		
+C<set_root_global>,	C<setattribute>,	C<seti_ind>,		
+C<setn_ind>,		C<setp_ind>,		C<setprop>,		
+C<setref>,		C<sets_ind>,		C<setstderr>,		
+C<setstdin>,		C<setstdout>,	C<shift>,		
+C<sin>,		C<sinh>,		C<sizeof>,		
+C<sleep>,		C<spawnw>,		C<splice>,		
+C<split>,		C<sprintf>,		C<sqrt>,		
+C<stat>,		C<store_lex>,	C<stringinfo>,		
+C<sub>,		C<subclass>,		C<substr>,		
+C<sweep>,		C<sysinfo>,		C<tailcall>,		
+C<tailcallmethod>,	C<tan>,		C<tanh>,		
+C<tell>,		C<thaw>,		C<throw>,		
+C<time>,		C<titlecase>,		C<trace>,		
+C<trans_charset>,	C<trans_encoding>,	C<typeof>,		
+C<unless_null>,	C<unpin>,		C<unregister>,		
+C<upcase>,		C<warningsoff>,	C<warningson>,		
+C<xor>,		
+
+=back
+
+=cut
+
+# x = clone y;
+rule builtin_clone { 'clone' <obj=expression> {*} }
+
+# x = concat s0, s1, s2, ... , sn;
+rule builtin_concat { 'concat' <str=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
 
 # if ( isa x, Class ) {... }
 rule builtin_isa { 'isa' <obj=expression> ',' <class=expression> {*} }
@@ -71,7 +246,4 @@ rule builtin_shift { 'shift' <arr=expression> {*} }
 
 # unshift array, x, y, z;
 rule builtin_unshift { 'unshift' <arr=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
-
-# x = concat s0, s1, s2, ... , sn;
-rule builtin_concat { 'concat' <str=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
 

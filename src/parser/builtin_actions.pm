@@ -2,6 +2,17 @@
 
 method built_in($/, $key)                { PASSTHRU($/, $key); }
 
+method builtin_clone($/) {
+	my $past := PAST::Op.new(
+		:name('clone'),
+		:node($/),
+		:pasttype('inline'),
+		:inline('    %r = clone %0'));
+	$past.push($<obj>.ast);
+	#DUMP($past, "builtin_clone");
+	make $past;
+}
+
 method builtin_concat($/) {
 	my $past := PAST::Op.new(
 		:name('concat'),
