@@ -471,6 +471,8 @@ our %adverb_arg_info;
 # For each adverb, check args: min #args, errormsg, max #args, errormsg.
 # If #args is below/above limit, print errormessage.
 %adverb_arg_info<anon>	:= (0,	"", 0,	":anon takes no args");
+%adverb_arg_info<extends> := (1,	"'extends' requires at least one parent class",
+	256,	"cannot specify more than 256 parent classes");
 %adverb_arg_info<init>	:= (0,	"", 0,	":init takes no args");
 %adverb_arg_info<load>	:= (0,	"", 0,	":load takes no args");
 %adverb_arg_info<main>	:= (0,	"", 0,	":main takes no args");
@@ -504,6 +506,7 @@ sub check_adverb_args($/, $adverb, $num) {
 our %adverb_aliases;
 %adverb_aliases{'...'} := 'slurpy';
 %adverb_aliases{'?'} := 'optional';
+#%adverb_aliases{'extends'} := 'parent';
 
 our %append_adverb_to_pirflags;
 %append_adverb_to_pirflags<anon> := 1;
@@ -514,74 +517,130 @@ our %append_adverb_to_pirflags;
 %append_adverb_to_pirflags<optional> := 1;
 %append_adverb_to_pirflags<opt_flag> := 1;
 
+sub adverb_extends($/, $decl, @args) {
+	if $decl<is_class> {
+		unless $decl<adverbs><extends> {
+			$decl<adverbs><extends> := new_array();
+		}
+		
+		for @args {
+			$decl<adverbs><extends>.push($_);
+		}
+	}
+	else {
+		$/.panic("Cannot extend non-class declaration.");
+	}
+}
+
+sub adverb_multi($/, $decl, @args) {
+	$decl<pirflags> := $decl<pirflags> ~ ' :multi(' ~ $decl<adverbs><multi> ~ ')';
+}
+
+sub adverb_named($/, $decl, @args) {
+	my $named;
+	
+	if +@args {
+		$named := @args[0];
+	}
+	else {
+		$named := $decl.name();
+	}
+	
+	$decl.named($named);
+}
+
+sub adverb_vtable($/, $decl, @args) {
+	$decl<is_vtable> := 1;
+
+	my $vtable_name;
+	
+	if +@args {
+		$vtable_name := @args[0];
+	}
+	else {
+		$vtable_name := $decl.name();
+	}
+
+	$decl<adverbs><vtable> := $vtable_name;
+	$decl<pirflags> := $decl<pirflags> ~ ' :vtable(' ~ $vtable_name ~ ')';
+}
+
 method adverb($/) {
-	my $decl := current_declaration();
-	my $adverb := ~$<t_adverb><ident>;
-
-	#say("Saw adverb -> ", $adverb);
-
-	# Maybe rewrite adverb
+	# What adverb are we seeing?
+	my $adverb;
+	
+	if $<extends> {
+		$adverb := ~$<extends>;
+	}
+	else {
+		$adverb := ~$<t_adverb><ident>;
+	}
+	
+	# Is this an alias for a different adverb?
 	if %adverb_aliases{$adverb} {
 		$adverb := %adverb_aliases{$adverb};
 	}
 
+	# What, if any, args were given?
 	my @args := new_array();
 	
 	if $<signature> {
 		@args.push(~$<signature>[0]);
-	} 
+	}
 	else {
+		# FIXME: For args that are strings, just attach the value,
+		# but class names get the node. This needs cleaning up.
 		for $<args> {
-			@args.push($_.ast<value>);
+			if $_.ast.isa(PAST::Value) {
+				@args.push($_.ast<value>);
+			}
+			else {
+				@args.push($_.ast);
+			}
 		}
 	}
-
-	if +@args {
+	
+	# Is the adverb+args valid?
+	check_adverb_args($/, $adverb, +@args);
+	
+	my $decl := current_declaration();
+	
+	# Is there a special handler? Can't use sub refs yet.
+	if +@args eq 1 {
+		$decl<adverbs>{$adverb} := @args[0];
+	}
+	elsif +@args {
 		$decl<adverbs>{$adverb} := @args;
 	}
 	else {
 		$decl<adverbs>{$adverb} := 1;
 	}
-
-	check_adverb_args($/, $adverb, +@args);
 	
-	if %append_adverb_to_pirflags{$adverb} {
-		$decl<pirflags> := $decl<pirflags> ~ ' :' ~ $adverb;
+	if $adverb eq 'extends' {
+		adverb_extends($/, $decl, @args);
 	}
 	elsif $adverb eq 'multi' {
-		$decl<pirflags> := $decl<pirflags> ~ ' :' ~ $adverb
-			~ '(' ~ @args[0] ~ ')';
+		adverb_multi($/, $decl, @args);
 	}
-	elsif  $adverb eq 'named' {
-		my $named := $decl.name();
-		
-		if +@args {
-			$named := @args[0];
-		}
-		
-		$decl.named($named);
-	}
-	elsif $adverb eq 'phylum' {
-		$decl<phylum> := @args[0];
+	elsif $adverb eq 'named' {
+		adverb_named($/, $decl, @args);
 	}
 	elsif $adverb eq 'slurpy' {
 		$decl.slurpy(1);
 	}
 	elsif $adverb eq 'vtable' {
-		$decl<is_vtable> := 1;
-		my $vtable_name;
-		
-		if +@args {
-			$vtable_name := @args[0];
-		}
-		else {
-			$vtable_name := $decl.name();
-		}
-		
-		$decl<pirflags> := $decl<pirflags> 
-			~ ' :' ~ $adverb ~ "('" ~ $vtable_name ~ "')";
+		adverb_vtable($/, $decl, @args);
 	}
-
+	elsif %append_adverb_to_pirflags{$adverb} {
+		$decl<pirflags> := $decl<pirflags> ~ ' :' ~ $adverb;
+	}
+	elsif %adverb_arg_info{$adverb} {
+		# Nothing here. But if it's in the table, it's not bogus.
+	}
+	else {
+		die("Unsupported/unexpected adverb '" ~ $adverb ~ "'");
+	}
+	
 	#DUMP($decl, "current_declaration[w/ adverb]");
 }
 
@@ -1435,7 +1494,7 @@ sub get_class_info_of_path(@path) {
 		$class.blocktype('declaration');
 		$class.pirflags(":init :load");
 		$class<is_class> := 1;
-		$class<phylum> := 'close';
+		$class<adverbs><phylum> := 'close';
 		$class<init_done> := 1;
 		#DUMP($class, "class");
 	}
@@ -1530,11 +1589,11 @@ sub add_class_attribute($attr) {
 
 # A class has been declared. So what?
 sub add_class_decl($class) {
-	if $class<phylum> eq 'P6object' {
+	if $class<adverbs><phylum> eq 'P6object' {
 		add_class_decl_p6object($class);
 	}
 	else {
-		die("Unrecognized phylum '" ~ $class<phylum>
+		die("Unrecognized phylum '" ~ $class<adverbs><phylum>
 			~ "' for class '" ~ $class.name() ~ "'");
 	}
 }
@@ -1574,11 +1633,11 @@ sub add_class_init_code($class) {
 sub make_init_class_sub($class) {
 	my $init_class_sub;
 
-	if $class<phylum> eq 'P6object' {
+	if $class<adverbs><phylum> eq 'P6object' {
 		$init_class_sub := make_init_class_sub_p6object($class);
 	}
 	else {
-		die("Unrecognized phylum '" ~ $class<phylum>
+		die("Unrecognized phylum '" ~ $class<adverbs><phylum>
 			~ "' for class '" ~ $class.name() ~ "'");
 	}
 
@@ -1593,16 +1652,22 @@ sub make_init_class_sub_p6object($class) {
 	$init_class_sub.node($ns_block);
 
 	my $hll := @path.shift();
-	#if $hll ne 'close' {
-	#	die("I don't know what to do about classes in a different HLL");
-	#}
-
 	my $class_name := join('::', @path);
 	@path.unshift($hll);
 	my $parent_class := "";
 
-	if $class<parent> {
-		$parent_class := ", 'parent' => '" ~ $class<parent> ~ "'";
+	if $class<adverbs><extends> {
+		my $parent := $class<adverbs><extends>[0];
+		my $nsp	:= clone_array($parent.namespace());
+		$nsp.push($parent.name());
+		my $class_name := join('::', $nsp);
+		
+		if $parent<hll> ne $ns_block<hll> {
+			$class_name := $parent<hll> ~ ';' ~ $class_name;
+		}
+		
+		$parent_class := ", 'parent' => '" ~ $class_name ~ "'";
+		say("Parent class: ", $parent_class);
 	}
 
 	my $attributes := "";

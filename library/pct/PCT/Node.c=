@@ -1,8 +1,40 @@
 # $Id: $
+extern void say();
+
+namespace PCT::Node;
+int serial_number = 10;
 
 class PCT::Node
+	extends ::parrot::Capture
 	:phylum(P6object)
 {
+	pmc attr(str attrname, pmc value, int has_value, pmc default = new Undef)
+		:method
+	{
+		if (has_value) {
+			#say("Value given for attr ", attrname, " = ", value);
+			
+			return asm(attrname, value) {{
+				$S0 = %0
+				self[$S0] = %1
+				%r = %1
+			}};
+			
+			# TODO return self[attrname] = value;
+		}
+		else {
+			#say("Fetching attr ", attrname);
+			value = self[attrname];
+			
+			if (isnull value) {
+				#say("Returning default value from attr");
+				return default;
+			}
+			
+			return value;
+		}
+	}
+
 	pmc init(pmc children ..., pmc adverbs ... :named)
 		:method
 	{
@@ -32,16 +64,20 @@ class PCT::Node
 	pmc new(pmc children ..., pmc adverbs ... :named)
 		:method
 	{
-		#TODO: pmc obj = new obj.HOW().parrotclass;
-		pmc obj = obj.HOW().parrotclass;
+		#TODO: pmc obj = new self.HOW().parrotclass;
+		# FIXME: This lexical works around a PCT bug (#803)
+		lexical pmc obj = self.HOW();
+		pmc p_class = obj.parrotclass;
 		
 		# FIXME: Need new <expr> support. See http://code.google.com/p/close/issues/detail?id=13
-		obj = asm(obj) {{ %r = new %0 }};
+		obj = asm(p_class) {{ %r = new %0 }};
 		
+		# FIXME: Need :flat, :named support in arg expressions.
 		#return obj.init(children :flat, adverbs :flat :named);
 		pmc new_obj = asm(obj, children, adverbs) {{ 
 			%r = %0.'init'(%1 :flat, %2 :flat :named)
 		}};
+		
 		return new_obj;
 	}
 	
@@ -49,40 +85,30 @@ class PCT::Node
 		:method
 	{
 		return clone self;
-	#	return asm(self) {{ %r = clone %0 }};
-	}
-	
-	pmc unshift(pmc value)
-		:method
-	{
-		unshift self, value;
-		return self;
-	}
-	
-	pmc shift()
-		:method
-	{
-		return shift self;
 	}
 
-	pmc push(pmc value)
+	int get_bool()
+		:method
+		:vtable
+	{
+		asm {{ .return (1) }};
+		# Should be:
+		# return 1;
+	}
+
+	int isa(pmc type)
 		:method
 	{
-		push self, value;
-		return self;
-	}
-	
-	pmc pop()
-		:method
-	{
-		return pop self;
-	}
+ 		return self.HOW().isa(self, type);
+ 	}
+
 	
 	pmc iterator()
 		:method
 	{
 		pmc iter = new Iterator, self.list();
-		iter = 0;
+		#iter = 0;
+		asm {{ iter = 0 }};
 		return iter;
 	}
 	
@@ -116,157 +142,44 @@ class PCT::Node
 		:method
 	{
 		# PCT doesn't give me access to this directly. Irksome.
-		int has_value = (isnull value ? 0 : 1);
+		#int has_value = (isnull value ? 0 : 1);
+		int has_value;
+		if (isnull value) { has_value = 0; }
+		else {has_value = 1; }
 		
 		#tailcall
 		self.attr('name', value, has_value);
 	}
-}
 
-#class PCT::Node
-#	:phylum(P6object)
-#{
-#	pmc init(pmc children ..., pmc adverbs ... :named)
-#		:method
-#	{
-#		foreach (pmc child: children) {
-#			push self, child;
-#		}
-#
-#		pmc meth;
-#		foreach (pmc adverb: adverbs) {
-#			#meth = find_method self, adverb;
-#			meth = asm(self, adverb) {{
-#				$S0 = %1
-#				%r = find_method %0, $S0
-#			}};
-#			
-#			unless (isnull meth) {
-#				asm(self, meth, adverbs[adverb]) {{
-#					$P0 = %1
-#					%0.$P0(%2)
-#				}};
-#			}
-#		}
-#		
-#		return self;
-#	}
-#	
-#	#pmc new(pmc children ..., pmc adverbs ... :named)
-#	#	:method
-#	#{
-#	#	pmc obj = new self.HOW().parrotclass;
-#	#	obj.init(children :flat, adverbs :flat :named);
-#	#	return obj;
-#	#}
-#	
-#	pmc clone() 
-#		:method
-#	{
-#	#	return clone self;
-#		return asm(self) {{ %r = clone %0 }};
-#	}
-#	
-#	pmc unshift(pmc value)
-#		:method
-#	{
-#		unshift self, value;
-#		return self;
-#	}
-#	
-#	pmc shift()
-#		:method
-#	{
-#		return shift self;
-#	}
-#
-#	pmc push(pmc value)
-#		:method
-#	{
-#		push self, value;
-#		return self;
-#	}
-#	
-#	pmc pop()
-#		:method
-#	{
-#		return pop self;
-#	}
-#	
-#	pmc iterator()
-#		:method
-#	{
-#		pmc iter = new Iterator, self.list();
-#		iter = 0;
-#		return iter;
-#	}
-#	
-#	# FIXME: 'isa' still not working right.
-#	void node(pmc node)
-#		:method
-#	{
-#		if (node) {
-#			if (isa node, PCT::Node) {
-#				self.source = node.source;
-#				self.pos = node.pos;
-#			}
-#			else if (isa node, PGE::Match) {
-#				self.source = node.'$.target';
-#				self.pos = node.from();
-#			}
-#			else {
-#				die(concat "Don't know how to save info from node of type ", typeof node);
-#			}
-#		}
-#	}
-#	
-#	# FIXME: Need a good syntax for optionals
-#	#pmc name(pmc value :optional)
-#	#	:method
-#	#{
-#	#	#tailcall
-#	#	self.attr('name', value, has_value);
-#	#}
-#	pmc name(pmc value = null)
-#		:method
-#	{
-#		# PCT doesn't give me access to this directly. Irksome.
-#		int has_value = (isnull value ? 0 : 1);
-#		
-#		#tailcall
-#		self.attr('name', value, has_value);
-#	}
-#}
-#~
-#~	pmc attr(str attrname, pmc value, int has_value, pmc default = new Undef)
-#~		:method
-#~	{
-#~		if (has_value) {
-#~			return self[attrname] = value;
-#~		}
-#~		else {
-#~			value = self[attrname];
-#~			return value == null ? default : value;
-#~		}
-#~	}
-#~
-#~	str unique(str fmt = '')
-#~		:method
-#~	{
-#~		return concat fmt, serno++;
-#~	}
-#~
-#~	int isa(pmc type)
-#~		:method
-#~	{
-#~ 		return self.HOW().isa(self, type);
-#~ 	}
-#~
-#~	int get_bool()
-#~		:method
-#~		:vtable('get_bool')
-#~	{
-#~		# Maybe: asm {{ .return (1) }};
-#~		return 1;
-#~	}
-#~}
+	pmc pop()
+		:method
+	{
+		return pop self;
+	}
+
+	pmc push(pmc value)
+		:method
+	{
+		push self, value;
+		return self;
+	}
+	
+	pmc shift()
+		:method
+	{
+		return shift self;
+	}
+
+	str unique(str format = '')
+		:method
+	{
+		return concat format, serial_number++;
+	}
+	
+	pmc unshift(pmc value)
+		:method
+	{
+		unshift self, value;
+		return self;
+	}
+}

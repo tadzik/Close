@@ -21,14 +21,28 @@ void load(pmc filename)
 {
 	pmc fname = filename;
 	asm(fname) {{
+		print "Loading '"
+		print %0
+		print "'\n"
 		push_eh failed
 		$S0 = %0
 		load_bytecode $S0
 		pop_eh
 		.return()
 	failed:
+		get_results "0", $P0
 		pop_eh
-		die "image not found"
+		$S0 = typeof $P0
+		$S1 = $P0
+		$S2 = "Bytecode for '"
+		$S3 = %0
+		concat $S2, $S3
+		concat $S2, "' not loaded.\n"
+		concat $S2, $S0
+		concat $S2, ": "
+		concat $S2, $S1
+		concat $S2, "\n"
+		die $S2
 	}};
 }
 
@@ -36,7 +50,7 @@ extern int print();
 
 void crt_init()
 {
-	asm {{ print "Loading close library\n" }};
+	#asm {{ print "Loading close library\n" }};
 	load("close_lib.pir");
 	#print("Loading done\n");
 }

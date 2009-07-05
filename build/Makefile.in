@@ -247,16 +247,25 @@ doc2wiki:
 		sudo trac-admin "$(TRAC_PATH)" wiki import "$$wfile" "$$wfile" ; \
 	done < INDEX
 
+%.pir : %.c\=
+	cl --target=pir --output=$*.pira $<
+	grep -v '^.annotate' $*.pira > $@
+	
+PCT_NODE_LIB_DIRS := \
+	-Llibrary/pct
+	
 PCT_NODE_DIR := library/pct/PCT
 PCT_NODE_T_DIR := t/library/pct/PCT/Node
 TARGET := pir
-node: build
-	$(RM_F) $(PCT_NODE_DIR)/Node.pir
-	cl --target=$(TARGET) --output=$(PCT_NODE_DIR)/Node.pir $(PCT_NODE_DIR)/Node.c=
+node: build $(PCT_NODE_DIR)/Node.pir
 	for tf in $$(find t/library/pct \( -name '.svn' -prune \) -o -name '*.t' -print ); \
 	do \
-		cl --combine library/close/crt0.cl $$tf; \
+		cl $(PCT_NODE_LIB_DIRS) --combine library/close/crt0.cl $$tf; \
 	done
+	
+NODE_CLEAN_RM_FILES := $(PCT_NODE_DIR)/Node.pir
+node_clean:
+	$(RM_F) $(NODE_CLEAN_RM_FILES)
 	
 # Local variables:
 #   mode: makefile

@@ -157,15 +157,16 @@ method builtin_push($/) {
 
 # TODO - Need some way to shift/unshift a list. (List expressions for call/return)
 method builtin_shift($/) {
-    my $past := PAST::Op.new(
-        :name('builtin-shift'),
-        :node($/),
-        :pasttype('inline'),
-        :inline('    %r = shift %0'));
-    $past.push($<arr>.ast);
+	my $past := PAST::Op.new(
+		:name('builtin-shift'),
+		:node($/),
+		:pasttype('inline'),
+		:inline('    %r = shift %0'),
+		$<arr>.ast);
+	#$past.push($<arr>.ast);
 
-    #DUMP($past, "builtin-shift");
-    make $past;
+	#DUMP($past, "builtin-shift");
+	make $past;
 }
 
 method builtin_unshift($/) {
