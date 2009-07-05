@@ -55,8 +55,15 @@ method builtin_isa($/) {
 	# isa 'string' may work, but I need to know more about when exactly.
 	# (Probably for PMCs, maybe for some kind of 'a::b' paths?)
 	$past.push($<obj>.ast);
-	$past.push($<class>.ast);
 	
+	my $nsp := clone_array($<class>.ast.namespace());
+	$nsp.push($<class>.ast.name());
+	my $class_key := "[ '" ~ join("' ; '", $nsp) ~ "' ]";
+	my $class := PAST::Val.new(
+		:node($<class>),
+		:returns('String'),
+		:value($class_key));
+	$past.push($class);
 	#DUMP($past, "expr: isa");
 	make $past;
 }

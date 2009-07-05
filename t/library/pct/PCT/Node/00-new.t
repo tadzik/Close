@@ -133,6 +133,29 @@ void test_new(pmc proto_obj)
 
 void test_node(pmc proto_obj)
 {
+	pmc it = proto_obj.new();
+	
+	it['source'] = "Hello";
+	it['pos'] = 3;
+	
+	
+	ok(it['source'], "Hello", "node: Source okay");
+	ok(it['pos'], 3, "node: Pos okay");
+	
+	pmc it2 = proto_obj.new();
+	
+	it2['source'] = "Goodbye";
+	it2['pos'] = 6;
+
+	ok(it2['source'], "Goodbye", "node: Source okay");
+	ok(it2['pos'], 6, "node: Pos okay");
+	
+	it2.node(it);
+	
+	ok(it2['source'], "Hello", "node: Source changed okay");
+	ok(it2['pos'], 3, "node: Pos changed okay");
+	
+	# FIXME: Need to test PGE::Match case, too.
 }
 
 void test_pop(pmc proto_obj)
@@ -201,6 +224,7 @@ void run_tests()
 	test_isa(P_class);		test_isa(C_class);
 	test_iterator(P_class);	test_iterator(C_class);
 	test_name();
+	test_node(P_class);		test_node(C_class);
 	test_pop(P_class);		test_pop(C_class);
 	test_push(P_class);		test_push(C_class);
 	test_shift(P_class);		test_shift(C_class);

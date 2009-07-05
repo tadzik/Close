@@ -215,7 +215,7 @@ rule builtin_clone { 'clone' <obj=expression> {*} }
 rule builtin_concat { 'concat' <str=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
 
 # if ( isa x, Class ) {... }
-rule builtin_isa { 'isa' <obj=expression> ',' <class=expression> {*} }
+rule builtin_isa { 'isa' <obj=expression> ',' <class=long_ident> {*} }
 
 # if ( isnull x ) {...}
 rule builtin_isnull { 'isnull' <expression> {*} }

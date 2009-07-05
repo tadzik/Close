@@ -562,7 +562,7 @@ sub adverb_vtable($/, $decl, @args) {
 	}
 
 	$decl<adverbs><vtable> := $vtable_name;
-	$decl<pirflags> := $decl<pirflags> ~ ' :vtable(' ~ $vtable_name ~ ')';
+	$decl<pirflags> := $decl<pirflags> ~ " :vtable('" ~ $vtable_name ~ "')";
 }
 
 method adverb($/) {
