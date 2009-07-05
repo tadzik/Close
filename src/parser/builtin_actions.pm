@@ -58,11 +58,20 @@ method builtin_isa($/) {
 	
 	my $nsp := clone_array($<class>.ast.namespace());
 	$nsp.push($<class>.ast.name());
-	my $class_key := "[ '" ~ join("' ; '", $nsp) ~ "' ]";
-	my $class := PAST::Val.new(
+	
+	if  $<class>.ast<is_rooted> {
+		$nsp.unshift($<class>.ast<hll>);
+	} 
+	else {
+		$nsp.unshift(current_hll_block().name());
+	}
+		
+	my $class_key := join('::', $nsp);
+	my $class := PAST::Op.new(
 		:node($<class>),
-		:returns('String'),
-		:value($class_key));
+		:pasttype('inline'),
+		:inline("\t$P0 = split '::', '" ~ $class_key ~ "'\n"
+			~ "\t%r = get_root_namespace $P0\n"));
 	$past.push($class);
 	#DUMP($past, "expr: isa");
 	make $past;
@@ -173,6 +182,18 @@ method builtin_shift($/) {
 	#$past.push($<arr>.ast);
 
 	#DUMP($past, "builtin-shift");
+	make $past;
+}
+
+method builtin_typeof($/) {
+	my $obj := $<obj>.ast;
+	my $past := PAST::Op.new(
+		:name('builtin-typeof'),
+		:node($/),
+		:pasttype('pirop'),
+		:pirop('typeof SP'));
+	$past.push($obj);
+	#DUMP($past, "builtin-typeof");
 	make $past;
 }
 

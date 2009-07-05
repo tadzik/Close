@@ -1,7 +1,9 @@
 # $Id: $
 extern void say();
+extern void die();
 
 namespace PCT::Node;
+
 int serial_number = 10;
 
 class PCT::Node
@@ -135,11 +137,8 @@ class PCT::Node
 	void node(pmc node)
 		:method
 	{
-	extern void say();
 		if (node) {
-	say("'node': ", node);
 			if (isa node, PCT::Node) {
-			say("Resetting from PCTNODE");
 				self['source'] = node['source'];
 				self['pos'] = node['pos'];
 			}
@@ -148,7 +147,7 @@ class PCT::Node
 				self['pos'] = node.from();
 			}
 			else {
-	#			die(concat "Don't know how to save info from node of type ", typeof node);
+				::die(concat "Don't know how to save info from node of type ", typeof node);
 			}
 		}
 	}

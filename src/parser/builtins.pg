@@ -66,7 +66,7 @@ functions. (This is the good stuff.)
 C<clone>,		C<concat>,		C<isa>,
 C<isnull>,		C<new>,		C<new>,
 C<null>,		C<pop>,		C<push>,
-C<shift>,		C<unshift>,
+C<shift>,		C<typeof>,		C<unshift>,
 
 =back
 
@@ -83,6 +83,7 @@ token t_builtin {
 	| 'pop'
 	| 'push'
 	| 'shift'
+	| 'typeof'
 	| 'unshift'
 	] 
 	>>		# End of word
@@ -107,6 +108,7 @@ rule built_in {
 		| <builtin_pop>	{*} #= builtin_pop
 		| <builtin_push>	{*} #= builtin_push
 		| <builtin_shift>	{*} #= builtin_shift
+		| <builtin_typeof>	{*} #= builtin_typeof
 		| <builtin_unshift>	{*} #= builtin_unshift
 		] 
 	|| <.panic: "Invalid syntax for builtin expression">
@@ -199,7 +201,7 @@ C<sweep>,		C<sysinfo>,		C<tailcall>,
 C<tailcallmethod>,	C<tan>,		C<tanh>,		
 C<tell>,		C<thaw>,		C<throw>,		
 C<time>,		C<titlecase>,		C<trace>,		
-C<trans_charset>,	C<trans_encoding>,	C<typeof>,		
+C<trans_charset>,	C<trans_encoding>,	
 C<unless_null>,	C<unpin>,		C<unregister>,		
 C<upcase>,		C<warningsoff>,	C<warningson>,		
 C<xor>,		
@@ -243,6 +245,9 @@ rule builtin_push {
 
 # x = shift array
 rule builtin_shift { 'shift' <arr=expression> {*} }
+
+# x = typeof obj
+rule builtin_typeof { 'typeof' <obj=expression> {*} }
 
 # unshift array, x, y, z;
 rule builtin_unshift { 'unshift' <arr=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
