@@ -206,6 +206,18 @@ method builtin_shift($/) {
 	make $past;
 }
 
+method builtin_split($/) {
+	my $past := PAST::Op.new(
+		:name('builtin-split'),
+		:node($/),
+		:pasttype('pirop'),
+		:pirop('split Pss'));
+	$past.push($<delim>.ast);
+	$past.push($<str>.ast);
+	#DUMP($past, "builtin-split");
+	make $past;
+}
+
 method builtin_typeof($/) {
 	my $obj := $<obj>.ast;
 	my $past := PAST::Op.new(

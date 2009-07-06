@@ -67,7 +67,8 @@ C<clone>,		C<concat>,		C<exists>,
 C<isa>,		C<isnull>,		
 C<new>,		C<new>,
 C<null>,		C<pop>,		C<push>,
-C<shift>,		C<typeof>,		C<unshift>,
+C<shift>,		C<split>,		
+C<typeof>,		C<unshift>,
 
 =back
 
@@ -85,6 +86,7 @@ token t_builtin {
 	| 'pop'
 	| 'push'
 	| 'shift'
+	| 'split'
 	| 'typeof'
 	| 'unshift'
 	] 
@@ -111,6 +113,7 @@ rule built_in {
 		| <builtin_pop>	{*} #= builtin_pop
 		| <builtin_push>	{*} #= builtin_push
 		| <builtin_shift>	{*} #= builtin_shift
+		| <builtin_split>	{*} #= builtin_split
 		| <builtin_typeof>	{*} #= builtin_typeof
 		| <builtin_unshift>	{*} #= builtin_unshift
 		] 
@@ -197,7 +200,7 @@ C<setref>,		C<sets_ind>,		C<setstderr>,
 C<setstdin>,		C<setstdout>,	C<shift>,		
 C<sin>,		C<sinh>,		C<sizeof>,		
 C<sleep>,		C<spawnw>,		C<splice>,		
-C<split>,		C<sprintf>,		C<sqrt>,		
+C<sprintf>,		C<sqrt>,		
 C<stat>,		C<store_lex>,	C<stringinfo>,		
 C<sub>,		C<subclass>,		C<substr>,		
 C<sweep>,		C<sysinfo>,		C<tailcall>,		
@@ -232,7 +235,7 @@ rule builtin_isnull { 'isnull' <expression> {*} }
 # FIXME: Add "new expression" support.
 rule builtin_new { 'new' <classname=long_ident> [ ',' <args1=expression> ]? {*} }
 
-# null
+# pmc x = null;
 token builtin_null { 'null' {*} }
 
 # x = pop array;
@@ -251,6 +254,9 @@ rule builtin_push {
 
 # x = shift array
 rule builtin_shift { 'shift' <arr=expression> {*} }
+
+# arr = split '::', "Foo::Bar";
+rule builtin_split { 'split' <delim=expression> ',' <str=expression> {*} }
 
 # x = typeof obj
 rule builtin_typeof { 'typeof' <obj=expression> {*} }
