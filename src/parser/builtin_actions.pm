@@ -42,6 +42,27 @@ method builtin_concat($/) {
 	make $past;
 }
 
+method builtin_exists($/) {
+	my $past := PAST::Op.new(
+		:name('builtin-exists'),
+		:node($/),
+		:pasttype('inline'),
+		:inline("\t$I0 = exists %0[%1]\n"
+			~ "\t%r = box $I0\n"));
+	
+	my $index := $<index>.ast;
+	
+	unless $index.isa(PAST::Var) && $index.scope() eq 'keyed' {
+		$/.panic("Builtin 'exists' requires a postfix index expression");
+	}
+	
+	$past.push($index[0]);
+	$past.push($index[1]);
+	
+	#DUMP($past, "builtin-exists");
+	make $past;
+}
+
 method builtin_isa($/) {
 	my $past := PAST::Op.new(
 		:name('isa'),

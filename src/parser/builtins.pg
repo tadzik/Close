@@ -63,8 +63,9 @@ functions. (This is the good stuff.)
 
 =item * Ops available as built-in functions:
 
-C<clone>,		C<concat>,		C<isa>,
-C<isnull>,		C<new>,		C<new>,
+C<clone>,		C<concat>,		C<exists>,		
+C<isa>,		C<isnull>,		
+C<new>,		C<new>,
 C<null>,		C<pop>,		C<push>,
 C<shift>,		C<typeof>,		C<unshift>,
 
@@ -76,6 +77,7 @@ C<shift>,		C<typeof>,		C<unshift>,
 token t_builtin {
 	[ 'clone'
 	| 'concat'
+	| 'exists'
 	| 'isa'
 	| 'isnull'
 	| 'new'
@@ -101,6 +103,7 @@ rule built_in {
 	[ 
 		[ <builtin_clone>	{*} #= builtin_clone
 		| <builtin_concat>	{*} #= builtin_concat
+		| <builtin_exists>	{*} #= builtin_exists
 		| <builtin_isa>	{*} #= builtin_isa
 		| <builtin_isnull>	{*} #= builtin_isnull
 		| <builtin_new>	{*} #= builtin_new
@@ -147,7 +150,7 @@ C<does>,		C<downcase>,	C<elements>,
 C<encoding>,	C<encodingname>,	C<eq_addr>,		
 C<eq_num>,		C<eq_str>,		C<err>,		
 C<errorsoff>,		C<errorson>,		C<escape>,		
-C<exchange>,	C<exists>,		C<exit>,		
+C<exchange>,	C<exit>,		
 C<exp>,		C<fact>,		C<fdiv>,		
 C<fdopen>,		C<find_caller_lex>,	C<find_cclass>,		
 C<find_charset>,	C<find_encoding>,	C<find_lex>,		
@@ -215,6 +218,9 @@ rule builtin_clone { 'clone' <obj=expression> {*} }
 
 # x = concat s0, s1, s2, ... , sn;
 rule builtin_concat { 'concat' <str=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
+
+# if (exists arr[idx]) {...}
+rule builtin_exists { 'exists' <index=postfix_expr> {*} }
 
 # if ( isa x, Class ) {... }
 rule builtin_isa { 'isa' <obj=expression> ',' <class=long_ident> {*} }
