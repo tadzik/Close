@@ -591,7 +591,7 @@ method adverb($/) {
 		# FIXME: For args that are strings, just attach the value,
 		# but class names get the node. This needs cleaning up.
 		for $<args> {
-			if $_.ast.isa(PAST::Value) {
+			if $_.ast.isa(PAST::Val) {
 				@args.push($_.ast<value>);
 			}
 			else {
