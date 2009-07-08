@@ -22,59 +22,30 @@ void test_add_param(pmc proto)
 	
 	ok(isnull o['paramlist'],  "New object gets no paramlist");
 	
-	str simple = "    .param pmc Fred\n";
-	o.add_param("Fred");
+	str simple = "    .param pmc Simon\n";
+	o.add_param("Simon");
 	ok(o['paramlist'][0], simple, "Simple param emits okay");
+	
+	str optional = "    .param pmc Ollie :optional\n    .param int has_Ollie :opt_flag\n";
+	o.add_param("Ollie", optional: 1);
+	ok(o['paramlist'][1], optional, "Optional param emits okay");
+
+	str slurpy = "    .param pmc sluggy :slurpy\n";
+	o.add_param("sluggy", slurpy: 1);
+	ok(o['paramlist'][2], slurpy, "Slurpy param emits okay");
+	
+	str named = "    .param pmc Norma :named(\"noodles\")\n";
+	o.add_param("Norma", named: "noodles");
+	ok(o['paramlist'][4], named, "Named param emits okay");
+	
+	str named_opt = "    .param pmc Niles :optional :named(\"Nylez\")\n    .param int has_Niles :opt_flag\n";
+	o.add_param("Niles", named: "Nylez", optional: 1);
+	ok(o['paramlist'][5], named_opt, "Named+optional emits okay");
+	
+	str named_slurpy = "    .param pmc nickolas :slurpy :named\n";
+	o.add_param("nickolas", slurpy: 1, named: 1);
+	ok(o['paramlist'][6], named_slurpy, "Named+slurpy emits okay");
 }
-=begin COMMENT
-
-	pmc add_param(pmc pname, pmc adverbs ... :named)
-		:method
-	{
-		extern pmc param_format	= new ResizableStringArray;
-
-		param_format[0]	= "    .param pmc %0";
-		param_format[1]	= "    .param pmc %0 :optional\n    .param int has_%0 :opt_flag";
-		param_format[2]	= "    .param pmc %0 :slurpy";
-		#param_format[3]	= There is no "optional slurpy"
-		param_format[4]	= "    .param pmc %0 :named(%1)";
-		param_format[5]	= "    .param pmc %0 :optional :named(%1)\n    .param int has_%0 :opt_flag";
-		param_format[6]	= "    .param pmc %0 :slurpy :named";
-
-		
-		int optional = adverbs['optional'];
-		int slurpy = adverbs['slurpy'];
-		str named = adverbs['named'];
-
-		int paramseq = 0;
-		
-		say("Optional?");
-		if (optional)	{ paramseq += 1; }
-		say("Slurpy?");
-		if (slurpy)	{ paramseq += 2; }
-		say("Named?");
-		if (named)	{ paramseq += 4; }
-
-		pmc paramlist = self['paramlist'];
-		
-		if (isnull paramlist) {
-			self['paramlist'] = paramlist = new ResizeablePMCArray;
-		}
-		
-		pmc code = paramlist[paramseq];
-		
-		if (isnull code) {
-			code = new CodeString;
-			paramlist[paramseq] = code;
-		}
-		
-		str paramfmt = param_format[paramseq];
-		named = code.escape(named);
-		code.emit(paramfmt, pname, named);
-	}
-
-
-=end COMMENT
 
 void test_blocktype(pmc proto)
 {
