@@ -260,6 +260,8 @@ PCTNODE_CLEAN_RM_FILES := $(PCT_NODE_DIR)/Node.pir
 
 TARGET := pir
 pctnode: build $(PCT_NODE_DIR)/Node.pir
+
+pctnode_test: pctnode
 	for tf in $$(find t/library/pct \( -name '.svn' -prune \) -o -name '*.t' -print ); \
 	do \
 		cl $(PCT_NODE_LIB_DIRS) --combine library/close/crt0.cl $$tf; \
@@ -272,6 +274,8 @@ PAST_NODE_DIR := library/pct/PAST
 PAST_NODE_T_DIR := t/library/pct/PAST/Node
 PASTNODE_CLEAN_RM_FILES := $(PAST_NODE_DIR)/Node.pir
 pastnode: build $(PAST_NODE_DIR)/Node.pir
+
+pastnode_test: pastnode
 	for tf in $$(find $(PAST_NODE_T_DIR) \( -name '.svn' -prune \) -o -name '*.t' -print ); \
 	do \
 		cl $(PCT_NODE_LIB_DIRS) --combine library/close/crt0.cl $$tf; \
@@ -284,6 +288,8 @@ POST_NODE_DIR := library/pct/POST
 POST_NODE_T_DIR := t/library/pct/POST/Node
 POSTNODE_CLEAN_RM_FILES := $(POST_NODE_DIR)/Node.pir
 postnode: build $(POST_NODE_DIR)/Node.pir
+
+postnode_test: postnode
 	for tf in $$(find $(POST_NODE_T_DIR) \( -name '.svn' -prune \) -o -name '*.t' -print ); \
 	do \
 		cl $(PCT_NODE_LIB_DIRS) --combine library/close/crt0.cl $$tf; \
