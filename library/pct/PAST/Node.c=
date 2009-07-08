@@ -1,0 +1,356 @@
+# $Id: $
+
+extern void die();
+
+class PAST::Node
+	extends ::parrot::PCT::Node
+	:phylum(P6object)
+{
+	pmc arity(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('arity', value, !isnull value);
+	}
+
+	pmc flat(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('flat', value, !isnull value);
+	}
+
+	pmc handlers(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('handlers', value, !isnull value);
+	}
+
+	pmc lvalue(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('lvalue', value, !isnull value);
+	}
+
+	pmc named(pmc value = null)
+		:method
+	{
+		return #TODO: tailcall
+		self.attr('named', value, !isnull value);
+	}
+
+	pmc returns(pmc value = null)
+		:method
+	{
+	
+		# FIXME: This is the same problem that affects PCT::Node::name(),
+		# that of access to the has_<name> flag (:opt_flag). And the same
+		# work-around.
+		# FIXME: Also, assignment in a ternary does not get the Integer 
+		# boxed right. Probably a compiler bug.
+		return # TODO: tailcall
+		self.attr('returns', value, !isnull value);
+	}
+}
+
+
+namespace PAST::Block;
+
+# FIXME: This should be inside the class, but it isn't passing this code through. :(
+# See ticket #22
+extern str subid_suffix = concat '_', asm {{
+	$I0 = time
+	$S0 = $I0
+	%r = box $S0
+}};
+
+class PAST::Block
+	extends PAST::Node
+	:phylum(P6object)
+{
+	pmc blocktype(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('blocktype', value, !isnull value);
+	}
+
+	pmc compiler(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('compiler', value, !isnull value);
+	}
+
+	pmc compiler_args(pmc value ... :named)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('compiler_args', value, elements value);
+	}
+
+	pmc control(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('control', value, !isnull value);
+	}
+
+	pmc hll(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('hll', value, !isnull value);
+	}
+
+	pmc loadinit(pmc value = null)
+		:method
+	{
+		if ((isnull value) && (isnull self['loadinit'])) {
+			extern class PAST::Stmts :phylum(P6object);
+			value = PAST::Stmts.new();
+		}
+	
+		return # TODO: tailcall
+		self.attr('loadinit', value, !isnull value);
+	}
+	
+	pmc namespace(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('namespace', value, !isnull value);
+	}
+
+	pmc pirflags(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('pirflags', value, !isnull value);
+	}
+
+	pmc subid(pmc value = null)
+		:method
+	{
+		if ((isnull value) && ! exists self['subid']) {
+			value = concat self.unique(), subid_suffix;
+		}
+		
+		return # TODO: tailcall
+		self.attr('subid', value, !isnull value);
+	}
+
+	pmc symtable(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('symtable', value, !isnull value);
+	}
+
+	pmc symbol(pmc name, pmc attributes ... :named)
+		:method
+	{
+		pmc symtable = self['symtable'];
+		
+		if (isnull symtable) {
+			symtable = self['symtable'] = new Hash;
+		}
+		
+		pmc symbol = symtable[name];
+		
+		if (isnull symbol) {
+			return symtable[name] = attributes;
+		}
+
+		if (attributes) {
+			foreach (pmc it : attributes) {
+				symbol[it] = attributes[it];
+			}
+		}
+		
+		return symbol;
+	}
+
+	pmc symbol_defaults(pmc attributes ... :named)
+		:method
+	{
+		return # TODO: tailcall
+		#self.symbol('', attributes :flat :named);
+		asm(attributes) {{	%r = self.'symbol'('', %0 :flat :named) }};
+	}
+
+	pmc lexical(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('lexical', value, !isnull value, 1);
+	}
+}
+
+class PAST::Control
+	extends PAST::Node
+	:phylum(P6object)
+{
+	pmc handle_types(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('handle_types', value, !isnull value);
+	}
+	
+	pmc handle_types_except(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('handle_types_except', value, !isnull value);
+	}
+}
+
+class PAST::Op
+	extends PAST::Node
+	:phylum(P6object)
+{
+	pmc inline(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('inline', value, !isnull value);
+	}
+
+	# pmc lvalue(value = null)
+	# I think this is not needed.
+	pmc lvalue(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('lvalue', value, !isnull value);
+	}
+
+	pmc opattr(pmc hash)
+		:method
+	{
+		str attributes = "pasttype pirop inline lvalue";
+		
+		foreach (pmc attr : split ' ', attributes) {
+			if (exists hash[attr]) {
+				pmc method = asm(self, attr) {{
+					$S0 = %1
+					%r = find_method %0, $S0
+				}};
+				
+				unless (isnull method) {
+					asm(self, method, hash[attr]) {{
+						%0.%1(%2)
+					}};
+				}
+			}
+		}
+	}
+	
+	pmc pasttype(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('pasttype', value, !isnull value);
+	}
+	
+	pmc pirop(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('pirop', value, !isnull value);
+	}
+}
+
+class PAST::Stmts
+	extends PAST::Node
+	:phylum(P6object)
+{
+	# Has no vowels, and no methods, either. 
+	# On the other hand, testing is easy.
+}
+
+class PAST::Val
+	extends PAST::Node
+	:phylum(P6object)
+{
+	pmc lvalue(pmc value = null)
+		:method
+	{
+		if ((!isnull value) && value) {
+			::die("Cannot set lvalue on PAST::Val node");
+		}
+		
+		return # TODO: tailcall
+		self.attr('lvalue', value, !isnull value);
+	}
+
+	pmc value(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('value', value, !isnull value);
+	}
+}
+
+class PAST::Var
+	extends PAST::Node
+	:phylum(P6object)
+{
+	pmc scope(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('scope', value, !isnull value);
+	}
+
+	pmc isdecl(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('isdecl', value, !isnull value);
+	}
+
+	pmc namespace(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('isdecl', value, !isnull value);
+	}
+
+	pmc slurpy(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('slurpy', value, !isnull value);
+	}
+
+	pmc viviself(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('viviself', value, !isnull value);
+	}
+	
+	pmc vivibase(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('vivibase', value, !isnull value);
+	}
+}
+
+class PAST::VarList
+	extends PAST::Node
+	:phylum(P6object)
+{
+	pmc bindvalue(pmc value = null) 
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('bindvalue', value, !isnull value);
+		
+	}
+}
