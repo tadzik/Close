@@ -1,0 +1,202 @@
+# $Id: $
+
+class POST::Node
+	extends ::close::PCT::Node
+	:phylum(P6object)
+{
+	pmc escape(str string)
+		:method
+	{
+		return (new CodeString).escape(string);
+	}
+	
+	str get_string()
+		:method
+		:vtable
+	{
+		asm(self.result()) {{
+			$S0 = %0
+			.return ($S0)
+		}};
+	}
+
+	pmc push_pirop(pmc pirop, pmc arglist ..., pmc adverbs ... :named)
+		:method
+	{
+		adverbs['pirop'] = pirop;
+		
+		pmc new_op = asm(arglist, adverbs) {{
+			$P0 = get_hll_global ['POST'], 'Op'
+			%r = $P0.'new'(%0 :flat, %1 :flat :named)
+		}};
+		
+		self.push(new_op);
+		return new_op;
+	}
+
+	pmc result(pmc value = null)
+		:method
+	{
+		if (isnull value) {
+			value = self['result'];
+
+			return	  (isnull value) ? ''
+				: (isa value, POST::Node) ? value.result() 
+				: value;
+		}
+		else {
+			return self['result'] = value;
+		}
+	}
+}
+
+class POST::Label
+	extends POST::Node
+	:phylum(P6object)
+{
+	pmc result(pmc value = null)
+		:method
+	{
+		if (isnull value) {
+			if (!isnull value = self['result']) {
+				return value;
+			}
+
+			value = self.unique(self.name());
+		}
+		
+		return self['result'] = value;
+	}
+}
+
+class POST::Op
+	extends POST::Node
+	:phylum(P6object)
+{
+	pmc pirop(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('pirop', value, !isnull value);
+	}
+	
+	pmc inline(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('inline', value, !isnull value);
+	}
+}
+
+class POST::Ops
+	extends POST::Node
+	:phylum(P6object)
+{
+	# I got nothing.
+}
+
+class POST::Sub
+	extends POST::Node
+	:phylum(P6object)
+{
+	pmc add_param(pmc pname, pmc adverbs ... :named)
+		:method
+	{
+		extern pmc param_format	= new ResizableStringArray;
+
+		param_format[0]	= "    .param pmc %0";
+		param_format[1]	= "    .param pmc %0 :optional\n    .param int has_%0 :opt_flag";
+		param_format[2]	= "    .param pmc %0 :slurpy";
+		#param_format[3]	= There is no "optional slurpy"
+		param_format[4]	= "    .param pmc %0 :named(%1)";
+		param_format[5]	= "    .param pmc %0 :optional :named(%1)\n    .param int has_%0 :opt_flag";
+		param_format[6]	= "    .param pmc %0 :slurpy :named";
+
+		int optional = adverbs['optional'];
+		int slurpy = adverbs['slurpy'];
+		str named = adverbs['named'];
+
+		int paramseq = 0;
+		
+		if (optional)	{ paramseq += 1; }
+		if (slurpy)	{ paramseq += 2; }
+		if (named)	{ paramseq += 4; }
+
+		pmc paramlist = self['paramlist'];
+		
+		if (isnull paramlist) {
+			self['paramlist'] = paramlist = new ResizeablePMCArray;
+		}
+		
+		pmc code = paramlist[paramseq];
+		
+		if (isnull code) {
+			code = new CodeString;
+			paramlist[paramseq] = code;
+		}
+		
+		str paramfmt = param_format[paramseq];
+		named = code.escape(named);
+		code.emit(paramfmt, pname, named);
+	}
+
+	pmc blocktype(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('blocktype', value, !isnull value);
+	}
+
+	pmc compiler(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('compiler', value, !isnull value);
+	}
+
+	pmc compiler_args(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('compiler_args', value, !isnull value);
+	}
+
+	pmc hll(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('hll', value, !isnull value);
+	}
+
+	pmc namespace(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('namespace', value, !isnull value);
+	}
+
+	pmc outer(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('outer', value, !isnull value);
+	}
+
+	pmc pirflags(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('pirflags', value, !isnull value);
+	}
+
+	pmc subid(pmc value = null)
+		:method
+	{
+		if ((isnull value) && !exists self['subid']) {
+			value = self.unique('post');
+		}
+		
+		return # TODO: tailcall
+		self.attr('subid', value, !isnull value);
+	}
+}
