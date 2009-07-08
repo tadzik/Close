@@ -63,7 +63,8 @@ functions. (This is the good stuff.)
 
 =item * Ops available as built-in functions:
 
-C<clone>,		C<concat>,		C<exists>,		
+C<clone>,		C<concat>,		
+C<elements>,		C<exists>,		
 C<isa>,		C<isnull>,		
 C<new>,		C<new>,
 C<null>,		C<pop>,		C<push>,
@@ -78,6 +79,7 @@ C<typeof>,		C<unshift>,
 token t_builtin {
 	[ 'clone'
 	| 'concat'
+	| 'elements'
 	| 'exists'
 	| 'isa'
 	| 'isnull'
@@ -105,6 +107,7 @@ rule built_in {
 	[ 
 		[ <builtin_clone>	{*} #= builtin_clone
 		| <builtin_concat>	{*} #= builtin_concat
+		| <builtin_elements> {*} #= builtin_elements
 		| <builtin_exists>	{*} #= builtin_exists
 		| <builtin_isa>	{*} #= builtin_isa
 		| <builtin_isnull>	{*} #= builtin_isnull
@@ -149,7 +152,7 @@ C<debug_init>,	C<debug_load>,	C<debug_print>,
 C<decodelocaltime>, C<decodetime>,	C<defined>,		
 C<delete>,		C<delprop>,		C<deref>,		
 C<die>,		C<dlfunc>,		C<dlvar>,		
-C<does>,		C<downcase>,	C<elements>,		
+C<does>,		C<downcase>,	
 C<encoding>,	C<encodingname>,	C<eq_addr>,		
 C<eq_num>,		C<eq_str>,		C<err>,		
 C<errorsoff>,		C<errorson>,		C<escape>,		
@@ -221,6 +224,9 @@ rule builtin_clone { 'clone' <obj=expression> {*} }
 
 # x = concat s0, s1, s2, ... , sn;
 rule builtin_concat { 'concat' <str=expression> ',' <val=expression> [ ',' <val=expression> ]* {*} }
+
+# x = elements arr;
+rule builtin_elements { 'elements' <arr=expression> {*} }
 
 # if (exists arr[idx]) {...}
 rule builtin_exists { 'exists' <index=postfix_expr> {*} }

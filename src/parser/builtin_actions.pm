@@ -31,14 +31,25 @@ method builtin_concat($/) {
 			$inline := $inline ~ "    concat %r, %" ~ $argnum ~ "\n";
 		}
 
-		++$argnum;
-		if $argnum > 10 {
+		$argnum++;
+		if $argnum >= 10 {
 			$/.panic("Too many arguments to builtin 'concat'");
 		}
 	}
 
 	$past.inline($inline);
 	#DUMP($past, "builtin_concat");
+	make $past;
+}
+
+method builtin_elements($/) {
+	my $past := PAST::Op.new(
+		:name('builtin-elements'),
+		:node($/),
+		:pasttype('pirop'),
+		:pirop('elements IP'),
+		$<arr>.ast);
+	#DUMP($past, "builtin-elements");
 	make $past;
 }
 
