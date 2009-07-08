@@ -1087,77 +1087,6 @@ sub replace_current_declaration($new_decl) {
 	return $new_decl;
 }
 
-# Assembly routine for a whole bunch of left-to-right associative binary ops.
-sub binary_expr_l2r($/) {
-	my $past := $<term>.shift().ast;
-
-	for $<op> {
-		my $op := binary_op($_);
-		$op.push($past);
-		$op.push($<term>.shift().ast);
-		$past := $op;
-	}
-
-	#DUMP($past, "binary-expr");
-	make $past;
-}
-
-our %binary_pastops;
-%binary_pastops{'&&'} := 'if';
-%binary_pastops{'and'} := 'if';
-%binary_pastops{'||'} := 'unless';
-%binary_pastops{'or'} := 'unless';
-%binary_pastops{'xor'} := 'xor';
-
-our %binary_pirops;
-%binary_pirops{'+'}  := 'add';
-%binary_pirops{'-'}  := 'sub';
-%binary_pirops{'*'}  := 'mul',
-%binary_pirops{'/'}  := 'div',
-%binary_pirops{'%'}  := 'mod',
-%binary_pirops{'<<'}  := 'shl',
-%binary_pirops{'>>'}  := 'shr',
-%binary_pirops{'&'}  := 'band',
-%binary_pirops{'band'}  := 'band',
-%binary_pirops{'|'}  := 'bor',
-%binary_pirops{'bor'}  := 'bor',
-%binary_pirops{'^'}  := 'bxor',
-%binary_pirops{'bxor'}  := 'bxor',
-
-our %binary_inline;
-%binary_inline{'=='} := "iseq";
-%binary_inline{'!='} := "isne";
-%binary_inline{'<'}  := "islt";
-%binary_inline{'<='}  := "isle";
-%binary_inline{'>'}  := "isgt";
-%binary_inline{'>='}  := "isge";
-
-# Create a "run this pir op" node for binary expressions.
-sub binary_op($/) {
-	my $opname   := ~$/;
-
-	my $past := PAST::Op.new(:name($opname), :node($/));
-
-	if %binary_pastops{$opname} {
-		$past.pasttype(%binary_pastops{$opname});
-	}
-	elsif %binary_pirops{$opname} {
-		$past.pasttype('pirop');
-		$past.pirop(%binary_pirops{$opname});
-	}
-	elsif %binary_inline{$opname} {
-		$past.pasttype('inline');
-		my $inline := "\t$I0 = " ~ %binary_inline{$opname} ~ " %0, %1\n"
-			~ "\t%r = new 'Integer'\n"
-			~ "\t%r = $I0\n";
-		$past.inline($inline);
-	}
-
-	#DUMP($past, "binary_op:" ~ $pirop);
-	make $past;
-}
-
-
 sub symbol_defined_locally($past) {
 	my $name := $past.name();
 	return current_lexical_scope().symbol($name);
@@ -1524,7 +1453,9 @@ sub get_init_block_of_path(@_path) {
 		$block.name('_init_namespace_' ~ $block.name());
 		$block.pirflags(":anon :init :load");
 		$block<init_done> := 1;
+		
 		#DUMP($block, "namespace init block");
+		
 	}
 
 	return $block;
@@ -1667,7 +1598,7 @@ sub make_init_class_sub_p6object($class) {
 		}
 		
 		$parent_class := ", 'parent' => '" ~ $class_name ~ "'";
-		say("Parent class: ", $parent_class);
+		#say("Parent class: ", $parent_class);
 	}
 
 	my $attributes := "";
