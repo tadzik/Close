@@ -83,6 +83,8 @@ void run_tests()
 	Parrot = asm {{ %r = get_root_global [ "parrot" ; "POST" ], "Node" }};
 	Close = POST::Node;
 	
+	say("# Testing POST::Node");
+	
 	test_escape(Parrot);		test_escape(Close);
 	test_get_string(Parrot);	test_get_string(Close);
 	test_push_pirop(Parrot);	test_push_pirop(Close);

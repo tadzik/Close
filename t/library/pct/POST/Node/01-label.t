@@ -43,6 +43,8 @@ void run_tests()
 	Parrot = asm {{ %r = get_root_global [ "parrot" ; "POST" ], "Label" }};
 	Close = POST::Label;
 	
+	say("# Testing POST::Label");
+	
 	test_result(Parrot);		test_result(Close);
 }	
 
