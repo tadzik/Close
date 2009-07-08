@@ -366,7 +366,7 @@ token language_element {
 	| 'for'
 	| 'foreach'
 	| 'if'
-	| 'lexical'
+	# | 'lexical'
 	| 'register'
 	| 'return'
 	#| 'self' Can't be prohibited, else it were a function. 
