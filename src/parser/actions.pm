@@ -253,74 +253,230 @@ method declaration($/, $key) {
 		close_lexical_scope($lstype);
 	}
 	else {
-		# $key eq 'done'
-		# This code has to deal with every single kind of declaration. Yikes.
-		my $past := close_declaration();
+		self.declaration_done($/);
+	}
+}
 
-		# One important thing is to establish the namespace for the
-		# symbol. Use scope to determine what to do:
-		if $past<scope> eq 'package' {
-			if !$past<is_class> {
-				add_global_symbol($past);
-			}
-			else {
-				add_class_decl($past);
-			}
-		} elsif $past<scope> eq 'attribute' {
-			# TODO: Do I pass initializer in here?
-			add_class_attribute($past);
+# Called by 'declaration' when end of decl is reached.
+method declaration_done($/) {
+	my $lstype;
+	my $decl_mode := 'ERROR: in declaration()';
+	
+	# This code has to deal with every single kind of declaration. Yikes.
+	my $past := close_declaration();
+
+	# Got any adverbs?
+	if +@($<adverbs>.ast) {
+		for @($<adverbs>.ast) {
+			decl_add_adverb($/, $past, $_);
 		}
-
-		if $<initializer> {
-			# FIXME: Is this wrong? Should this be an assignment ?
-			$past.viviself($<initializer>[0].ast);
-			$past.lvalue(1);
+	}
+	
+	# FIXME: This is wrong, for classes at least. Need to insert declaring name
+	# into parent namespace before block open, so block guts can refer to it.
+	
+	# One important thing is to establish the namespace for the
+	# symbol. Use scope to determine what to do:
+	if $past<scope> eq 'package' {
+		if !$past<is_class> {
+			add_global_symbol($past);
 		}
-		elsif $past<is_function> {
-			# Definition or declaration?
-			if $<compound_stmt> {
-				$past.push($<compound_stmt>.ast);
-			}
-			else {
-				$past<is_decl_only> := 1;
-				$past := PAST::Op.new(
-					:node($past),
-					:name($past.name() ~ " (decl)"),
-					:pasttype('null'));
-			}
+		else {
+			add_class_decl($past);
 		}
-		elsif $past<is_class> {
-			if $<compound_stmt> {
-				# Remove all method blocks - put them in the namespace
-				my @path := namespace_path_of_var($past);
-				my $namespace := get_past_block_of_path(@path);
+	} elsif $past<scope> eq 'attribute' {
+		# TODO: Do I pass initializer in here?
+		add_class_attribute($past);
+	}
 
-				my $block := $<compound_stmt>.ast;
-				my $num_items := +@($block);
-				my $node;
+	if $<initializer> {
+		# FIXME: Is this wrong? Should this be an assignment ?
+		$past.viviself($<initializer>[0].ast);
+		$past.lvalue(1);
+	}
+	elsif $past<is_function> {
+		# Definition or declaration?
+		if $<compound_stmt> {
+			$past.push($<compound_stmt>.ast);
+		}
+		else {
+			$past<is_decl_only> := 1;
+			$past := PAST::Op.new(
+				:node($past),
+				:name($past.name() ~ " (decl)"),
+				:pasttype('null'));
+		}
+	}
+	elsif $past<is_class> {
+		if $<compound_stmt> {
+			# Remove all method blocks - put them in the namespace
+			my @path := namespace_path_of_var($past);
+			my $namespace := get_past_block_of_path(@path);
 
-				while $num_items-- {
-					$node := $block.shift();
+			my $block := $<compound_stmt>.ast;
+			my $num_items := +@($block);
+			my $node;
 
-					if $node.isa(PAST::Block) {
-						#say("Adding method ", $node.name(), " to nsp block ", $namespace.name());
-						$namespace.push($node);
-					}
-					else {
-						# FIXME: I don't know what to do with these.
-						say("Recycling unknown node");
-						$block.push($node);
-					}
+			while $num_items-- {
+				$node := $block.shift();
+
+				if $node.isa(PAST::Block) {
+					#say("Adding method ", $node.name(), " to nsp block ", $namespace.name());
+					$namespace.push($node);
+				}
+				else {
+					# FIXME: I don't know what to do with these.
+					say("Recycling unknown node");
+					$block.push($node);
 				}
 			}
-
-			$past := PAST::Op.new(:node($/), :pasttype('null'));
 		}
 
-		#DUMP($past, "declaration (now closed)");
-		#say("Done with <declaration>: ", $past.name());
-		make $past;
+		$past := PAST::Op.new(:node($/), :pasttype('null'));
 	}
+
+	#DUMP($past, "declaration (now closed)");
+	#say("Done with <declaration>: ", $past.name());
+	make $past;
+}
+
+our %adverb_aliases;
+%adverb_aliases{'...'} := 'slurpy';
+%adverb_aliases{'?'} := 'optional';
+
+sub unalias_adverb_name($adverb) {
+	my $name := $adverb.name();
+	
+	if %adverb_aliases{$name} {
+		return (%adverb_aliases{$name});
+	}
+	
+	return $name;
+}
+
+our %adverb_arg_limits;
+# For each adverb, check args: min #args, errormsg, max #args, errormsg.
+# If #args is below/above limit, print errormessage.
+%adverb_arg_limits<anon>	:= (0,	"", 0,	":anon takes no args");
+%adverb_arg_limits<extends>	:= (1,	"'extends' requires at least one parent class",
+					256,	"cannot specify more than 256 parent classes");
+%adverb_arg_limits<init>		:= (0,	"", 0,	":init takes no args");
+%adverb_arg_limits<load>		:= (0,	"", 0,	":load takes no args");
+%adverb_arg_limits<main>	:= (0,	"", 0,	":main takes no args");
+%adverb_arg_limits<method>	:= (0,	"", 0,	":method takes no args");
+%adverb_arg_limits<multi>	:= (1,	"You must provide a signature for :multi(...)", 
+					1, ":multi(...) requires an unquoted signature");
+%adverb_arg_limits<named>	:= (0,	"",	1,	"Too many arguments for adverb :named(str)");
+%adverb_arg_limits<optional>	:= (0,	"", 0,	":optional takes no args");
+%adverb_arg_limits<opt_flag>	:= (0,	"", 0,	":opt_flag takes no args");
+%adverb_arg_limits<phylum>	:= (1,	"You must provide a phylum named for :phylum(str)",
+					1, "Too many args for adverb :phylum(str)");
+%adverb_arg_limits<slurpy>	:= (0,	"", 0,	":slurpy takes no args");
+%adverb_arg_limits<vtable>	:= (0,	"", 1, "Too many args for adverb :vtable(str)");
+
+sub adverb_is_valid($name) {
+	if %adverb_arg_limits{$name} {
+		return (1);
+	}
+	
+	return (0);
+}
+
+sub check_adverb_args($/, $name, $adverb) {
+	unless adverb_is_valid($name) {
+		$/.panic("Unsupported/unexpected adverb '" ~ $name ~ "'");
+	}
+	
+	my $arg_info := %adverb_arg_limits{$name};
+	my $num_args := +@($adverb);
+	
+	if $num_args < $arg_info[0] {
+		$/.panic($arg_info[1]);
+	}
+	
+	if $num_args > $arg_info[2] {
+		$/.panic($arg_info[3]);
+	}
+}
+
+sub adverb_args_storage($adverb) {
+	my $num_args := +@($adverb);
+	
+	# FIXME: Data format change in AST. How to handle values?
+	if $num_args == 0 {
+		return (1);
+	}
+	elsif $num_args  == 1 {
+		return $adverb[0].value();
+	}
+	else {	# $num_args > 1
+		my $args := new_array();
+		
+		for $adverb {
+			$args.push($_.value());
+		}
+
+		return ($args);
+	}			
+}
+
+sub adverb_extends($/, $decl) {
+	unless $decl<is_class> {
+		$/.panic("Cannot extend non-class declaration.");
+	}
+}
+
+sub adverb_multi($/, $decl) {
+	$decl<pirflags> := $decl<pirflags> ~ ' :multi(' ~ $decl<adverbs><multi> ~ ')';
+}
+
+sub adverb_named($/, $decl) {
+	my $named := $decl<adverbs><named>;
+	
+	if $named == 1 {
+		$named := $decl.name();
+	}
+	
+	$decl.named($named);
+}
+
+sub adverb_vtable($/, $decl) {
+	$decl<is_vtable> := 1;
+	my $vtable_name := $decl<adverbs><vtable>;
+	
+	if $vtable_name == 1 {
+		$vtable_name := $decl.name();
+	}
+
+	$decl<pirflags> := $decl<pirflags> ~ " :vtable('" ~ $vtable_name ~ "')";
+}
+
+our %append_adverb_to_pirflags;
+%append_adverb_to_pirflags<anon> := 1;
+%append_adverb_to_pirflags<init> := 1;
+%append_adverb_to_pirflags<load> := 1;
+%append_adverb_to_pirflags<main> := 1;
+%append_adverb_to_pirflags<method> := 1;
+%append_adverb_to_pirflags<optional> := 1;
+%append_adverb_to_pirflags<opt_flag> := 1;
+
+sub decl_add_adverb($/, $past, $adverb) {
+	my $name := unalias_adverb_name($adverb);
+	my $num_args := +@($adverb);
+	
+	check_adverb_args($/, $name, $adverb);		# FIXME: Data format change in params.
+	$past<adverbs>{$name} := adverb_args_storage($adverb);
+
+	# Is there a special handler? Can't use sub refs yet.
+	if	$name eq 'extends' {	adverb_extends($/, $past);	}
+	elsif	$name eq 'multi'	{	adverb_multi($/, $past);	}
+	elsif	$name eq 'named'	{	adverb_named($/, $past);	}
+	elsif	$name eq 'slurpy'	{	$past.slurpy(1);			}
+	elsif	$name eq 'vtable'	{	adverb_vtable($/, $past);	}
+	elsif	%append_adverb_to_pirflags{$name} {
+		$past<pirflags> := $past<pirflags> ~ ' :' ~ $name;
+	}
+	#DUMP($past, "current_declaration[w/ adverb]");
 }
 
 method parameter_decl_list($/, $key) {
@@ -467,181 +623,43 @@ method decl_suffix($/, $key) { PASSTHRU($/, $key); }
 #~ 	]
 #~ }
 
-our %adverb_arg_info;
-# For each adverb, check args: min #args, errormsg, max #args, errormsg.
-# If #args is below/above limit, print errormessage.
-%adverb_arg_info<anon>	:= (0,	"", 0,	":anon takes no args");
-%adverb_arg_info<extends> := (1,	"'extends' requires at least one parent class",
-	256,	"cannot specify more than 256 parent classes");
-%adverb_arg_info<init>	:= (0,	"", 0,	":init takes no args");
-%adverb_arg_info<load>	:= (0,	"", 0,	":load takes no args");
-%adverb_arg_info<main>	:= (0,	"", 0,	":main takes no args");
-%adverb_arg_info<method> := (0,	"", 0,	":method takes no args");
-%adverb_arg_info<multi>	:= (1,	"You must provide a signature for :multi(...)", 
-	1, ":multi(...) requires an unquoted signature");
-%adverb_arg_info<named> := (0, "",	1,	"Too many arguments for adverb :named(str)");
-%adverb_arg_info<optional> := (0,	"", 0,	":optional takes no args");
-%adverb_arg_info<opt_flag> := (0,	"", 0,	":opt_flag takes no args");
-%adverb_arg_info<phylum> := (1,	"You must provide a phylum named for :phylum(str)",
-	1, "Too many args for adverb :phylum(str)");
-%adverb_arg_info<slurpy>	:= (0,	"", 0,	":slurpy takes no args");
-%adverb_arg_info<vtable>	:= (0,	"", 1, "Too many args for adverb :vtable(str)");
-
-sub check_adverb_args($/, $adverb, $num) {
-	unless %adverb_arg_info{$adverb} {
-		$/.panic("Unknown adverb: " ~ $adverb);
-	}
-	
-	my $arg_info := %adverb_arg_info{$adverb};
-	
-	if $num < $arg_info[0] {
-		$/.panic($arg_info[1]);
-	}
-	
-	if $num > $arg_info[2] {
-		$/.panic($arg_info[3]);
-	}
-}
-
-our %adverb_aliases;
-%adverb_aliases{'...'} := 'slurpy';
-%adverb_aliases{'?'} := 'optional';
-#%adverb_aliases{'extends'} := 'parent';
-
-our %append_adverb_to_pirflags;
-%append_adverb_to_pirflags<anon> := 1;
-%append_adverb_to_pirflags<init> := 1;
-%append_adverb_to_pirflags<load> := 1;
-%append_adverb_to_pirflags<main> := 1;
-%append_adverb_to_pirflags<method> := 1;
-%append_adverb_to_pirflags<optional> := 1;
-%append_adverb_to_pirflags<opt_flag> := 1;
-
-sub adverb_extends($/, $decl, @args) {
-	if $decl<is_class> {
-		unless $decl<adverbs><extends> {
-			$decl<adverbs><extends> := new_array();
-		}
-		
-		for @args {
-			$decl<adverbs><extends>.push($_);
-		}
-	}
-	else {
-		$/.panic("Cannot extend non-class declaration.");
-	}
-}
-
-sub adverb_multi($/, $decl, @args) {
-	$decl<pirflags> := $decl<pirflags> ~ ' :multi(' ~ $decl<adverbs><multi> ~ ')';
-}
-
-sub adverb_named($/, $decl, @args) {
-	my $named;
-	
-	if +@args {
-		$named := @args[0];
-	}
-	else {
-		$named := $decl.name();
-	}
-	
-	$decl.named($named);
-}
-
-sub adverb_vtable($/, $decl, @args) {
-	$decl<is_vtable> := 1;
-
-	my $vtable_name;
-	
-	if +@args {
-		$vtable_name := @args[0];
-	}
-	else {
-		$vtable_name := $decl.name();
-	}
-
-	$decl<adverbs><vtable> := $vtable_name;
-	$decl<pirflags> := $decl<pirflags> ~ " :vtable('" ~ $vtable_name ~ "')";
-}
-
 method adverb($/) {
-	# What adverb are we seeing?
-	my $adverb;
+	my $past := PAST::Val.new(:node($/));
 	
 	if $<extends> {
-		$adverb := ~$<extends>;
+		$past.name(~$<extends>);
 	}
 	else {
-		$adverb := ~$<t_adverb><ident>;
-	}
-	
-	# Is this an alias for a different adverb?
-	if %adverb_aliases{$adverb} {
-		$adverb := %adverb_aliases{$adverb};
+		$past.name(~$<t_adverb><ident>);
 	}
 
-	# What, if any, args were given?
-	my @args := new_array();
-	
 	if $<signature> {
-		@args.push(~$<signature>[0]);
-	}
+		$past.push(
+			PAST::Val.new(
+				:name('signature'), 
+				:node($<signature>[0]), 
+				:returns('String'), 
+				:value(~$<signature>[0])));
+	} 
 	else {
-		# FIXME: For args that are strings, just attach the value,
-		# but class names get the node. This needs cleaning up.
 		for $<args> {
-			if $_.ast.isa(PAST::Val) {
-				@args.push($_.ast<value>);
-			}
-			else {
-				@args.push($_.ast);
-			}
+			$past.push($_.ast);
 		}
 	}
 	
-	# Is the adverb+args valid?
-	check_adverb_args($/, $adverb, +@args);
+	#DUMP($past, "adverb");
+	make $past;
+}
+
+method adverbs($/) {
+	my $past := PAST::Val.new(:name('adverb-list'), :node($/));
 	
-	my $decl := current_declaration();
-	
-	# Is there a special handler? Can't use sub refs yet.
-	if +@args eq 1 {
-		$decl<adverbs>{$adverb} := @args[0];
+	for $<adverb> {
+		$past.push($_.ast);
 	}
-	elsif +@args {
-		$decl<adverbs>{$adverb} := @args;
-	}
-	else {
-		$decl<adverbs>{$adverb} := 1;
-	}
-	
-	if $adverb eq 'extends' {
-		adverb_extends($/, $decl, @args);
-	}
-	elsif $adverb eq 'multi' {
-		adverb_multi($/, $decl, @args);
-	}
-	elsif $adverb eq 'named' {
-		adverb_named($/, $decl, @args);
-	}
-	elsif $adverb eq 'slurpy' {
-		$decl.slurpy(1);
-	}
-	elsif $adverb eq 'vtable' {
-		adverb_vtable($/, $decl, @args);
-	}
-	elsif %append_adverb_to_pirflags{$adverb} {
-		$decl<pirflags> := $decl<pirflags> ~ ' :' ~ $adverb;
-	}
-	elsif %adverb_arg_info{$adverb} {
-		# Nothing here. But if it's in the table, it's not bogus.
-	}
-	else {
-		die("Unsupported/unexpected adverb '" ~ $adverb ~ "'");
-	}
-	
-	#DUMP($decl, "current_declaration[w/ adverb]");
+
+	#DUMP($past, "adverbs");
+	make $past;
 }
 
 method initializer($/, $key) { PASSTHRU($/, $key); }

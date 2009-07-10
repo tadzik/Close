@@ -162,7 +162,7 @@ rule declaration {
 	[ <.DECL_MODE_PARAM> [ <!before ')' > || <.fail> ] ]?
 	<decl_specifiers>
 	<declarator>
-	[ <adverb> ]*			# NB: [ ]* is to allow <ws> in between
+	<adverbs>
 	[ [ <.DECL_MODE_EXTERN> || <.DECL_MODE_CLASS> ]
 		<?before '{'>
 		{*} #= body_open
@@ -241,6 +241,11 @@ rule array_or_hash_decl {
 	]
 }
 
+rule adverbs {
+	[ <adverb> ]*
+	{*}
+}
+
 rule adverb {
 	| [ $<extends>='extends' <args=long_ident> [ ',' <args=long_ident> ]* ] 
 	  {*}
@@ -249,7 +254,7 @@ rule adverb {
 		[ '(' 
 			[ <args=string_lit> [ ',' <args=string_lit> ]* 
 			| <signature=string_literal: ')' >	# Support :multi(_, A)
-			]?
+			]
 		')' ]?
 	]
 	{*}
