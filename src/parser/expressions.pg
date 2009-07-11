@@ -20,6 +20,7 @@ rule primary_expr {
 
 rule asm_expr {
 	'asm'
+	# FIXME: This should be "<postfix_call>"
 	[ '('
 		<arg_list>
 		[ ')'
@@ -33,16 +34,6 @@ rule asm_expr {
 token asm_contents {
     '{{' .*? '}}'
     {*}
-}
-
-rule arg_list {
-    [ <arg=arg_expr> [ ',' <arg=arg_expr> ]* ]?
-    {*}
-}
-
-rule arg_expr {
-	[ <argname=short_ident> ':' ]? <expression>
-	{*}
 }
 
 rule postfix_expr { 
@@ -67,6 +58,20 @@ rule postfix_member {
 
 rule postfix_call {
 	'(' <arg_list> ')'		{*}
+}
+
+rule arg_list {
+    [ <arg=arg_expr> [ ',' <arg=arg_expr> ]* ]?
+    {*}
+}
+
+token colon_space {
+	':' <.ws_all>
+}
+
+rule arg_expr {
+	[ <argname=short_ident>  <.colon_space> ]? <expression> <adverbs>
+	{*}
 }
 
 rule postfix_index {

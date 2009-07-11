@@ -1,36 +1,60 @@
 # $Id$
 extern int print();
 
-extern void f2() :init
+void fflat(int num :named("num"), str msg :named("msg")) {
+	print("ok ", num, " - ", msg, "\n");
+}
+
+void test_named() {
+	pmc args = new Hash;
+	args['num']  = 7;
+	fflat(msg: ":named works in arg-expressions", 7);
+	fflat(msg: ":named works in arg-expressions", args :named :flat);
+}
+
+void test_flat() {
+	pmc args = new ResizablePMCArray;
+	push args, 6, ":flat works in arg-expressions";
+	
+	fflat(args :flat);
+}
+	
+void f2() :init
 {
-	print("1..5\n");
+	print("1..7\n");
 	print("ok 1 - :init functions run first.\n");
 }
 
-extern void f1() :init
+void f1() :init
 {
 	print("ok 2 - :init functions run in definition order\n");
 }
 
-extern void f22(int p1) :multi(_)
+void f22(int p1) :multi(_)
 {
 	print("ok 4 - :multi() functions work\n");
 }
 
-extern void f22(int p1, int p2) :multi(_,_)
+void f22(int p1, int p2) :multi(_,_)
 {
 	print("ok 5 - :multi() functions work (2-ary remix)\n");
 }
 
-extern void test_main()
-{
+void test_multi() {
 	f22(1);
 	f22(1, 2);
 }
 
-extern void f0() :init
+void test_adverbs()
+{
+	test_flat();
+	test_multi();
+	test_named();
+}
+
+void f0() :init
 {
 	print("ok 3 - :init functions run in definition order\n");
 }
 
-extern void _runner() :init { test_main(); }
+extern void _runner() :init { test_adverbs(); }

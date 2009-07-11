@@ -344,7 +344,7 @@ our %adverb_aliases;
 %adverb_aliases{'...'} := 'slurpy';
 %adverb_aliases{'?'} := 'optional';
 
-sub unalias_adverb_name($adverb) {
+sub adverb_unalias_name($adverb) {
 	my $name := $adverb.name();
 	
 	if %adverb_aliases{$name} {
@@ -360,6 +360,7 @@ our %adverb_arg_limits;
 %adverb_arg_limits<anon>	:= (0,	"", 0,	":anon takes no args");
 %adverb_arg_limits<extends>	:= (1,	"'extends' requires at least one parent class",
 					256,	"cannot specify more than 256 parent classes");
+%adverb_arg_limits<flat>		:= (0,	"", 0,	":flat takes no args");
 %adverb_arg_limits<init>		:= (0,	"", 0,	":init takes no args");
 %adverb_arg_limits<load>		:= (0,	"", 0,	":load takes no args");
 %adverb_arg_limits<main>	:= (0,	"", 0,	":main takes no args");
@@ -461,10 +462,10 @@ our %append_adverb_to_pirflags;
 %append_adverb_to_pirflags<opt_flag> := 1;
 
 sub decl_add_adverb($/, $past, $adverb) {
-	my $name := unalias_adverb_name($adverb);
+	my $name := adverb_unalias_name($adverb);
 	my $num_args := +@($adverb);
 	
-	check_adverb_args($/, $name, $adverb);		# FIXME: Data format change in params.
+	check_adverb_args($/, $name, $adverb);
 	$past<adverbs>{$name} := adverb_args_storage($adverb);
 
 	# Is there a special handler? Can't use sub refs yet.

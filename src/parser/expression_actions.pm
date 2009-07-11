@@ -39,8 +39,36 @@ method arg_expr($/) {
 		$past.named(~$<argname>[0].ast.name());
 	}
 
+	if +@($<adverbs>.ast) {
+		for @($<adverbs>.ast) {
+			arg_expr_add_adverb($/, $past, $_);
+		}
+	}
+	
 	#DUMP($past, "arg_expr");
 	make $past;
+}
+
+sub adverb_arg_named($/, $past) {
+	$past.named($past<adverbs><named>);
+}
+
+
+sub arg_expr_add_adverb($/, $past, $adverb) {
+	# Presently this is a no-op, since the only two valid adverbs are :flat and :named.
+	my $name := adverb_unalias_name($adverb);
+	
+	check_adverb_args($/, $name, $adverb);		
+	$past<adverbs>{$name} := adverb_args_storage($adverb);
+	
+	# There is no "decl" here, so special handlers all the way.
+	if	$name eq 'flat'	{ $past.flat(1); }
+	elsif	$name eq 'named'	{ adverb_arg_named($/, $past); }
+	else {
+		$/.panic("Unexpected adverb: '" ~ $adverb.name() ~ "' in arg-expression");
+	}
+	
+	#DUMP($past, "argument-expression, with adverbs");
 }
 
 method asm_expr($/, $key) {
