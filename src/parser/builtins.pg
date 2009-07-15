@@ -64,7 +64,7 @@ functions. (This is the good stuff.)
 =item * Ops available as built-in functions:
 
 C<clone>,		C<concat>,		
-C<elements>,		C<exists>,		
+C<elements>,		C<exists>,		C<find_caller_lex>,	
 C<isa>,		C<isnull>,		
 C<new>,		C<new>,
 C<null>,		C<pop>,		C<push>,
@@ -81,6 +81,7 @@ token t_builtin {
 	| 'concat'
 	| 'elements'
 	| 'exists'
+	| 'find_caller_lex'
 	| 'isa'
 	| 'isnull'
 	| 'new'
@@ -109,6 +110,7 @@ rule built_in {
 		| <builtin_concat>	{*} #= builtin_concat
 		| <builtin_elements> {*} #= builtin_elements
 		| <builtin_exists>	{*} #= builtin_exists
+		| <builtin_find_caller_lex> {*} #= builtin_find_caller_lex
 		| <builtin_isa>	{*} #= builtin_isa
 		| <builtin_isnull>	{*} #= builtin_isnull
 		| <builtin_new>	{*} #= builtin_new
@@ -158,7 +160,7 @@ C<eq_num>,		C<eq_str>,		C<err>,
 C<errorsoff>,		C<errorson>,		C<escape>,		
 C<exchange>,	C<exit>,		
 C<exp>,		C<fact>,		C<fdiv>,		
-C<fdopen>,		C<find_caller_lex>,	C<find_cclass>,		
+C<fdopen>,		C<find_cclass>,		
 C<find_charset>,	C<find_encoding>,	C<find_lex>,		
 C<find_method>,	C<find_multi>,	C<find_name>,		
 C<find_not_cclass>,	C<find_sub_not_null>, C<floor>,		
@@ -230,6 +232,9 @@ rule builtin_elements { 'elements' <arr=expression> {*} }
 
 # if (exists arr[idx]) {...}
 rule builtin_exists { 'exists' <index=postfix_expr> {*} }
+
+# pmc foo = find_caller_lex '$foo';
+rule builtin_find_caller_lex { 'find_caller_lex' <name=expression> {*} }
 
 # if ( isa x, Class ) {... }
 rule builtin_isa { 'isa' <obj=expression> ',' <class=long_ident> {*} }

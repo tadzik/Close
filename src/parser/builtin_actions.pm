@@ -74,6 +74,19 @@ method builtin_exists($/) {
 	make $past;
 }
 
+method builtin_find_caller_lex($/) {
+	my $past := PAST::Op.new(
+		:name('builtin-find_caller_lex'),
+		:node($/),
+		:pasttype('pirop'),
+		:pirop('find_caller_lex PS'));
+	
+	$past.push($<name>.ast);
+	
+	#DUMP($past, "builtin-find_caller_lex");
+	make $past;
+}
+
 method builtin_isa($/) {
 	my $past := PAST::Op.new(
 		:name('isa'),
