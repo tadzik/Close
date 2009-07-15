@@ -1,3 +1,4 @@
+# $Id$
 grammar close::Grammar is PCT::Grammar;
 
 rule TOP {

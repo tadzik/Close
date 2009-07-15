@@ -796,29 +796,69 @@ method jump_stmt($/, $key) {
 			:inline('    goto ' ~ $<label>));
 	}
 	elsif $key eq 'return' {
-	$past := PAST::Op.new(
-	:name("return"),
-	:node($/),
-	:pasttype('pirop'),
-	:pirop('return'));
+		$past := PAST::Op.new(
+			:name("return"),
+			:node($/),
+			:pasttype('pirop'),
+			:pirop('return'));
 
-	if $<retval> {
-	$past.push($<retval>[0].ast);
-	}
+		if $<retval> {
+			$past.push($<retval>[0].ast);
+		}
 	}
 	elsif $key eq 'tailcall' {
-	$past := PAST::Op.new(
-	:name("tailcall"),
-	:node($/),
-	:pasttype('pirop'),
-	:pirop('tailcall'));
+		my $call_past := $<retval>.ast;
+		
+		$past := PAST::Op.new(
+			:name("tailcall"),
+			:node($/),
+			:pasttype('inline'));
 
-	$past.push($<retval>.ast);
+		my $inline := '';
+		
+		my $arg_i := 0;
+		
+		if $call_past.pasttype() eq 'call' {
+			if $call_past.name() {
+				$inline := "    .tailcall '" ~ $call_past.name() ~ "'";
+				$arg_i := 0;
+			}
+			else {
+				$inline := "    .tailcall %0";
+				$arg_i := 1;
+			}
+		}
+		elsif $call_past.pasttype() eq 'callmethod' {
+			if $call_past.name() {
+				$inline := "    .tailcall %0.'" ~ $call_past.name() ~ "'";
+				$arg_i := 1;
+			}
+			else {
+				$inline := "    .tailcall %0.%1";
+				$arg_i := 2;
+			}
+		}
+		else {
+			$/.panic("Invalid pasttype '" ~ $call_past.pasttype() ~ "' in tailcall");
+		}
+
+		$inline := $inline ~ '(';
+		if $arg_i < +@($call_past) {
+			$inline := $inline ~ '%' ~ $arg_i++;
+		}
+		
+		while $arg_i < +@($call_past) {
+			$inline := $inline ~ ', %' ~ $arg_i++;
+		}
+
+		$inline := $inline ~ ")\n";
+		$past.inline($inline);
+		#DUMP($past, "tailcall");
 	}
 	else {
-	$/.panic("Unanticipated type of jump statement: '"
-	~ $key
-	~ "' - you need to implement it!");
+		$/.panic("Unanticipated type of jump statement: '"
+			~ $key
+			~ "' - you need to implement it!");
 	}
 
 	#DUMP($past, $key);

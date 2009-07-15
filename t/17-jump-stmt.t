@@ -21,11 +21,48 @@ skip3:
 	ok(3, "If+goto");
 }
 
-void test()
+int tr1(int x) 
 {
-	plan(3);
-
-	test_goto();
+	return (x);
 }
 
-extern void _runner() :init { test(); }
+str tr2()
+{
+	return "to sender";
+}
+
+void test_return()
+{
+	ok(tr1(0), 0, "Return 0 ok");
+	ok(tr1(1), 1, "Return 1 ok");
+	ok(tr2(), "to sender", "Return str ok");
+}
+
+int ttc1a() {
+	return find_caller_lex 'x';
+}
+
+int ttc1() {
+	lexical int x = 100;
+	tailcall ttc1a();
+}
+
+
+void test_tailcall()
+{
+	lexical pmc x = 1;
+
+	ok(ttc1(), 1, "Tailcall <name> ok");
+}
+	
+	
+void test()
+{
+	plan(6);
+
+	test_goto();
+	test_return();
+	test_tailcall();
+}
+
+void _runner() :init :load { test(); }

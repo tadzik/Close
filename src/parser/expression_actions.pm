@@ -129,13 +129,14 @@ sub postfixup($past) {
 		my $func := $past[0];
 
 		if $func.isa('PAST::Var') {
+			# Rewrite a.b() into (callmethod 'b', a, args)
 			if $func.scope() eq 'attribute' {
-				# a.method() call. fix it up (case #2)
 				$past.pasttype('callmethod');
 				$past.name($func.name());
 				$past.shift();
 				$past.unshift($func[0]);
 			}
+			# Rewrite f() into (call 'f', args)
 			else {
 				unless $func<decl> {
 					die("No decl info stored for symbol '" ~ $func.name() ~ "'");

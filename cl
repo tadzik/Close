@@ -23,5 +23,4 @@ do
 	fi
 done
 
-../../parrot $BEFORE_ARGS -Llibrary/close -r close.pbc $AFTER_ARGS
-
+parrot $BEFORE_ARGS -Llibrary/close -r close.pbc $AFTER_ARGS
