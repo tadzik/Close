@@ -1,0 +1,881 @@
+=head1 PCT::HllCompiler
+
+=head2 Version
+
+$Id: $
+
+=head2 Abstract
+
+The base class for compiler objects.
+
+=head2 Synopsis
+
+Optional, eh.
+
+=head2 Description
+
+This file implements a C<HllCompiler> class of objects used for creating HLL 
+compilers.  It provides the standard methods required for all compilers, as 
+well as some standard scaffolding for running compilers from a command line.
+
+=cut
+
+namespace PCT::HllCompiler;
+
+extern void ::load();
+load('Parrot/Exception.pbc');
+
+class PCT::HllCompiler
+	:phylum(P6object)
+{
+	attribute pmc @stages;
+	attribute pmc $parsegrammar ;
+	attribute pmc $parseactions;
+	attribute pmc $astgrammar;
+	attribute pmc $commandline_banner;
+	attribute pmc $commandline_prompt;
+	attribute pmc @cmdoptions;
+	attribute pmc $usage;
+	attribute pmc $version;
+    
+	# There's a bunch of definitions, but do they get used?
+	
+	# .include 'cclass.pasm'
+
+	void init()
+		:vtable
+		:method
+	{
+		load_bytecode 'config.pir';
+
+		self.'@stages' = split ' ', "parse past post pir evalpmc";
+
+		self.'@cmdoptions' = split ' ', "e=s help|h target=s dumper=s trace|t=s encoding=s output|o=s combine version|v";
+
+		self.'$usage' = concat
+			"  This compiler is based on PCT::HllCompiler.\n",
+			"\n",
+			"  Options:\n";
+		
+		foreach (pmc option : self.'@cmdoptions') {
+			concat self.'$usage', "\t", option, "\n";
+		}
+		
+		str revision = '???';
+		
+		push_eh _handler;
+		pmc config = _config();
+		revision = config['revision'];
+		
+	_handler:
+		pop_eh
+		self.'$version' = concat "This compiler is built with the Parrot Compiler Toolkit, parrot revision ",
+			revision,
+			".";
+	}
+	
+
+=head2 Methods
+
+=over 4
+
+=item attr(string attrname, pmc value, int has_value)
+
+Helper method for accessors -- gets/sets an attribute given
+by C<attrname> based on C<has_value>.
+
+=cut
+	pmc attr(str attrname, pmc value, int has_value, pmc default = new ::parrot::Undef)
+		:method
+	{
+		if (has_value) {
+			self.*attrname = value;
+		}
+		else {
+			if (isnull (value = self.*attrname))
+				value = default;
+		}
+		
+		return value;
+	}
+	
+=item command_line(PMC args)
+
+Generic method for compilers invoked from a shell command line.
+
+=cut
+	void command_line(pmc args, pmc adverbs ... :named)
+		:method
+	{
+		# Test for Perl's Test::Harness, exit immediately if found
+		if ((index args[2], '@INC') >= 0) {
+			exit 0;
+		}
+	
+		load_bytecode 'dumper.pbc'
+		load_bytecode 'PGE/Dumper.pbc'
+
+		str arg0 = args[0];
+		
+		pmc opts = self.process_args(args);
+		
+		foreach (str opt : opts) {
+			adverbs[opt] = opts[opt];
+		}
+
+		if (adverbs['help']) self.usage();		# exits when called
+		
+		if (adverbs['version']) self.version();	# exits when called
+		
+		pmc result = '';
+		
+		if (exists adverbs['e']) { 
+			result = self.eval(arg0, '-e', args :flat, adverbs :flat :named);
+			goto save_output;
+		}
+		else 
+		unless (args) {
+			self.interactive(args :flat, adverbs :flat :named);
+		}
+		else {
+			if (adverbs['combine']) {
+				result = self.evalfiles(args, adverbs :flat :named);
+			}
+			else {
+				result = self.evalfiles(arg0, args: flat, adverbs :flat :named);
+			}
+
+		save_output:
+			unless (isnull result) {
+				if (defined result) {
+					str target = downcase adverbs['target'];
+					
+					if (target == 'pir') {
+						pmc ofh = getstdout;
+						str output = adverbs['output'];
+						if (output != '' && output != '-') {
+							ofh = open output, 'w'
+							
+							unless (ofh) {
+								return # TODO: tailcall
+								self.panic("Error: file cannot be written: ", output);
+							}
+						}
+						
+						# FIXME: There's a 2-ary version of print?
+						print ofh, result;
+						close ofh;
+					}
+				}
+			}
+		}
+	}
+
+
+=item compile(pmc code [, "option" => value, ... ])
+
+Compile C<source> (possibly modified by any provided options)
+by iterating through any stages identified for this compiler.
+If a C<target> option is provided, then halt the iteration
+when the stage corresponding to target has been reached.
+
+=cut
+
+	pmc compile(pmc source, pmc adverbs ... :named) 
+		:method
+	{
+		str target = downcase adverbs['target'];
+		
+		pmc stages = self.'@stages';
+		pmc result = source;
+		
+		for (str stagename : stages) {
+			result = self.*stagename(result, adverbs :flat :named);
+			
+			if (target == stagename) {
+				break;
+			}
+		}
+		
+		return result;
+	}
+	
+=item panic(message :slurpy)
+
+Helper method to throw an exception (with a message).
+
+=cut
+
+	void panic(pmc args ...) 
+		:method 
+	{
+		die join '', args;
+	}
+
+=item language(string name)
+
+Register this object as the compiler for C<name> using the
+C<compreg> opcode.
+
+=cut
+
+	void language(str name)
+		:method
+	{
+		# FIXME: Add compreg builtin
+		compreg name, self;
+	}
+
+=item version()
+
+Display compiler version information.
+
+=cut
+
+	void version()
+		:method
+	{
+		say(self.'$version');
+		exit 0;
+	}
+	
+=item usage()
+
+Prints usage message and exits.
+
+=cut
+	
+	void usage(str name = null)
+		:method
+	{
+		unless (isnull name) {
+			say(name);
+		}
+		
+		say(self.'$usage');
+		exit 0;
+	}
+	
+=item parse_name(string name)
+
+Split C<name> into its component namespace parts, as required by pdd21.  The 
+default is simply to split the name based on double-colon separators.
+
+=cut
+
+	pmc parse_name(str name)
+		:method
+	{
+		return split '::', name;
+	}
+	
+=item dumper(obj, name, options)
+
+Dump C<obj> with C<name> according to C<options>.
+
+=cut
+
+	void dumper(pmc object, str name, pmc options ... :named)
+		:method
+	{
+		str dumper = options['dumper'];
+		
+		if (dumper) {
+			load_bytecode 'PCT/Dumper.pbc';
+			dumper = downcase dumper
+			return # TODO: tailcall
+			PCT::Dumper::(*dumper)(obj, name);
+		}
+		
+		# else
+		return # TODO: tailcall
+		_dumper(obj, name);
+	}
+
+=item stages([stages])
+
+Accessor for the C<stages> attribute.
+
+=cut 
+
+	pmc stages(pmc value = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('@stages', value, !isnull value);
+	}
+
+=item parsegrammar([string grammar])
+
+Accessor for the C<parsegrammar> attribute.
+
+=cut
+
+	pmc parsegrammar(str grammar = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('$parsegrammar', value, !isnull value);
+	}
+	
+=item parseactions([actions])
+
+Accessor for the C<parseactions> attribute.
+
+=cut
+
+	pmc parseactions(str actions = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('$parseactions', value, !isnull value);
+	}
+	
+
+=item astgrammar([grammar])
+
+Accessor for the C<astgrammar> attribute.
+
+=cut
+
+	pmc astgrammar(str actions = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('$astgrammar', value, !isnull value);
+	}
+
+=item commandline_banner([string value])
+
+Set the command-line banner for this compiler to C<value>.
+The banner is displayed at the beginning of interactive mode.
+
+=cut
+
+	pmc commandline_banner(str actions = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('$commandline_banner', value, !isnull value);
+	}
+
+=item commandline_prompt([string value])
+
+Set the command-line prompt for this compiler to C<value>.
+The prompt is displayed in interactive mode at each point where
+the compiler is ready for code to be compiled and executed.
+
+=cut
+
+	pmc commandline_prompt(str actions = null)
+		:method
+	{
+		return # TODO: tailcall
+		self.attr('$commandline_prompt', value, !isnull value);
+	}
+
+=item removestage(string stagename)
+
+Delete a stage from the compilation process queue.
+
+=cut
+
+	void removestage(str stagename)
+		:method
+	{
+		pmc newstages = new ResizableStringArray;
+		
+		for (str stage : self.'@stages') {
+			unless (stage == stagename) {
+				push newstages, stage;
+			}
+		}
+		
+		self.'@stages' = newstages;
+	}
+
+=item addstage(string stagename [, "option" => value, ... ])
+
+Add a stage to the compilation process queue. Takes either a "before" or
+"after" named argument, which gives the relative ordering of the stage
+to be added. If "before" and "after" aren't specified, the new stage is
+inserted at the end of the queue.
+
+It's possible to add multiple stages of the same name: for example, you
+might repeat a stage like "optimize_tree" or "display_benchmarks" after
+each transformation. If you have multiple stages of the same name, and
+add a new stage before or after that repeated stage, the new stage will
+be added at every instance of the repeated stage.
+
+=cut
+
+	void addstage(str stagename, pmc adverbs ... :named)
+		:method
+	{
+		str position;
+		str target;
+		pmc stages = self.'@stages';
+		
+		if (exists adverbs['before']) {
+			position = 'before';
+			target = adverbs['before'];
+		}
+		else if (exists adverbs['after']) {
+			position = 'after';
+			target = adverbs['after'];
+		}
+		else {
+			push self.'@stages', stagename;
+			return;
+		}
+		
+		pmc new_stages = new ResizableStringArray;
+		
+		foreach (str current : self.'@stages') {
+			if (current != target) {
+				push new_stages, current;
+			}
+			else {
+				if (position == 'before') {
+					push new_stages, stagename;
+				}
+				
+				push new_stages, current;
+				
+				if (position == 'after') {
+					push new_stages, stagename;
+				}
+			}
+		}
+		
+		self.'@stages' = new_stages;
+	}
+
+=item eval(code [, "option" => value, ...])
+
+Compile and execute the given C<code> taking into account any
+options provided.
+
+=cut
+
+	pmc eval(pmc code, pmc args ..., pmc adverbs ... :named)
+		:method
+	{
+		if (isnull args) {
+			args = new ResizablePMCArray;
+		}
+		
+		if (isnull adverbs) {
+			adverbs = new Hash;
+		}
+		
+		pmc compiled_code = self.compile(code, adverbs :flat :named);
+		
+		if (!isa compiled_code, ::parrot::String) {
+			if (adverbs['target'] == '') {
+				trace adverbs['trace'];
+				pmc tmp = (*compiled_code)(args :flat);
+				trace 0
+				return tmp;
+			}
+		}
+		
+		return compiled_code;	
+	}
+
+	pmc evalpmc(pmc source, pmc adverbs ... :named)
+		:method
+	{
+		pmc pir_compiler = compreg 'PIR';
+		return (*compreg 'PIR')(source);
+	}
+
+=item parse(source [, "option" => value, ...])
+
+Parse C<source> using the compiler's C<parsegrammar> according
+to any options and return the resulting parse tree.
+
+=cut
+
+	pmc parse(pmc source, pmc adverbs ... :named)
+		:method
+	{
+		pmc parsegrammar;
+		pmc top;
+		
+		str tcode = adverbs['transcode'];
+		
+		if (tcode) {
+			foreach (pmc tc : split ' ', tcode) {
+				push_eh tcode_enc
+				source = trans_charset source, (find_charset tc);
+				pop_eh
+				break;
+				
+			tcode_enc:
+				pop_eh
+				push_eh tcode_fail;
+				source = trans_encoding source, (find_encoding tc);
+				pop_eh
+				break;
+				
+			tcode_fail:
+				pop_eh
+			}
+		}
+		
+		str target = downcase adverbs['target'];
+		
+		parsegrammar = self.parsegrammar();
+		
+		if (can parsegrammar, 'TOP') {
+			top = find_method parsegrammar, 'TOP';
+		}
+		else if (typeof parsegrammar != 'NameSpace') {
+			pmc temp = self.parse_name(parsegrammar);
+			str name = pop temp;
+			pmc temp2 = get_hll_global temp, name;
+			if (can temp2, 'TOP') {
+				top = find_method temp2, 'TOP';
+			}
+			else {
+				pmc ns = self.parse_name(parsegrammar);
+				top = get_hll_global ns, 'TOP';
+				if (isnull top) {
+					self.panic('Cannot find TOP regex in ', parsegrammar);
+				}
+			}
+		}
+		else {
+			top = parsegrammar['TOP'];
+			if (isnull top) {
+				self.panic('Cannot find TOP regex in ', parsegrammar);
+			}
+		}
+		
+		# have top:
+		pmc parseactions;
+		pmc action = null;
+		
+		if (target != 'parse') {
+			parseactions = self.parseactions();
+			
+			if (parseactions) {
+				if (isa parseactions, ::parrot::NameSpace) {
+					action = new get_class parseactions;
+				}
+				else if ((isa parseactions, ::parrot::Class) 
+					|| (does parseactions, 'array')) {
+					action = new parseactions;
+				}
+				else if (isa parseactions, ::parrot::String) {
+					pmc cls = get_class parseactions;
+					if (isnull cls) {
+						parseactions = split '::', parseactions;
+						push_eh err_bad_parseactions
+						P0 = get_class parseactions;
+						if (isnull P0) {
+							goto err_bad_parseactions;
+						}
+						
+						pop_eh
+						action = new parseactions;
+					}
+				}
+				else {
+					action = parseactions;
+				}
+			}
+		} # have_action
+		
+		pmc match = top(source, grammar : parsegrammar, action : action);
+		
+		if (match) {
+			return match;
+		}
+		
+		err_no_parsegrammar:
+		self.panic('Missing parsegrammar in compiler');
+		return;
+		
+		err_failedparse:
+		self.panic('Failed to parse source');
+		return;
+
+		err_bad_parseactions:
+		pop_eh
+		self.panic('Unable to find action grammar ', self.parseactions());
+		return;
+	}
+
+
+}
+
+=item past(source [, "option" => value, ...])
+
+Transform C<source> into PAST using the compiler's
+C<astgrammar> according to any options, and return the
+resulting ast.
+
+=cut
+
+.sub 'past' :method
+    .param pmc source
+    .param pmc adverbs         :slurpy :named
+
+  compile_astgrammar:
+    .local pmc astgrammar_name
+    astgrammar_name = self.'astgrammar'()
+    $S0 = typeof astgrammar_name
+    eq $S0, 'NameSpace', astgrammar_ns
+    unless astgrammar_name goto compile_match
+
+    .local pmc astgrammar_namelist
+    .local pmc astgrammar, astbuilder
+    astgrammar_namelist = self.'parse_name'(astgrammar_name)
+    unless astgrammar_namelist goto err_past
+    astgrammar = new astgrammar_namelist
+    astbuilder = astgrammar.'apply'(source)
+    .tailcall astbuilder.'get'('past')
+  astgrammar_ns:
+    $P0 = get_class astgrammar_name
+    astgrammar = new $P0
+    astbuilder = astgrammar.'apply'(source)
+    .tailcall astbuilder.'get'('past')
+
+  compile_match:
+    #push_eh err_past
+    .local pmc ast
+    ast = source.'item'()
+    #pop_eh
+    $I0 = isa ast, ['PAST';'Node']
+    unless $I0 goto err_past
+    .return (ast)
+
+  err_past:
+    #pop_eh
+    $S0 = typeof source
+    .tailcall self.'panic'('Unable to obtain PAST from ', $S0)
+.end
+
+
+=item post(source [, adverbs :slurpy :named])
+
+Transform PAST C<source> into POST.
+
+=cut
+
+.sub 'post' :method
+    .param pmc source
+    .param pmc adverbs         :slurpy :named
+    $P0 = compreg 'PAST'
+    .tailcall $P0.'to_post'(source, adverbs :flat :named)
+.end
+
+
+.sub 'pir' :method
+    .param pmc source
+    .param pmc adverbs         :slurpy :named
+
+    $P0 = compreg 'POST'
+    .tailcall $P0.'to_pir'(source, adverbs :flat :named)
+.end
+
+=item interactive(["encoding" => encoding] [, "option" => value, ...])
+
+Runs an interactive compilation session -- reads lines of input
+from the standard input and evaluates each.  The C<encoding> option
+specifies the encoding to use for the input (e.g., "utf8").
+
+=cut
+
+.sub 'interactive' :method
+    .param pmc adverbs         :slurpy :named
+    .local string target, encoding
+    target = adverbs['target']
+    target = downcase target
+
+    # on startup show the welcome message
+    $P0 = self.'commandline_banner'()
+    printerr $P0
+
+    .local pmc stdin
+    .local int has_readline
+    stdin = getstdin
+    encoding = adverbs['encoding']
+    if encoding == 'fixed_8' goto interactive_loop
+    unless encoding goto interactive_loop
+    stdin.'encoding'(encoding)
+  interactive_loop:
+    .local pmc code
+    unless stdin goto interactive_end
+
+    .local string prompt
+    prompt = '> '
+    $P0 = self.'commandline_prompt'()
+    $I0 = defined $P0
+    unless $I0 goto have_prompt
+    prompt = $P0
+  have_prompt:
+
+    ##  display a prompt ourselves if readline isn't present
+  interactive_read:
+    code = stdin.'readline_interactive'(prompt)
+    if null code goto interactive_end
+    unless code goto interactive_loop
+    concat code, "\n"
+    push_eh interactive_trap
+    $P0 = self.'eval'(code, adverbs :flat :named)
+    pop_eh
+    if null $P0 goto interactive_loop
+    unless target goto interactive_loop
+    if target == 'pir' goto target_pir
+    self.'dumper'($P0, target, adverbs :flat :named)
+    goto interactive_loop
+  target_pir:
+    say $P0
+    goto interactive_loop
+  interactive_trap:
+    get_results '0', $P0
+    pop_eh
+    $S0 = $P0
+    if $S0 == '' goto have_newline
+    $S1 = substr $S0, -1, 1
+    $I0 = is_cclass .CCLASS_NEWLINE, $S1, 0
+    if $I0 goto have_newline
+    $S0 = concat $S0, "\n"
+  have_newline:
+    print $S0
+    goto interactive_loop
+  interactive_end:
+    .return ()
+.end
+
+
+=item EXPORTALL(source, destination)
+
+Export all namespace entries from the default export namespace for source
+(source::EXPORT::ALL) to the destination namespace.
+
+=cut
+
+.sub 'EXPORTALL' :method
+    .param pmc source
+    .param pmc dest
+    .local pmc ns_iter, item, export_list
+
+    source = source['EXPORT']
+    unless source, no_namespace_error
+    source = source['ALL']
+    unless source, no_namespace_error
+
+    ns_iter = iter source
+    export_list = new 'ResizablePMCArray'
+  export_loop:
+    unless ns_iter, export_loop_end
+    item = shift ns_iter
+    push export_list, item
+    goto export_loop
+  export_loop_end:
+
+    source.'export_to'(dest,export_list)
+    .return ()
+
+  no_namespace_error:
+    $P0 = new 'Exception'
+    $P0 = 'Missing EXPORT::ALL NameSpace'
+    throw $P0
+    .return ()
+.end
+
+=item evalfiles(files [, args] [, "encoding" => encoding] [, "option" => value, ...])
+
+Compile and evaluate a file or files.  The C<files> argument may
+be either a single filename or an array of files to be processed
+as a single compilation unit.  The C<encoding> option specifies
+the encoding to use when reading the files, and any remaining
+options are passed to the evaluator.
+
+=cut
+
+.sub 'evalfiles' :method
+    .param pmc files
+    .param pmc args            :slurpy
+    .param pmc adverbs         :slurpy :named
+
+    unless null adverbs goto have_adverbs
+    adverbs = new 'Hash'
+  have_adverbs:
+    .local string target
+    target = adverbs['target']
+    target = downcase target
+    .local string encoding
+    encoding = adverbs['encoding']
+    $I0 = does files, 'array'
+    if $I0 goto have_files_array
+    $P0 = new 'ResizablePMCArray'
+    push $P0, files
+    files = $P0
+  have_files_array:
+    .local string code
+    code = ''
+    .local pmc iter
+    iter = new 'Iterator', files
+  iter_loop:
+    unless iter goto iter_end
+    .local string iname
+    .local pmc ifh
+    iname = shift iter
+    ifh = new 'FileHandle'
+    unless encoding == 'utf8' goto iter_loop_1
+    ifh.'encoding'(encoding)
+  iter_loop_1:
+    $S0 = ifh.'readall'(iname)
+    code .= $S0
+    close ifh
+    goto iter_loop
+  iter_end:
+    $S0 = join ' ', files
+    $P1 = box $S0
+    .lex '$?FILES', $P1
+    $P0 = self.'eval'(code, args :flat, adverbs :flat :named)
+    if target == '' goto end
+    if target == 'pir' goto end
+    self.'dumper'($P0, target, adverbs :flat :named)
+  end:
+    .return ($P0)
+
+  err_infile:
+    .tailcall self.'panic'('Error: file cannot be read: ', iname)
+.end
+
+
+=item process_args(PMC args)
+
+Performs option processing of command-line args
+
+=cut
+
+.sub 'process_args' :method
+    .param pmc args
+
+    load_bytecode 'Getopt/Obj.pbc'
+
+    .local string arg0
+    arg0 = shift args
+    .local pmc getopts
+    getopts = new 'Getopt::Obj'
+    getopts.'notOptStop'(1)
+    $P0 = getattribute self, '@cmdoptions'
+    .local pmc iter
+    iter = new 'Iterator', $P0
+  getopts_loop:
+    unless iter goto getopts_end
+    $S0 = shift iter
+    push getopts, $S0
+    goto getopts_loop
+  getopts_end:
+    .tailcall getopts.'get_options'(args)
+.end
+
+
