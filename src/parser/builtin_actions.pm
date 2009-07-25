@@ -122,6 +122,18 @@ method builtin_isa($/) {
 	make $past;
 }
 
+method builtin_isntsame($/) {
+	my $past := PAST::Op.new(
+		:name('isntsame'),
+		:node($/),
+		:pasttype('pirop'),
+		:pirop('isntsame IPP'));
+	$past.push($<arg1>.ast);
+	$past.push($<arg2>.ast);
+	#DUMP($past, "expr: isntsame");
+	make $past;
+}
+
 method builtin_isnull($/) {
 	my $past := PAST::Op.new(
 		:name('isnull'),
@@ -133,6 +145,19 @@ method builtin_isnull($/) {
 	#DUMP($past, "expr: isnull");
 	make $past;
 }
+
+method builtin_issame($/) {
+	my $past := PAST::Op.new(
+		:name('isntsame'),
+		:node($/),
+		:pasttype('pirop'),
+		:pirop('issame IPP'));
+	$past.push($<arg1>.ast);
+	$past.push($<arg2>.ast);
+	#DUMP($past, "expr: issame");
+	make $past;
+}
+
 
 # NB: This operator gives precedence to variable names over class names.
 # If you create a variable called 'Iterator', you won't be able to create a new

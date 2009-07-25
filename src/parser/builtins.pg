@@ -65,7 +65,8 @@ functions. (This is the good stuff.)
 
 C<clone>,		C<concat>,		
 C<elements>,		C<exists>,		C<find_caller_lex>,	
-C<isa>,		C<isnull>,		
+C<isa>,		C<isntsame>,		C<isnull>,		
+C<issame>,		
 C<new>,		C<new>,
 C<null>,		C<pop>,		C<push>,
 C<shift>,		C<split>,		
@@ -83,7 +84,9 @@ token t_builtin {
 	| 'exists'
 	| 'find_caller_lex'
 	| 'isa'
+	| 'isntsame'
 	| 'isnull'
+	| 'issame'
 	| 'new'
 	| 'null'
 	| 'pop'
@@ -98,13 +101,10 @@ token t_builtin {
 }
 
 rule built_in {
-	[ <?before <t_builtin> >  
-	|| <.fail> 
-	]
+	<?before <t_builtin> >  
 	
 	# This brace required because otherwise the paragraph above is
-	# considered part of the || expression below, and when <fail>
-	# happens, the ||panic kicks in.
+	# considered part of the || expression below.
 	[ 
 		[ <builtin_clone>	{*} #= builtin_clone
 		| <builtin_concat>	{*} #= builtin_concat
@@ -112,7 +112,9 @@ rule built_in {
 		| <builtin_exists>	{*} #= builtin_exists
 		| <builtin_find_caller_lex> {*} #= builtin_find_caller_lex
 		| <builtin_isa>	{*} #= builtin_isa
+		| <builtin_isntsame> {*} #= builtin_isntsame
 		| <builtin_isnull>	{*} #= builtin_isnull
+		| <builtin_issame>	{*} #= builtin_issame
 		| <builtin_new>	{*} #= builtin_new
 		| <builtin_null>	{*} #= builtin_null
 		| <builtin_pop>	{*} #= builtin_pop
@@ -176,7 +178,6 @@ C<gmtime>,		C<gt_num>,		C<gt_str>,
 C<index>,		C<inspect>,		C<interpinfo>,		
 C<invoke>,		C<invokecc>,		C<is_cclass>,		
 C<isa>,		C<isfalse>,		
-C<isntsame>,		C<isnull>,		C<issame>,		
 C<istrue>,		C<iter>,		C<join>,		
 C<lcm>,		C<le_num>,		C<le_str>,		
 C<length>,		C<ln>,			C<load_bytecode>,		
@@ -239,8 +240,14 @@ rule builtin_find_caller_lex { 'find_caller_lex' <name=expression> {*} }
 # if ( isa x, Class ) {... }
 rule builtin_isa { 'isa' <obj=expression> ',' <class=long_ident> {*} }
 
+# if ( isntsame x, y ) {...}
+rule builtin_isntsame { 'isntsame' <arg1=expression> ',' <arg2=expression> {*} }
+
 # if ( isnull x ) {...}
 rule builtin_isnull { 'isnull' <expression> {*} }
+
+# if ( issame x, y ) {...}
+rule builtin_issame { 'issame' <arg1=expression> ',' <arg2=expression> {*} }
 
 # x = new Iterator, foo
 # FIXME: Add "new expression" support.

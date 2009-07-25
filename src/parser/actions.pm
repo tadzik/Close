@@ -21,7 +21,11 @@ pod section of the grammar.
 
 class close::Grammar::Actions;
 
-method TOP($/, $key) {
+method TOP($/) {
+	make $<translation_unit>.ast;
+}
+
+method translation_unit($/, $key) {
 	my $lstype := 'compilation unit';
 	if $key eq 'start' {
 		# I begin to suspect that this is useless.
@@ -168,178 +172,6 @@ method long_ident($/) {
 	make $past;
 }
 
-# 1. Declaring an uninitialized attribute:   attribute int foo;
-#  - causes an add-attr entry in the class-init function, plus a symbol table entry
-# for the class block.
-# 2. Declaring an initialized attribute:  attribute int foo = 0;
-#  - causes an add-attr entry in the class-init function, plus a symbol table entry
-#  - for the class block, plus an initialization step in the _init or _new method,
-#  - or however it's enacted.
-# 3. Declaring a method: int foo() :method {...}
-#  - causes an add-method entry in the class-init function, plus a symbol table
-#  - entry for the class block.
-# 4. Declaring a non-method: int foo() {...}
-#  - causes an entry in the namespace, not the class. (?)
-#
-
-method declaration($/, $key) {
-	my $lstype;
-	my $decl_mode := 'ERROR: in declaration()';
-
-	if $key eq 'body_open' {
-		# Put PAST::Block back on stack as either function body
-		# or class block.
-		my $block := current_declaration();
-
-		if $block<is_extern> {
-			$/.panic("You cannot use 'extern' with a definition");
-		}
-
-		if $block<is_function> {
-			$lstype := 'function body';
-			$decl_mode := 'local';
-
-			if $block<adverbs> && $block<adverbs><method>
-				or $block<is_vtable> {
-				# Create a 'self' lexical automatically.
-				my $auto_self := PAST::Var.new(
-					:isdecl(1),
-					:name('self'),
-					:node($/),
-					:scope('register'));
-				add_local_symbol($auto_self);
-				# Don't lexify it. Just remember that it was declared.
-				#$block[0].push($auto_self);
-			}
-		}
-		elsif $block<is_class> {
-			$lstype := 'class body';
-			$decl_mode := 'class';
-		}
-		else {
-			DUMP($block, "current_decl");
-			$/.panic("Blocks can only be used "
-				~ "in class and function definitions");
-
-		}
-
-		#say("Opening declaration of " ~ $lstype ~ " " ~ $block.name());
-		open_decl_mode($decl_mode);
-		$block<lstype> := $lstype;
-		push_lexical_scope($block);
-
-		if $block<is_class> {
-			# Open namespace inside class decl. so methods
-			# will be part of nsp block
-
-			open_class($block);
-		}
-	}
-	elsif $key eq 'body_close' {
-		my $block := current_declaration();
-
-		if $block<is_function> {
-			$lstype := 'function body';
-			$decl_mode := 'local';
-		}
-		elsif $block<is_class> {
-			close_class();
-			$lstype := 'class body';
-			$decl_mode := 'class';
-		}
-
-		#say("Closing declaration of " ~ $lstype ~ " " ~ $block.name());
-		close_decl_mode($decl_mode);
-		close_lexical_scope($lstype);
-	}
-	else {
-		self.declaration_done($/);
-	}
-}
-
-# Called by 'declaration' when end of decl is reached.
-method declaration_done($/) {
-	my $lstype;
-	my $decl_mode := 'ERROR: in declaration()';
-	
-	# This code has to deal with every single kind of declaration. Yikes.
-	my $past := close_declaration();
-
-	# Got any adverbs?
-	if +@($<adverbs>.ast) {
-		for @($<adverbs>.ast) {
-			decl_add_adverb($/, $past, $_);
-		}
-	}
-	
-	# FIXME: This is wrong, for classes at least. Need to insert declaring name
-	# into parent namespace before block open, so block guts can refer to it.
-	
-	# One important thing is to establish the namespace for the
-	# symbol. Use scope to determine what to do:
-	if $past<scope> eq 'package' {
-		if !$past<is_class> {
-			add_global_symbol($past);
-		}
-		else {
-			add_class_decl($past);
-		}
-	} elsif $past<scope> eq 'attribute' {
-		# TODO: Do I pass initializer in here?
-		add_class_attribute($past);
-	}
-
-	if $<initializer> {
-		# FIXME: Is this wrong? Should this be an assignment ?
-		$past.viviself($<initializer>[0].ast);
-		$past.lvalue(1);
-	}
-	elsif $past<is_function> {
-		# Definition or declaration?
-		if $<compound_stmt> {
-			$past.push($<compound_stmt>.ast);
-		}
-		else {
-			$past<is_decl_only> := 1;
-			$past := PAST::Op.new(
-				:node($past),
-				:name($past.name() ~ " (decl)"),
-				:pasttype('null'));
-		}
-	}
-	elsif $past<is_class> {
-		if $<compound_stmt> {
-			# Remove all method blocks - put them in the namespace
-			my @path := namespace_path_of_var($past);
-			my $namespace := get_past_block_of_path(@path);
-
-			my $block := $<compound_stmt>.ast;
-			my $num_items := +@($block);
-			my $node;
-
-			while $num_items-- {
-				$node := $block.shift();
-
-				if $node.isa(PAST::Block) {
-					#say("Adding method ", $node.name(), " to nsp block ", $namespace.name());
-					$namespace.push($node);
-				}
-				else {
-					# FIXME: I don't know what to do with these.
-					say("Recycling unknown node");
-					$block.push($node);
-				}
-			}
-		}
-
-		$past := PAST::Op.new(:node($/), :pasttype('null'));
-	}
-
-	#DUMP($past, "declaration (now closed)");
-	#say("Done with <declaration>: ", $past.name());
-	make $past;
-}
-
 our %adverb_aliases;
 %adverb_aliases{'...'} := 'slurpy';
 %adverb_aliases{'?'} := 'optional';
@@ -408,6 +240,10 @@ sub adverb_args_storage($adverb) {
 		return (1);
 	}
 	elsif $num_args  == 1 {
+		if $adverb[0].isa(PAST::Var) {
+			return $adverb;	# It's an "extends" clause, I think.
+		}
+		
 		return $adverb[0].value();
 	}
 	else {	# $num_args > 1
@@ -469,10 +305,10 @@ sub decl_add_adverb($/, $past, $adverb) {
 	$past<adverbs>{$name} := adverb_args_storage($adverb);
 
 	# Is there a special handler? Can't use sub refs yet.
-	if	$name eq 'extends' {	adverb_extends($/, $past);	}
+	if	$name eq 'extends'	{	adverb_extends($/, $past);	}
 	elsif	$name eq 'multi'	{	adverb_multi($/, $past);	}
 	elsif	$name eq 'named'	{	adverb_named($/, $past);	}
-	elsif	$name eq 'slurpy'	{	$past.slurpy(1);			}
+	elsif	$name eq 'slurpy'	{	$past.slurpy(1);		}
 	elsif	$name eq 'vtable'	{	adverb_vtable($/, $past);	}
 	elsif	%append_adverb_to_pirflags{$name} {
 		$past<pirflags> := $past<pirflags> ~ ' :' ~ $name;
@@ -480,149 +316,6 @@ sub decl_add_adverb($/, $past, $adverb) {
 	#DUMP($past, "current_declaration[w/ adverb]");
 }
 
-method parameter_decl_list($/, $key) {
-	my $lstype := 'parameter list';
-
-	if $key eq 'open' {
-		open_decl_mode('parameter');
-		my $past := open_lexical_scope('(parameter_decl_list)', $lstype);
-		$past.node($/);
-		$past.push( PAST::Stmts.new(:name('local variables')) );
-		$past<is_function> := 1;
-		$past.blocktype('declaration');
-		make $past;
-	}
-	else {
-		close_decl_mode('parameter');
-		my $past := close_lexical_scope($lstype);
-		#DUMP($past, "parameter_decl_list");
-
-		for $past<symtable> {
-			$past.push($past<symtable>{$_}<decl>);
-		}
-
-		current_declaration()<params> := $past;
-		make $past;
-	}
-}
-
-method decl_specifiers($/) {
-	my $past := open_declaration($/);
-
-	### Storage specifier
-
-	my $storage;
-
-	if $<storage_spec> {
-		$storage := ~$<storage_spec>[0];
-
-		if $storage eq 'extern' {
-			$past<is_extern> := 1;
-			$storage := 'package';
-		}
-		elsif $storage eq 'static' {
-			$past<is_static> := 1;
-			$storage := 'package';
-		}
-	}
-	else {
-		$storage := get_default_storage_spec();
-		#say("Using default storage spec: ", $storage);
-	}
-
-	$past.scope($storage);
-
-	### Type qualifiers
-
-	if $<type_qualifier> {
-		my $tq := ~$<type_qualifier>;
-
-		if $tq eq 'const' {
-			$past<is_const> := 1;
-		}
-	}
-
-	### Type specifier (not optional)
-
-	my $type := ~$<type_spec>;
-	#say("Type specifier: ", $type);
-	$past<type> := $type;
-
-	my $rtype;
-
-	if $type eq 'class' { $rtype := "P"; $past<is_class> := 1; }
-	elsif $type eq 'int'  { $rtype := "I"; }
-	elsif $type eq 'num'  { $rtype := "N"; }
-	elsif $type eq 'pmc'  { $rtype := "P"; }
-	elsif $type eq 'str'  { $rtype := "S"; }
-	elsif $type eq 'void' { $rtype := "v"; }
-	else { $rtype := "P"; }
-}
-
-method declarator($/) {
-	# Get name and other info from the identifier ast.
-	my $symbol		:= $<name>.ast;
-
-	my $decl			:= current_declaration();
-
-	# If the declarator is a sub(), uplift the params block
-	# to be the declarator past.
-	if $decl<params> && $decl<params><is_function> {
-		my $block		:= $decl<params>;
-		#DUMP($block, "uplift block");
-		# params<is_function> should be set by param_list
-		#$block<is_function> := $decl<is_function>;
-		$block.node($decl);
-		$block<params> := 'uplifted';
-		$block.pirflags($decl<pirflags>);
-		$block<rtype>	:= $decl<rtype>;
-		$block<scope>	:= $decl.scope();
-		$decl		:= replace_current_declaration($block);
-	}
-	elsif $decl<is_class> {
-		# Clone array to separate class namespace from enclosing nsp.
-		# (Else "nsp X { class C {" modifies X.namespace() because the
-		# long_ident inherits the nsp)
-		$symbol.namespace(clone_array($symbol.namespace()));
-		$symbol.namespace().push($symbol.name());
-
-		my @path := namespace_path_of_var($symbol);
-		my $block := get_class_info_of_path(@path);
-
-		$block.node($decl);
-		$block.pirflags($decl<pirflags>);
-		$block<rtype>	:= $decl<rtype>;
-		$block<scope>	:= $decl.scope();
-
-		$decl		:= replace_current_declaration($block);
-		#DUMP($decl, "class decl (after swap)");
-	}
-
-	$decl<is_rooted>	:= $symbol<is_rooted>;
-	$decl<hll>		:= $symbol<hll>;
-	$decl.name($symbol.name());
-	$decl.namespace($symbol.namespace());
-
-	# FIXME: I think this is wrong for pkg vars. Test?
-	unless $decl<is_class> {
-		# say("Saw declarator for ", $decl.name());
-		add_local_symbol($decl);
-	}
-
-	make $decl;
-}
-
-method decl_suffix($/, $key) { PASSTHRU($/, $key); }
-
-#~ method array_or_hash_decl($/, $key) {
-#~ 	my $past := PAST::Var.new()
-#~ }
-#~ rule array_or_hash_decl {
-#~ 	[ '%'				{*} #= hash
-#~ 	| <expression>	{*} #= fixed_array
-#~ 	| 				{*} #= resizable_array
-#~ 	]
-#~ }
 
 method adverb($/) {
 	my $past := PAST::Val.new(:node($/));
@@ -662,8 +355,6 @@ method adverbs($/) {
 	#DUMP($past, "adverbs");
 	make $past;
 }
-
-method initializer($/, $key) { PASSTHRU($/, $key); }
 
 method short_ident($/) {
 	my $name := ~$<id>;
@@ -716,282 +407,6 @@ method float_lit($/, $key) {
         :value(~$/));
     #DUMP($past, "number");
     make $past;
-}
-
-method statement($/, $key)              { PASSTHRU($/, $key); }
-
-method null_stmt($/) {
-    my $past := PAST::Op.new(:node($/), :pasttype('null'));
-    #DUMP($past, "null stmt");
-    make $past;
-}
-
-method expression_stmt($/) {
-    my $past := $<expression>.ast;
-    #DUMP($past, "expression_stmt");
-    make $past;
-}
-
-method compound_stmt($/) {
-	my $past := PAST::Stmts.new(:node($/), :name("compound_stmt"));
-
-	for $<item> {
-		#DUMP($_.ast, "item in block");
-		$past.push($_.ast);
-	}
-
-	make $past;
-}
-
-method conditional_stmt($/) {
-    my $keyw;
-    $keyw := (substr($<kw>, 0, 2) eq 'if')
-        ?? 'if'
-        !! 'unless';
-
-    my $past := PAST::Op.new(:node($/), :pasttype($keyw));
-    $past.push($<expression>.ast);      # test
-    $past.push($<then>.ast);            # then
-
-    if $<else> {
-        $past.push($<else>[0].ast);     # else
-    }
-
-    #DUMP($past, $keyw ~ " statement");
-    make $past;
-}
-
-method labeled_stmt($/, $key) {
-	my $past := PAST::Stmts.new(:name('labeled stmt'), :node($/));
-
-	for $<label> {
-		$past.push($_.ast);
-	}
-
-	$past.push($<statement>.ast);
-
-	#DUMP($past, "labeled stmt");
-	make $past;
-}
-
-method label($/) {
-	my $label := ~$<bareword>;
-	my $past := PAST::Op.new(
-		:name('label: ' ~ $label),
-		:node($/),
-		:pasttype('inline'),
-		:inline($label ~ ":\n"));
-	#DUMP($past, "label");
-	make $past;
-}
-
-method jump_stmt($/, $key) {
-	my $past;
-
-	if $key eq 'goto' {
-		$past := PAST::Op.new(
-			:name('goto ' ~ $<label>),
-			:node($/),
-			:pasttype('inline'),
-			:inline('    goto ' ~ $<label>));
-	}
-	elsif $key eq 'return' {
-		$past := PAST::Op.new(
-			:name("return"),
-			:node($/),
-			:pasttype('pirop'),
-			:pirop('return'));
-
-		if $<retval> {
-			$past.push($<retval>[0].ast);
-		}
-	}
-	elsif $key eq 'tailcall' {
-		my $call_past := $<retval>.ast;
-		
-		$past := PAST::Op.new(
-			:name("tailcall"),
-			:node($/),
-			:pasttype('inline'));
-
-		my $inline := '';
-		
-		my $arg_i := 0;
-		
-		if $call_past.pasttype() eq 'call' {
-			if $call_past.name() {
-				$inline := "    .tailcall '" ~ $call_past.name() ~ "'";
-				$arg_i := 0;
-			}
-			else {
-				$inline := "    .tailcall %0";
-				$arg_i := 1;
-			}
-		}
-		elsif $call_past.pasttype() eq 'callmethod' {
-			if $call_past.name() {
-				$inline := "    .tailcall %0.'" ~ $call_past.name() ~ "'";
-				$arg_i := 1;
-			}
-			else {
-				$inline := "    .tailcall %0.%1";
-				$arg_i := 2;
-			}
-		}
-		else {
-			$/.panic("Invalid pasttype '" ~ $call_past.pasttype() ~ "' in tailcall");
-		}
-
-		$inline := $inline ~ '(';
-		if $arg_i < +@($call_past) {
-			$inline := $inline ~ '%' ~ $arg_i++;
-		}
-		
-		while $arg_i < +@($call_past) {
-			$inline := $inline ~ ', %' ~ $arg_i++;
-		}
-
-		$inline := $inline ~ ")\n";
-		$past.inline($inline);
-		#DUMP($past, "tailcall");
-	}
-	else {
-		$/.panic("Unanticipated type of jump statement: '"
-			~ $key
-			~ "' - you need to implement it!");
-	}
-
-	#DUMP($past, $key);
-	make $past;
-}
-
-method iteration_stmt($/, $key)         { PASSTHRU($/, $key); }
-
-method foreach_stmt($/, $key) {
-	if $key eq 'index' {
-		open_decl_mode('parameter');
-		return 0;
-	}
-
-	my $index_var := $<index>.ast;
-
-	if $key eq 'open' {
-		close_decl_mode('parameter');
-
-		if $index_var.isdecl() {
-			if $index_var.scope() eq 'parameter' {
-				$index_var.scope('register');
-			}
-
-			add_local_symbol($index_var);
-		}
-		else {
-			my $info := symbol_defined_locally($index_var);
-
-			if !$info {
-				$/.panic("Symbol '"
-					~ $index_var.name()
-					~ "' is not defined locally.");
-			}
-			else {
-				$index_var.scope($info<decl>.scope());
-			}
-		}
-
-		return 0;
-	}
-
-	my $index_ref;
-
-	# Eventual past is { ... initialization ... while-loop }
-	my $past := PAST::Stmts.new(:name('foreach-loop'), :node($/));
-
-	if $index_var.isdecl() {
-		$past.push($index_var);
-
-		# Replace decl of  index var with new ref-only node.
-		$index_var := PAST::Var.new(
-			:lvalue(1),
-			:name($index_var.name()),
-			:node($index_var),
-			:scope('register'));
-	}
-
-	my $iter_name	:= make_temporary_name('foreach_'
-		~ $index_var.name() ~ '_iter');
-
-	my $iterator	:= PAST::Op.new(
-		:inline("    %r = new 'Iterator', %0"),
-		:name('new-iterator'),
-		:node($<index>),
-		:pasttype('inline'));
-	$iterator.push($<list>.ast);
-
-	my $iter_temp	:= PAST::Var.new(
-		:isdecl(1),
-		:lvalue(1),
-		:name($iter_name),
-		:node($<list>),
-		:scope('register'),
-		:viviself($iterator));
-	my $iter_read := PAST::Var.new(
-		:name($iter_name),
-		:node($<statement>),
-		:scope('register'));
-
-	# Store the iterator setup in the initialization part of the PAST
-	$past.push($iter_temp);
-
-	my $while := PAST::Op.new(
-		:name('foreach-while'),
-		:node($<statement>),
-		:pasttype('while'));
-
-	# While condition: while (iter) {...}
-	$while.push($iter_read);
-
-	# Insert a "index = shift iter" into while block
-	my $body := PAST::Stmts.new(:node($<statement>));
-	my $shift := PAST::Op.new(
-		:node($<statement>),
-		:pasttype('bind'));
-	$shift.push($index_var);
-	$shift.push(
-		PAST::Op.new(
-			:name('shift-iterator'),
-			:node($<statement>),
-			:pasttype('inline'),
-			:inline('    %r = shift %0'),
-			$iter_read));
-	$body.push($shift);
-	$body.push($<statement>.ast);
-	$while.push($body);
-	$past.push($while);
-
-	#DUMP($past, "foreach-stmt");
-	make $past;
-
-}
-
-method do_while_stmt($/) {
-    my $past := PAST::Op.new(:name('do-while-loop'), :node($/));
-    my $keyword := substr(~$<kw>, 0, 5);
-    $past.pasttype('repeat_' ~ $keyword);
-    $past.push($<expression>.ast);
-    $past.push($<statement>.ast);
-    #DUMP($past, $past.pasttype());
-    make $past;
-}
-
-method while_do_stmt($/) {
-	my $past := PAST::Op.new(:name('while-do-loop'), :node($/));
-	my $keyword := substr(~$<kw>, 0, 5);
-	$past.pasttype($keyword);
-	$past.push($<expression>.ast);
-	$past.push($<statement>.ast);
-
-	#DUMP($past, $past.pasttype());
-	make $past;
 }
 
 ##### Implementation helpers
@@ -1514,7 +929,6 @@ sub get_init_block_of_path(@_path) {
 		$block<init_done> := 1;
 		
 		#DUMP($block, "namespace init block");
-		
 	}
 
 	return $block;
@@ -1559,14 +973,8 @@ sub add_class_attribute($attr) {
 	$class.symbol($attr.name(), :decl($attr));
 
 	if !$class<is_extern> {
-		add_class_init_code($class);
-
-#~ 		my $name := $attr.name();
-#~ 		my $past := PAST::Op.new(
-#~ 			:name('class add-attribute for ' ~ $attr.name()),
-#~ 			:node($class),
-#~ 			:pasttype('inline'),
-#~ 			:inline("\t" ~ "addattribute the_class, '" ~ $name ~ "'\n"));
+		# FIXME: Don't know what this is supposed to do. Pretty sure it's wrong.
+		#add_class_init_code($class);
 	}
 
 
@@ -1623,6 +1031,9 @@ sub add_class_init_code($class) {
 sub make_init_class_sub($class) {
 	my $init_class_sub;
 
+	if $class<adverbs><phylum> eq 'close' {
+		$init_class_sub := make_init_class_sub_close($class);
+	}
 	if $class<adverbs><phylum> eq 'P6object' {
 		$init_class_sub := make_init_class_sub_p6object($class);
 	}
@@ -1634,7 +1045,7 @@ sub make_init_class_sub($class) {
 	return $init_class_sub;
 }
 
-sub make_init_class_sub_p6object($class) {
+sub make_init_class_sub_close($class) {
 	my @path		:= namespace_path_of_var($class);
 	my $ns_block	:= get_past_block_of_path(@path);
 
@@ -1700,6 +1111,73 @@ sub make_init_class_sub_p6object($class) {
 	return $init_class_sub;
 }
 
+sub make_init_class_sub_p6object($class) {
+	my @path		:= namespace_path_of_var($class);
+	my $ns_block	:= get_past_block_of_path(@path);
+
+	my $init_class_sub := get_class_init_of_path(@path);
+	$init_class_sub.node($ns_block);
+
+	my $hll := @path.shift();
+	my $class_name := join('::', @path);
+	@path.unshift($hll);
+	my $parent_class := "";
+
+	if $class<adverbs><extends> {
+		my $parent := $class<adverbs><extends>[0];
+		my $nsp	:= clone_array($parent.namespace());
+		$nsp.push($parent.name());
+		my $class_name := join('::', $nsp);
+		
+		if $parent<hll> ne $ns_block<hll> {
+			$class_name := $parent<hll> ~ ';' ~ $class_name;
+		}
+		
+		$parent_class := ", 'parent' => '" ~ $class_name ~ "'";
+		#say("Parent class: ", $parent_class);
+	}
+
+	my $attributes := "";
+
+	#DUMP($class, "class");
+	if $class<symtable> {
+		my $delim := '';
+
+		for $class<symtable> {
+			$attributes := $attributes ~ $delim ~ $_;
+			$delim := ' ';
+		}
+
+		if $attributes ne '' {
+			$attributes := ", 'attr' => '" ~ $attributes ~ "'";
+		}
+	}
+
+	my $inline_code := "\tload_bytecode 'P6object.pbc'\n"
+		~ "\t.local pmc p6meta, cproto\n"
+		~ "\tp6meta = new 'P6metaclass'\n"
+		~ "\tcproto = p6meta.'new_class'("
+			~ "'" ~ $class_name ~ "'"
+			~ $parent_class
+			~ $attributes
+		~ ")\n";
+
+	$init_class_sub.push(PAST::Op.new(
+		:name('Standard P6object preliminary'),
+		:node($class),
+		:pasttype('inline'),
+		:inline($inline_code)));
+
+	# Add a call to the namespace init block.
+	my $ns_init	:= get_init_block_of_path(@path);
+	$ns_init.push(PAST::Op.new(
+		:name($init_class_sub.name()),
+		:node($class),
+		:pasttype('call')));
+
+	return $init_class_sub;
+}
+
 ##################################################################
 
 =head4 PAST Generation
@@ -1710,11 +1188,85 @@ everything wraps up.
 
 =cut
 
+our $add_test_code := 0;
+
+# NB: This code emits a test function. I added it to try to reproduce 
+# an irreproducible PAST error. I am keeping it because it's good for feeding
+# Pmichaud reproducible test cases.
+
+sub make_test_sub()
+{
+	my $past := PAST::Block.new(
+		:blocktype('immediate'),
+		:name('XXXXX_test_code'));
+	
+	if $add_test_code {
+		#say("Generating XXXXX_test_code");
+		$past.blocktype('declaration');
+		$past<hll> := 'close';
+		#$past.method(1);
+		my @namespace := ('close', 'Namespace');
+		$past.namespace(@namespace);
+		$past.pirflags(" :method");
+		$past<scope> := 'package';
+		
+		# Declare params(name, symbol)
+		$past.push(PAST::Var.new(:name('name'), :scope('parameter'), :isdecl(1),
+			:namespace('close::Namespace'))); #:hll('close'),
+		$past.push(PAST::Var.new(:name('symbol'), :scope('parameter'), :isdecl(1),
+			:namespace('close::Namespace'))); #:hll('close'),
+		
+		# CODE: say("Adding symbol");
+		my $say := PAST::Op.new(
+			:name('say'),
+			:pasttype('call'),
+			PAST::Val.new(
+				:returns('String'),
+				:value('Adding symbol')
+			)
+		);
+		#$past.push($say);
+		
+		# CODE: self.symbols[name] = symbol;
+		$past.push(PAST::Op.new(
+			:name("="),
+			:pasttype('bind'),
+			PAST::Var.new(
+				:lvalue(1),
+				:name("indexed lookup"),
+				:scope('keyed'),
+				PAST::Var.new(
+					:name('symbols'),
+					:scope('attribute'),
+					PAST::Var.new(
+						#:hll('close'), :namespace('close::Namespace'),
+						:name('self'),
+						:scope('register')
+					)
+				),
+				PAST::Var.new(
+					#:hll('close'), :namespace('close::Namespace'),
+					:name('name'),
+					:scope('lexical') # parameter
+				)
+			),
+			PAST::Var.new(
+				#:hll('close'), :namespace('close::Namespace'),
+				:name('symbol'),
+				:scope('lexical') # parameter
+			)
+		));
+	}
+	
+	return $past;
+}
+
 sub compilation_unit_past()
 {
 	our $Symbol_table;
 	my @ns_list := get_all_namespaces();
 	my $past := PAST::Stmts.new();
+	$past.push(make_test_sub());
 
 	say("Got ", +@ns_list, " namespaces");
 	for @ns_list {

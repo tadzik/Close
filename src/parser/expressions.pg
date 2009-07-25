@@ -18,6 +18,12 @@ rule primary_expr {
 		{*} #= long_ident
 }
 
+token constant {
+	| <string_lit>                 {*} #= string_lit
+	| <float_lit>                {*} #= float_lit
+	| <integer_lit>                {*} #= integer_lit
+}
+
 rule asm_expr {
 	'asm'
 	# FIXME: This should be "<postfix_call>"
@@ -66,7 +72,7 @@ rule arg_list {
 }
 
 token colon_space {
-	':' <.ws_all>
+	':' <.WS_ALL>
 }
 
 rule arg_expr {
@@ -163,5 +169,6 @@ token assign_op {
 	| '+=' | '-='
 	| '*=' | '/=' | '%='
 	| '<<=' | '>>=' | '&=' | '|=' | '^='
+	| '&&=' | '||=' | 'and=' | 'or='
 	]
 }

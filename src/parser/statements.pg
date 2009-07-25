@@ -1,3 +1,29 @@
+$Id$
+
+=VERSION 
+
+$Rev$
+
+=cut
+
+rule extern_statement {
+	| <namespace_block>
+	| <namespace_directive>
+	| <block_statement>
+}
+
+rule block_statement {
+	| <namespace_alias_definition>
+	| <using_directive>
+	| <using_declaration>
+	| <simple_declaration>
+	| <statement>
+}
+
+rule simple_declaration {
+	# What is currently in declaration.pg/declaration, I think.
+}
+
 rule statement {
 	[ <labeled_stmt>	{*} #= labeled_stmt
 	| <null_stmt>		{*} #= null_stmt

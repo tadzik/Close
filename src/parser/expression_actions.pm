@@ -281,6 +281,10 @@ our %assign_opcodes;
 %assign_opcodes{'&='}	:= 'band';
 %assign_opcodes{'|='}	:= 'bor';
 %assign_opcodes{'^='}	:= 'bxor';
+%assign_opcodes{'and='}	:= 'and';
+%assign_opcodes{'&&='}	:= 'and';
+%assign_opcodes{'or='}	:= 'or';
+%assign_opcodes{'||='}	:= 'or';
 
 method assign_expr($/, $key) {
 	if $key eq 'single' {
