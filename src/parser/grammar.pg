@@ -1,46 +1,30 @@
 # $Id$
+
+=VERSION 
+
+$ Rev: $
+
+=cut
+
 grammar close::Grammar is PCT::Grammar;
 
 rule TOP {
+	<translation_unit> {*}
+}
+
+rule translation_unit {
 	{{
 		$P0 = box 1
 		set_global '$Top_of_file', $P0
 	}}
 	{*} #= start
-	<hll_block>+
+	<extern_statement>*
 	[ $ || <panic: 'Syntax error'> ]
 	{*} #= finish
 }
 
-rule hll_block {
-	[ 'hll' <hllname=short_ident> ';'
-	|| <?{{
-		$P0 = get_global '$Top_of_file'
-		.return ($P0)
-		}}>
-	]
-	{{
-		$P0 = box 1
-		set_global '$Top_of_hll_block', $P0
-		$P0 = box 0
-		set_global '$Top_of_file', $P0
-	}}
-	{*} #= open
-	<namespace_block>+
-	{*} #= close
-}
-
 rule namespace_block {
-	[ 'namespace' <namespace_name>  ';'
-	|| <?{{
-		$P0 = get_global '$Top_of_hll_block'
-		.return ($P0)
-		}}>
-	]
-	{{
-		$P0 = box 0
-		set_global '$Top_of_hll_block', $P0
-	}}
+	[ 'namespace' <namespace_name>  ';' ]?
 	{*} #= open
 	<declaration>*
 	{*} #= close
@@ -86,162 +70,6 @@ token long_ident {
 	{*}
 }
 
-# Declarations can have different flavors.
-# 1- External declarations can be of (namespace-) global variables, or functions.
-#	Functions may be declared (prototype) or defined.
-#
-#	This mode allows a {...} block for code to follow function declarations.
-#	The void keyword only applies to functions.
-#
-#	<?decl_mode_is: 'extern'>
-#
-# 2- Local declarations in compound statements. These are variable definitions,
-#	or external variable declarations, or external function declarations.
-#
-#	This mode prohibits the {...} block for function definitions. (There's
-#	an argument to be made for nesting functions, because of scopes. Maybe
-#	in release 3...)
-#
-#	<?decl_mode_is: 'local'>
-#
-# 3- Class member declarations of "class" functions (extern), "class" data
-# 	(extern again) or "attribute" data.
-#
-#	This mode is the only one that allows the 'attribute' keyword.
-#
-#	<?decl_mode_is: 'class'>
-#
-# 4- Parameter declarations in function prototypes.
-#
-#	This mode allows only the "lexical" and "register" storage specifiers.
-#
-token DECL_MODE_CLASS {
-	<?{{
-		$P0 = get_hll_global [ 'close' ; 'Grammar' ; 'Actions' ], '@Decl_mode_stack'
-		$S0 = $P0[0]
-		if 'class' == $S0 goto yes
-		.return (0)
-	yes:
-		.return (1)
-	}}>
-}
-
-token DECL_MODE_EXTERN {
-	<?{{
-		$P0 = get_hll_global [ 'close' ; 'Grammar' ; 'Actions' ], '@Decl_mode_stack'
-		$S0 = $P0[0]
-		if 'extern' == $S0 goto yes
-		.return (0)
-	yes:
-		.return (1)
-	}}>
-}
-
-token DECL_MODE_LOCAL {
-	<?{{
-		$P0 = get_hll_global [ 'close' ; 'Grammar' ; 'Actions' ], '@Decl_mode_stack'
-		$S0 = $P0[0]
-		if 'local' == $S0 goto yes
-		.return (0)
-	yes:
-		.return (1)
-	}}>
-}
-
-token DECL_MODE_PARAM {
-	<?{{
-		$P0 = get_hll_global [ 'close' ; 'Grammar' ; 'Actions' ], '@Decl_mode_stack'
-		$S0 = $P0[0]
-		if 'parameter' == $S0 goto yes
-		.return (0)
-	yes:
-		.return (1)
-	}}>
-}
-
-rule declaration {
-	[ <.DECL_MODE_PARAM> [ <!before ')' > || <.fail> ] ]?
-	<decl_specifiers>
-	<declarator>
-	<adverbs>
-	[ [ <.DECL_MODE_EXTERN> || <.DECL_MODE_CLASS> ]
-		<?before '{'>
-		{*} #= body_open
-		<compound_stmt>
-		{*} #= body_close
-	| [ '=' <initializer> ]?
-		[ <!DECL_MODE_PARAM>
-			[ ';' || <panic: "Missing ';' after declaration"> ]
-		]?
-	]
-	{*} #= done
-}
-
-rule decl_specifiers {
-	[ <!DECL_MODE_PARAM> <storage_spec>? ]?
-	<type_qualifier>*
-	<type_spec>
-	{*}
-}
-
-token storage_spec {
-	<?before  'attribute' | 'extern' | 'lexical' | 'register' | 'static' >
-	[
-		[ <.DECL_MODE_CLASS>		'attribute'
-		| <!DECL_MODE_PARAM>	'extern'
-		| <.DECL_MODE_LOCAL>	'lexical'
-		| <.DECL_MODE_LOCAL>	'register'
-		| <.DECL_MODE_EXTERN>	'static'
-		]
-	||	<panic: "Illegal storage specifier in current context">
-	]
-}
-
-token type_qualifier {
-	'const'
-	# | 'inline'
-}
-
-token type_spec {
-	| <builtin_type>
-}
-
-token builtin_type {
-	[ 'class' | 'int' | 'num' | 'pmc' | 'str' | 'void' ]
-}
-
-rule declarator {
-	<name=long_ident>
-	<decl_suffix>*
-	{*}
-}
-
-rule decl_suffix {
-	| '(' <parameter_decl_list>
-		[ ')' || <panic: "Missing ')' to close parameter list"> ]
-		{*} #= parameter_decl_list
-#	| '[' <array_or_hash_decl>
-#		[ ']' || <panic: "Missing ']' to close array or hash declaration" >  ]
-#		{*} #= array_or_hash_decl
-}
-
-# foo(a, b)
-# foo()
-# foo(a, b, rest ...)
-# foo(a, "b", "c" ..., rest ...)
-rule parameter_decl_list {
-	{*} #= open
-	[ <declaration> [ ',' <declaration> ]* ]?
-	{*} #= close
-}
-
-rule array_or_hash_decl {
-	[ '%'			{*} #= hash
-	| <expression>	{*} #= fixed_array
-	| 			{*} #= resizable_array
-	]
-}
-
 rule adverbs {
 	[ <adverb> ]*
 	{*}
@@ -267,10 +95,6 @@ token t_adverb {
 	| $<ident>='?'	# An alias for optional:  func(a, b, c? = 1)
 }
 
-rule initializer {
-	<assign_expr>                   {*} #= assign_expr
-}
-
 token ws {
 	| <?{{								# Cache ws results.
 		$P0 = get_global '$!ws'
@@ -283,30 +107,34 @@ token ws {
 		set_global '$!ws', match
 		.return(0)
 	}}>
-	| <!ww> <.ws_all>+
-	| <.ws_all>*
+	| <!ww> <.WS_ALL>+
+	| <.WS_ALL>*
 }
 
-token ws_all {
+token WS_ALL {
 	[ \s+
-	| '#' \N* [ \n | $ ]
-	| <.pod_comment>
+	| '#' \N* [ \n | $ ]		# Deprecated
+	| <.POD>			# Deprecated
+	| '/*' .*? '*/'			# <.C_BLOCK_COMMENT>
+	| '//' \N* [ \n | $ ]		# <.C_LINE_COMMENT>
 	]
 }
 
-regex pod_comment {
+regex POD {
 	^^ '='	[ [ 'cut' \h*: | 'end' [\h\N*]? ]
-			| 'for' [ \h \N+: ] \n [ \N+\n ]*:
-			| \w\N*: \n .*? \n '=' [ 'cut' \h*: | 'end' [\h\N*]? ]
-			]
-			[\n|$]
+		| 'for' [ \h \N+: ] \n [ \N+\n ]*:
+		| \w\N*: \n .*? \n '=' [ 'cut' \h*: | 'end' [\h\N*]? ]
+		]
+		[ \n | $ ]
 }
 
-token constant {
-	| <string_lit>                 {*} #= string_lit
-	| <float_lit>                {*} #= float_lit
-	| <integer_lit>                {*} #= integer_lit
-}
+#token C_BLOCK_COMMENT {
+#	'/*' .*? '*/'
+#}
+
+#token C_LINE_COMMENT {
+#	'//' \N* [ \n | $ ]
+#}
 
 token string_lit {
 	[ '\'' <string_literal: '\''> '\''
@@ -390,3 +218,22 @@ token builtin_function {
 
 # rule expression is defined in expressions.pg
 # rule built_in is defined in builtins.pg
+
+## rule hll_block {
+## 	[ 'hll' <hllname=short_ident> ';'
+## 	|| <?{{
+## 		$P0 = get_global '$Top_of_file'
+## 		.return ($P0)
+## 		}}>
+## 	]
+## 	{{
+## 		$P0 = box 1
+## 		set_global '$Top_of_hll_block', $P0
+## 		$P0 = box 0
+## 		set_global '$Top_of_file', $P0
+## 	}}
+## 	{*} #= open
+## 	<namespace_block>+
+## 	{*} #= close
+## }
+
