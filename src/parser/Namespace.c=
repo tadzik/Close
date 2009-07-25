@@ -1,0 +1,219 @@
+=begin pod
+
+=TITLE Namespace support class for Close compiler
+
+=VERSION
+
+$Id: $
+
+=SYNOPSIS
+
+	using namespace close;
+	
+	// HLL name and namespace path elements are strings
+	string hll = "close";
+	string namespace_path[] = { "Foo", "Bar" };
+	
+	// Fetch namespace at hll:close :: Foo :: Bar (created if necessary.)
+	Namespace nsp = Namespace::fetch(hll, namespace_path :flat);
+	
+	// Check for local definition of symbol.
+	string symbol_name = "x";
+	int is_defined_locally = nsp.contains(symbol_name);
+
+	Namespace other =  get_another(); // ... some other namespace
+	
+	nsp.searchpath_append(other);	// "using namespace other;"
+	
+	// Check if defined locally OR in "using namespace ..." searchpath 
+	// of this nsp.
+	int is_defined_in_searchpath = nsp.search(symbol_name);
+	
+=DESCRIPTION
+
+=cut
+
+class close::Namespace
+	extends ::parrot::PAST::Block
+	:phylum(P6object)
+{
+	# Attributes
+	attribute pmc	children;	# Child namespaces.
+	attribute pmc	past_blocks;	# Various supporting PAST blocks.
+	attribute pmc	searchq;	# Queue of namespaces to search with this one.
+	attribute pmc	symbols;	# Symbols declared in this namespace.
+	
+=item * C<void add_symbol(string name)>
+
+Adds a new symbol to the namespace. Replaces any earlier symbol of the same name.
+
+=cut
+
+	void add_symbol(string name, pmc symbol)
+		:method
+	{
+	#extern void say();
+	#say("Adding symbol");
+		self.symbols[name] = symbol;
+	}
+	
+=item * C<Namespace child(string name)>
+
+Returns a namespace that is a child of the invocant, with the given name. A new
+namespace will be created if needed.
+
+=cut
+
+	pmc child(string name)
+		:method
+	{
+		unless (exists self.children[name]) {
+			self.children[name] = close::Namespace.new();
+		}
+		
+		return self.children[name];
+	}
+	
+=item * C<int contains(string name)>
+
+Returns true if the invocant namespace contains a symbol matching C<name>,
+false otherwise.
+
+=cut
+
+	int contains(string name)
+		:method
+	{
+		return exists self.symbols[name];
+	}
+
+=item * init(...)
+
+Initializes new Namespace objects. Called by C<new>. 
+
+=cut
+
+	void init(pmc positional_params ..., pmc named_params ... :named)
+		:method
+	{
+		self.children		= new Hash;
+		self.past_blocks	= new Hash;
+		self.searchq		= new ResizablePMCArray;
+		self.symbols		= new Hash;
+		
+		# 'self' is always first in search queue.
+		push self.searchq, self;
+	}
+
+=item * C<Namespace fetch(string path_elements ...)>
+
+Looks up a namespace in the namespace tree under the given path. The path is 
+assumed to be rooted at the absolute top -- the hll must be the first entry. 
+Returns the namespace record requested. Any namespace record listed in C<path> 
+that is not already present will be created.
+
+Returns C<null> if no path elements are provided.
+
+=cut
+
+	pmc fetch(string path_elements ...)
+	{
+		extern pmc close::Namespace::root;
+
+		if (isnull root) {
+			root = close::Namespace.new();
+		}
+		
+		pmc current = root;
+		
+		foreach (string name : path_elements) {
+			current = current.child(name);
+		}
+		
+		if (issame current, root) {
+			return null;
+		}
+		
+		return current;
+	}
+
+=item * lookup_symbol(string name)
+
+Returns the associated symbol information for C<name> if it is present in
+the invocant Namespace, otherwise returns C<null>.
+
+=cut
+
+	pmc lookup_symbol(string name)
+		:method
+	{
+		if (exists self.symbols[name]) {
+			return self.symbols[name];
+		}
+		
+		return null;
+	}
+
+=item * new(...)
+
+Creates and initializes a new Namespace object. Returns the new object.
+
+=cut
+	
+	pmc new(pmc positional_params ..., pmc named_params ... :named)
+		:method
+	{
+		pmc p_class = self.HOW().parrotclass;
+		
+		# FIXME: Need new <expr> support. See Close issue #13
+		pmc obj = asm(p_class) {{ %r = new %0 }};
+		obj.init(positional_params :flat, named_params :flat :named);
+		return obj;
+	}
+
+=item * search(string name)
+
+Searches all the entries in the Search Queue for this namespace -- that is, the 
+namespace itself plus any namespaces included via C<using namespace>
+directives. Returns the matching symbol entry for C<name> if found, otherwise
+C<null>.
+
+=cut	
+	pmc search(string name)
+		:method
+	{
+		pmc result;
+		
+		foreach (pmc entry : self.searchq) {
+			unless (isnull (result = entry.lookup_symbol(name))) {
+				return result;
+			}
+		}
+		
+		return result;
+	}
+
+=item * searchpath_append(Namespace other)
+
+Appends another namespace to the search path of this namespace. 
+
+=cut
+
+	void searchpath_append(pmc other)
+		:method
+	{
+		push self.searchq, other;
+	}
+	
+=item * searchpath_prepend(Namespace other)
+
+Prepends a given namespace to the search path of this namespace. 
+
+=cut
+
+	void searchpath_prepend(pmc other)
+		:method
+	{
+		unshift self.searchq, other;
+	}
+}
