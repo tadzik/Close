@@ -4,9 +4,9 @@ namespace ::;
 
 extern void print(pmc args...);
 
-extern int test_counter = 0;
+int test_counter = 0;
 
-extern int ok(pmc condition, str test_name) :multi(_,_)
+int ok(pmc condition, str test_name) :multi(_,_)
 {
 	unless (condition) print("not ");
 	test_counter++;
@@ -20,19 +20,27 @@ extern int ok(pmc condition, str test_name) :multi(_,_)
 	return condition;
 }
 
-extern int ok(pmc got, pmc expected, str test_name) :multi(_,_,_)
+int ok(pmc got, pmc expected, str test_name) :multi(_,_,_)
 {
-	int match;
-
-	match = (got == expected);
-	ok(match, test_name);
-
-	unless (match) {
-		print("# Wanted: ", expected, ", but got: ", got, "\n");
+	int same = 0;
+	
+	if ((isnull got) and (isnull expected)) {
+		same = 1;
+	}
+	else if (!(isnull got) and !(isnull expected) and (got == expected)) {
+		same = 1;
+	}
+	
+	ok(same, test_name);
+	
+	unless (same) {
+		print("# Wanted: ", ((isnull expected) ? "<null>" : expected),
+			", but got: ", ((isnull got) ? "<null>" : got)
+			, "\n");
 	}
 }
 
-extern void plan(int num_tests = 0)
+void plan(int num_tests = 0)
 {
 	if (num_tests) {
 		print("1..", num_tests, "\n");

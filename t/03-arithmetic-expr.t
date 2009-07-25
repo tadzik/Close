@@ -2,16 +2,23 @@
 extern void plan();
 extern void ok();
 
-extern void test_literals()
+int test_param_order(int a, int b)
 {
-    plan(5);
-
-    ok(34, 15 + 19, "addition");
-    ok(77 - 10, 67, "subtraction");
-
-    ok(15, 5 * 3, "multiplication");
-    ok(3, 27 / 9, "division");
-    ok(13 % 8, 5, "modulus");
+	return (5 * a) + b;
 }
 
-extern void _runner() :init { test_literals(); }
+void test_arithmetic()
+{
+	plan(6);
+
+	ok(34, 15 + 19, "addition");
+	ok(77 - 10, 67, "subtraction");
+
+	ok(15, 5 * 3, "multiplication");
+	ok(3, 27 / 9, "division");
+	ok(13 % 8, 5, "modulus");
+	
+	ok(17, test_param_order(3, 2), "parameters in correct order");
+}
+
+extern void _runner() :init { test_arithmetic(); }

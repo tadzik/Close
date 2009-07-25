@@ -58,6 +58,7 @@ SOURCES := \
 
 GRAMMARS_PG := \
 	src/parser/grammar.pg \
+	src/parser/declarations.pg \
 	src/parser/expressions.pg \
 	src/parser/statements.pg \
 	src/parser/builtins.pg
@@ -65,7 +66,9 @@ GRAMMARS_PG := \
 ACTIONS_PM := \
 	src/parser/actions.pm \
 	src/parser/builtin_actions.pm \
-	src/parser/expression_actions.pm
+	src/parser/declaration_actions.pm \
+	src/parser/expression_actions.pm \
+	src/parser/statement_actions.pm
 
 BUILTINS_PIR := \
   src/builtins/literals.pir \
@@ -298,11 +301,16 @@ postnode_test: postnode
 postnode_clean:
 	$(RM_F) $(POSTNODE_CLEAN_RM_FILES)
 
-lib: pctnode pastnode postnode
+pctlib: pctnode pastnode postnode
 
-lib_clean: pctnode_clean pastnode_clean
+pctlib_clean: pctnode_clean pastnode_clean
+
+HLL_CLOSE_PIR := \
+	 src/parser/Namespace.pir
+HLL_CLOSE_CLEAN_RM_FILES := \
+	$(HLL_CLOSE_PIR)
 	
-# Local variables:
-#   mode: makefile
-# End:
-# vim: ft=make:
+hll_close: $(HLL_CLOSE_PIR)
+
+hll_close_clean: 
+	$(RM_F) $(HLL_CLOSE_CLEAN_RM_FILES)

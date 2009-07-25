@@ -18,6 +18,8 @@ void test()
 {
 	lexical int foo;
 	
+	plan(2);
+	
 	foo = 10;
 	ok(10, test_fcl1(), "find_caller_lex <str>");
 	

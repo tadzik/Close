@@ -37,6 +37,12 @@ class PCT::Node
 		}
 	}
 
+	pmc clone() 
+		:method
+	{
+		return clone self;
+	}
+
 	pmc init(pmc children ..., pmc adverbs ... :named)
 		:method
 	{
@@ -63,6 +69,21 @@ class PCT::Node
 		return self;
 	}
 	
+	int isa(pmc type)
+		:method
+	{
+ 		return self.HOW().isa(self, type);
+ 	}
+	
+	pmc iterator()
+		:method
+	{
+		pmc iter = new Iterator, self.list();
+		#iter = 0;
+		asm {{ iter = 0 }};
+		return iter;
+	}
+	
 	pmc new(pmc children ..., pmc adverbs ... :named)
 		:method
 	{
@@ -83,12 +104,6 @@ class PCT::Node
 		return new_obj;
 	}
 	
-	pmc clone() 
-		:method
-	{
-		return clone self;
-	}
-
 	int get_bool()
 		:method
 		:vtable
@@ -98,22 +113,6 @@ class PCT::Node
 		# return 1;
 	}
 
-	int isa(pmc type)
-		:method
-	{
- 		return self.HOW().isa(self, type);
- 	}
-
-	
-	pmc iterator()
-		:method
-	{
-		pmc iter = new Iterator, self.list();
-		#iter = 0;
-		asm {{ iter = 0 }};
-		return iter;
-	}
-	
 	# FIXME: Need a good syntax for optionals
 	#pmc name(pmc value :optional)
 	#	:method

@@ -58,7 +58,7 @@ void test_tailcall()
 	
 void test()
 {
-	plan(6);
+	plan(7);
 
 	test_goto();
 	test_return();
