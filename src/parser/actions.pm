@@ -26,19 +26,308 @@ method TOP($/) {
 }
 
 method translation_unit($/, $key) {
-	my $lstype := 'compilation unit';
 	if $key eq 'start' {
-		# I begin to suspect that this is useless.
-		# But extra crap on the stack isn't toxic, so leave it for now.
-		open_lexical_scope('compilation unit', $lstype);
+		open_pervasive_symbols();
+		open_namespace_definition('close', new_array());
 	}
 	else {
-		close_lexical_scope($lstype);
-
 		my $past := compilation_unit_past();
 		#DUMP($past, "program");
 		make $past;
 	}
+}
+
+our %Unique_name;
+
+sub make_unique_name($category) {
+	unless %Unique_name{$category} {
+		%Unique_name{$category} := 0;
+	}
+	
+	my $name := $category ~ '_0000' ~ %Unique_name{$category}++;
+	$name := substr($name, 0, -4);
+	return $name;
+}
+	
+sub make_type_specifier($name, $noun, $scope) {
+	my $spec := PAST::Val.new(:value($name));
+	
+	for ('const', 'declarator', 'extern', 'label', 'typedef', 'volatile') {
+		$spec{'is_' ~ $_} := 0;
+	}
+	
+	$spec<is_specifier> := 1;
+	$spec<name> := $name;
+	$spec<noun> := $noun;
+	$spec<storage_class> := 'register';
+	$spec<decl_scope> := $scope;
+	
+	return ($spec);
+}
+
+sub make_aggregate($kind, $tag) {
+	unless $tag {
+		$tag := make_unique_name($kind);
+	}
+	
+	my $agg := PAST::Block.new(
+		:blocktype('immediate'),
+		:name($kind ~ ' ' ~ $tag));	# 'struct foo' or 'enum bar'
+	$agg<kind> := $kind;
+	$agg<tag> := $tag;
+	
+	return ($agg);
+}
+
+sub make_declarator($ref, $attr, $label) {
+	my $decl := PAST::Val.new(:value($label));
+	
+	for ('array', 'const', 'specifier', 'typedef', 'volatile') {
+		$decl{'is_' ~ $_} := 0;
+	}
+	
+	$decl{$attr} := 1;
+	$decl<is_declarator> := 1;
+	$decl<type> := $ref;
+}
+
+sub make_pointer_to($type, $const, $volatile) {
+	my $decl := make_declarator($type, 'is_pointer', 'pointer to');	
+	$decl<is_volatile> := 0;
+	$decl<is_const> := 0;
+	return ($decl);
+}
+
+sub make_function_returning($type) {
+	my $decl := make_declarator($type, 'is_function', 'function returning');	
+	return ($decl);
+}
+
+sub make_array_of($type, $elements) {
+	my $decl := make_declarator($type, 'is_array', 'array of');
+	
+	if $elements {
+		$decl<num_elements> := $elements;
+		$decl.value('array of ' ~ $elements);
+	}
+	
+	return ($decl);
+}
+
+sub make_hash_of($type) {
+	my $decl := make_declarator($type, 'is_hash', 'hash of');
+	return ($decl);
+}
+
+sub print_aggregate($agg) {
+	say(substr($agg<kind> ~ "        ", 0, 8),
+		substr($agg<tag> ~ "                  ", 0, 18));
+	
+	for $agg<symtable> {
+		print_symbol($agg.symbol($_)<decl>);
+	}
+}
+
+sub print_symbol($sym) {
+	if $sym<is_alias> {
+		say(substr($sym.name() ~ "                  ", 0, 18),
+			" ",
+			substr("is an alias for: " ~ "                  ", 0, 18),
+			" ",
+			substr($sym<alias_for><scope>.name() ~ '::' 
+				~ $sym<alias_for>.name() ~ "                              ", 0, 30));
+	}
+	else {
+		say(substr($sym.name() ~ "                  ", 0, 18),
+			" ",
+			substr($sym<pir_name> ~ "                  ", 0, 18),
+			" ",
+			$sym<scope>.name(), 
+			" ",
+			type_to_string($sym<type>));
+	}
+}
+
+sub type_to_string($type) {
+	my $str := '';
+	
+	unless $type {
+		return '(NULL)';
+	}
+	
+	while $type {
+		my $append;
+		
+		if $type<is_declarator> {
+			if $type<is_array> { 
+				$append := '[]';
+				if $type<num_elements> {
+					$append := '[' ~ $type<num_elements> ~ ']';
+				}
+			}
+			elsif $type<is_function> {
+				$append := '()';
+			}
+			elsif $type<is_hash> {
+				$append := '[%]';
+			}
+			elsif $type<is_pointer> {
+				$append := '*';
+			}
+			else {
+				$append := '<<unrecognized declarator: ' ~ $type.value() ~ '>>';
+			}
+		}
+		else {
+			$append := $type<name>
+				~ "\tS:" ~ substr($type<storage_class>, 0, 3)
+				~ "\tR:" ~ $type<register_class>;
+			
+			if $type<is_extern> {
+				$append := $append ~ ' extern';
+			}
+		}
+		
+		$str := $str ~ $append;
+		$type := $type<type>;
+	}
+	
+	return ($str);
+}
+
+sub make_new_symbol($name, $type, $scope) {
+	my $symbol := PAST::Var.new(:name($name));
+
+	for ('alias', 'duplicate', 'implicit') {
+		$symbol{'is_' ~ $_} := 0;
+	}
+
+	$symbol<pir_name> := $name;
+	$symbol<scope> := $scope;
+	$symbol<type> := $type;
+	
+	my $etype := $type;
+	
+	while $etype<is_declarator> {
+		$etype := $etype<type>;
+	}
+	
+	$symbol<etype> := $etype;
+	return ($symbol);
+}
+
+sub make_alias($name, $symbol, $scope) {
+	my $alias := make_new_symbol($name, Undef, $scope);
+	$alias<is_alias> := 1;
+	$alias<alias_for> := $symbol;
+	
+	if $symbol<has_aliases>{$scope} {
+		die("Cannot create second alias for symbol in same scope.");
+	}
+	
+	$symbol<has_aliases>{$scope} := $alias;
+	return ($alias);
+}
+
+sub same_type($type1, $type2) {
+	while $type1 && $type2 {
+		if $type1 =:= $type2 {
+			return 1;
+		}
+		elsif $type1<is_declarator> && $type2<is_declarator> {
+			if $type1<is_array> && $type2<is_array> {
+				if $type1<num_elements> != $type2<num_elements> {
+					return 0;
+				}
+			}
+			elsif $type1<is_function> && $type2<is_function> {
+				# FIXME: Compare args, somehow.
+				my $param := 0;
+				
+				while $type1<parameters>[$param] {
+					unless $type2<parameters>[$param] {
+						return 0;
+					}
+					
+					unless same_type($type1<parameters>[$param]<type>,
+						$type2<parameters>[$param]<type>) {
+						return 0;
+					}
+				}
+			}
+			elsif $type1<is_hash> && $type2<is_hash> {
+				# I got nothin', here.
+			}
+			elsif $type1<is_pointer> && $type2<is_pointer> {
+				if $type1<is_const> != $type2<is_const>
+					|| $type1<is_volatile> != $type2<is_volatile> {
+					return 0;
+				}
+			}
+		}
+		elsif $type1<is_specifier> && $type2<is_specifier> {
+			if $type1<noun> ne $type2<noun> {
+				return 0;
+			}
+			elsif $type1<is_const> != $type2<is_const>
+				|| $type1<is_volatile> != $type2<is_volatile> {
+				return 0;
+			}
+		}
+	}
+	
+	return 1;
+}
+
+sub open_pervasive_symbols() {
+	my $psym := PAST::Block.new(
+		:blocktype('immediate'),
+		:name("Pervasive Symbols"));
+	$psym<lstype> := 'pervasive scope';
+	
+	# Created predefined types.
+	
+	for ('auto:X', 'float:N', 'int:I', 'pmc:P', 'string:S', 'void:X') {
+		my @parts := split(':', $_);
+		my $name := @parts[0];
+		
+		my $type := make_type_specifier($name, $name, $psym);
+		$type<is_specifier> := 1;
+		$type<register_class> := @parts[1];
+		
+		my $symbol := make_new_symbol($name, $type, $psym);
+		
+		$psym.symbol($name, :decl($symbol));
+	}
+	
+	# FIXME: Move these to be typedefs in a standard namespace. (Then kill 'em.)
+	my $symbol := make_alias('num', $psym.symbol('float')<decl>, $psym);
+	$psym.symbol('num', :decl($symbol));
+	
+	$symbol := make_alias('str', $psym.symbol('string')<decl>, $psym);
+	$psym.symbol('str', :decl($symbol));
+	
+	say("BEHOLD!! A symbol table.");
+	for $psym<symtable> {
+		print_symbol($psym.symbol($_)<decl>);
+	}
+	
+	push_lexical_scope($psym);
+}
+
+sub open_namespace_definition($hll, @path) {
+	@path.unshift($hll);
+	my $block := get_past_block_of_path(@path);
+	push_lexical_scope($block);
+}
+
+method namespace_path($/) {
+	say("Namespace path: ", $/);
+}
+
+method declarator_name($/) {
+	say("Declarator name!");
+	say($/);
 }
 
 method hll_block($/, $key) {
@@ -93,25 +382,25 @@ method namespace_block($/, $key) {
 }
 
 method namespace_name($/) {
-	my @parts := new_array();
+	# my @parts := new_array();
 
-	for $<part> {
-		@parts.push(~$_);
-	}
+	# for $<part> {
+		# @parts.push(~$_);
+	# }
 
-	my $past := PAST::Var.new(:node($/));
+	# my $past := PAST::Var.new(:node($/));
 
-	if $<root> and $<part> and +@($<part>) {
-		$past<is_rooted> := 1;
-		$past<hll> := @parts.unshift();
-	}
-	else {
-		$past<hll> := current_hll_block().name();
-	}
+	# if $<root> and $<part> and +@($<part>) {
+		# $past<is_rooted> := 1;
+		# $past<hll> := @parts.unshift();
+	# }
+	# else {
+		# $past<hll> := current_hll_block().name();
+	# }
 
-	$past.namespace(@parts);
-	#DUMP($past, "namespace_name");
-	make $past;
+	# $past.namespace(@parts);
+	# DUMP($past, "namespace_name");
+	# make $past;
 }
 
 method long_ident($/) {

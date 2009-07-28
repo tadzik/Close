@@ -58,10 +58,12 @@ SOURCES := \
 
 GRAMMARS_PG := \
 	src/parser/grammar.pg \
+	src/parser/builtins.pg \
 	src/parser/declarations.pg \
 	src/parser/expressions.pg \
+	src/parser/names.pg \
 	src/parser/statements.pg \
-	src/parser/builtins.pg
+	src/parser/tokens.pg
 
 ACTIONS_PM := \
 	src/parser/actions.pm \
@@ -87,6 +89,7 @@ DOCS := README
 BUILD_CLEANUPS := \
   close.pbc \
   "src/gen_*.pir" \
+  src/gen_grammar.pm \
   src/gen_actions.pm \
   "*.c" \
   "*$(O)" \

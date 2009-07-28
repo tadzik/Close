@@ -8,20 +8,89 @@ $ Rev: $
 
 grammar close::Grammar is PCT::Grammar;
 
+=rule TOP
+
+Top is the PGE-mandated top-level entry. In this implementation, it matches a 
+single C<translation_unit> and returns the PAST of that rule.
+
+=cut
+
 rule TOP {
 	<translation_unit> {*}
 }
 
+=rule block_statement
+
+=cut
+
+rule block_statement {
+	| <namespace_alias_definition>
+	| <using_directive>
+	| <using_declaration>
+	| <simple_declaration>
+	| <statement>
+}
+
+=rule extern_statement
+
+An C<extern_statement> is a statement that may appear outside a function. 
+Because "normal" statements are assumed to be part of a namespace or class 
+init block, all of them are permitted. In addition, a C<namespace_definition>
+may only appear outside a function.
+
+=cut
+
+rule extern_statement {
+	| <namespace_definition>
+	| <declaration>
+#	| <namespace_directive>
+#	| <block_statement>
+}
+
+=rule namespace_definition
+
+A namespace definition is a block that assigns a namespace path to all the
+declarations contained in the block.
+
+    namespace Foo {
+        void bark();	// Defines Foo::bark();
+    }
+
+=cut
+
+rule namespace_definition {
+	<EXTERN>? <.NAMESPACE> <namespace_path> 
+	'{'
+		{*} #= open
+		<extern_statement>*
+	'}'
+	{*} #= close
+}
+
+=head5 C<translation_unit>
+
+A I<translation unit> is a compiled file, with all of the ancillary included 
+bits that may appear. Essentialy, whatever is needed to produce a C<.pbc>
+file as output.
+
+In Close, a translation unit is defined as a sequence of zero or more 
+C<extern_stmt> items. These may be plain old code, namespace blocks,
+variables, classes, or functions.
+
+=cut
+
 rule translation_unit {
-	{{
-		$P0 = box 1
-		set_global '$Top_of_file', $P0
-	}}
 	{*} #= start
 	<extern_statement>*
 	[ $ || <panic: 'Syntax error'> ]
 	{*} #= finish
 }
+
+rule simple_declaration {
+	# What is currently in declaration.pg/declaration, I think.
+}
+
+###########################################################################
 
 rule namespace_block {
 	[ 'namespace' <namespace_name>  ';' ]?
