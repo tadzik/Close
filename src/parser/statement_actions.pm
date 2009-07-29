@@ -1,4 +1,4 @@
-method statement($/, $key)              { PASSTHRU($/, $key); }
+method statement($/, $key)              { PASSTHRU($/, $key, 'statement'); }
 
 method null_stmt($/) {
     my $past := PAST::Op.new(:node($/), :pasttype('null'));
@@ -145,7 +145,7 @@ method jump_stmt($/, $key) {
 	make $past;
 }
 
-method iteration_stmt($/, $key)         { PASSTHRU($/, $key); }
+method iteration_statement($/, $key)         { PASSTHRU($/, $key, 'iteration_statement'); }
 
 method foreach_stmt($/, $key) {
 	if $key eq 'index' {

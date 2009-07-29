@@ -1,6 +1,6 @@
 # $Id$
 
-method expression($/, $key)				{ PASSTHRU($/, $key); }
+method expression($/, $key)				{ PASSTHRU($/, $key, 'expression'); }
 
 method primary_expr($/, $key)     {
 	my $past := $/{$key}.ast;
@@ -288,8 +288,7 @@ our %assign_opcodes;
 
 method assign_expr($/, $key) {
 	if $key eq 'single' {
-		#DUMP($<single>.ast, "assg.rvalue");
-		PASSTHRU($/, $key);
+		PASSTHRU($/, $key, 'assign_expr_rvalue');
 	}
 	else {
 		my $lhpast	:= $<lhs>.ast;

@@ -1,6 +1,6 @@
 # $Id$
 
-method built_in($/, $key)                { PASSTHRU($/, $key); }
+method built_in($/, $key)                { PASSTHRU($/, $key, 'built_in'); }
 
 method builtin_clone($/) {
 	my $past := PAST::Op.new(
