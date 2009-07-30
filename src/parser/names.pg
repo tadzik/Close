@@ -1,0 +1,238 @@
+=head2 Names
+
+The C<IDENTIFIER> token, described above, defines a simple name. For many 
+symbols, this is sufficient. E.g., 
+
+    namespace std {
+        int strlen(string s) {
+            return elements(s);
+        }
+    }
+    
+In the example code, the namespace name (C<std>) is an C<IDENTIFIER>, the 
+function name (C<strlen>) is an C<IDENTIFIER>, and the parameter name (C<s>) 
+is an C<IDENTIFIER>.
+
+But Close recognizes several special cases. First, there are names that require
+combining identifiers. A complex namespace name looks like C<Foo::Bar>. Second,
+there are punctuated names, such as the C<:flat> adverb. Finally, there are 
+I<semantic> distinctions, such as the identifiers used in declarations (which
+may or may not already be in the symbol table) and those used as terms in an 
+expression, which I<must> be previously defined.
+
+=head3 Aliases
+
+Nearly all symbols in Close may be declared with an B<alias>. An alias is 
+simply a name that is easier to type or use in Close. The compiler will 
+translate references to the alias into references to the original name. Thus, 
+code which needs to refer to an attribute called C<object.'$!LINE'> could 
+declare an alias for the attribute instead, and refer to C<object.line>.
+
+=rule new_alias_name
+
+Every alias must be a C<BAREWORD>, in keeping with their simplifying purpose.
+In fact, aliases are just symbol names, and so they will be looked up as such. 
+The C<new_alias_name> token is used only in declarations.
+
+=cut
+
+token new_alias_name {
+	<BAREWORD> {*}
+}
+
+=head3 High-level Language Names
+
+As specified by the Parrot documentation, HLL names are all lower case, and may
+not begin with an underscore. (Underscored names are reserved for HLL helper 
+functions: 'tcl' reserves '_tcl', etc.)
+
+=token hll_name
+
+Close allows quoted HLL names to permit naming HLLs that may conflict with 
+Close language keywords. In addition, Close permits leading underscores so that
+other HLLs can write their helper functions in Close.
+
+=cut
+
+token hll_name {
+	<IDENTIFIER> {*}
+}
+
+=head3 Namespaces
+
+Namespaces are a fundamental part of the Parrot VM architecture. Every function
+or variable has a namespace. Classes have an associated namespace; named classes
+use the namespace with the same name.
+
+Namespaces are hierarchial, although like Java there is no requirement that the 
+parent-child relationship of two namespaces has any significance to the contents
+of the namespaces.
+
+The Parrot namespace tree is actually rooted just above the level of the HLLs. 
+This gives each HLL a separate namespace. See the Parrot Design Documentation,
+in particular I<PDD 21: Namespaces>, for details.
+ 
+=token namespace_name
+
+Individual (sub)namespaces can take on pretty much any name in Parrot. For this
+reason, Close treats them as identifiers, permitting the C<QUOTED> form. 
+
+=cut
+
+token namespace_name {
+	<IDENTIFIER> {*}		#= IDENTIFIER
+}
+
+=rule namespace_path
+
+B<Note:> A I<namespace path> is not the same as a qualified identifier.
+There are three ways to specify a namepace in Close.
+
+=item # Rooted path
+
+You may specify the HLL name, prefixed with the keyword 'hll' and a colon (:), 
+plus the path of the namespace, delimited by double-colons (::). For example,
+C<hll : close :: Foo :: Bar> is valid, although the spaces are optional.
+
+This is called a I<rooted path> because the opcode used in PIR for this kind
+of access would be C<get_root_global [ 'close' ; 'Foo' ; 'Bar' ], ...>
+
+=item # Hll path
+
+You may omit the HLL name if it is the same as the HLL name of the current
+namespace. In this case, a leading double-colon ('::') indicates that the HLL
+has been omitted, but the namespace path begins relative to the "hll root" 
+namespace.
+
+As a special case, the root namespace I<of an HLL> can be specified as C<::>
+alone.
+
+    namespace :: { ... }
+
+=item # Relative path
+
+Finally, you may specify a namespace by providing a relative path from the
+current namespace (I<only!>) to an inner namespace. 
+
+    namespace A {
+        namespace B { ... }
+    }
+    
+=cut
+
+rule namespace_path {
+	| [ HLL ':' <hll_name> ]? 
+		$<root>='::' 
+		[ <path=namespace_name> [ '::' <path=namespace_name> ]* ]?
+	{*}
+	| <path=namespace_name> 
+		[ '::' <path=namespace_name> ]*		
+	{*}
+}
+
+=head3 Symbol Names
+
+There are two basic classes of symbol name in Close. Some elements, such as 
+formal parameters, aliases, and labels, are required to be short, unqualified 
+identifiers -- C<BAREWORD>s -- while references to types, functions, and 
+variables may include an elaborate I<qualified> name.
+
+=rule simple_identifier
+
+A simple identifier must fit the C<BAREWORD> specification (q.v.).
+
+=cut
+
+rule simple_identifier {
+	<BAREWORD> {*}
+}
+
+=rule qualified_identifier
+
+A qualified identifier may be a bareword, but it may also include an C<hll>,
+C<namespace_name>, C<class> name, and the like. Any seqence that ends with
+a bareword will be a qualified identifier. (A namespace path may end with 
+the '::' indicating the hll root namespace. So a namespace path is I<not> 
+parsed as a qualified identifier.)
+
+=cut
+
+rule qualified_identifier {
+	[ [ HLL ':' <hll_name> ]? 			# Maybe an hll:close prefix
+		$<root>='::' ]?			# Maybe rooted namespace
+	<parts=BAREWORD>			# Definitely a bareword.
+		[ '::' <parts=BAREWORD> ]*	# Maybe a namespace qualifier
+	{*}
+}
+
+=rule declarator_name
+
+When declaring new names, there are some possible complicationgs. First, a 
+I<namespace> may be declared -- meaning there is no guarantee of an identifier
+at the end of the name. Second, the name may refer to a symbol in another hll, 
+which requires support for quoted literals.
+
+=cut
+
+rule declarator_name {
+	| [ HLL ':' <hll_name> ]?
+		$<root>='::'
+		[ <path=IDENTIFIER> 
+			[ '::' <path=IDENTIFIER> ]* ]?
+	{*}
+	| <path=IDENTIFIER> [ '::' <path=IDENTIFIER> ]*
+	{*}
+}
+	
+#####
+
+
+
+=head3 Adverbs
+
+Adverbial modifiers can appear in several places in Close code. They
+mostly appear in declarations, but they can also appear in argument 
+lists.
+
+For the most part, an adverb is recognized as a colon followed by 
+an identifier: C<:method> is one example. 
+
+# Note that a namespace_name is not the same as a qualified_identifier.
+# Namespace names are "that part of the name before the
+# trailing identifier." That means that '::' is a valid namespace
+# name, but not a valid qualified_identifier.
+#
+
+token namespace_name2 {
+	[ [ $<root>='::' ]? <part=bareword> :: [ '::' <part=bareword> ]*
+	| [ $<root>='::' ]
+	| '[' ::  [$<root>='::' ]? [ <part=string_lit> [ ';' <part=string_lit> ]* ]?
+		[ ']' || <panic: 'Missing "]" in namespace name'> ]
+	]
+	{*}
+}
+
+rule adverbs {
+	[ <adverb> ]*
+	{*}
+}
+
+rule adverb {
+	| [ $<extends>='extends' <args=qualified_identifier> [ ',' <args=qualified_identifier> ]* ] 
+	  {*}
+	| [
+		<t_adverb>		# matches ":something", with no space inside
+		[ '(' 
+			[ <args=string_lit> [ ',' <args=string_lit> ]* 
+			| <signature=string_literal: ')' >	# Support :multi(_, A)
+			]
+		')' ]?
+	]
+	{*}
+}
+
+token t_adverb {
+	| ':' <ident> 
+	| $<ident>='...'	# An alias for slurpy
+	| $<ident>='?'	# An alias for optional:  func(a, b, c? = 1)
+}

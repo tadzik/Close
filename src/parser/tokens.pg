@@ -1,0 +1,362 @@
+# $Id$
+
+=head2 Lexical Elements
+
+=head3 White Space
+
+=token ws
+
+White space is matched with the C<ws> token prescribed by the Perl 6 Grammar 
+engine. The C<ws> token is specified to match I<optional> whitespace. That is,
+the token cannot fail to match when no whitespace is present -- it must match a 
+zero-length string. Thus, if the grammar calls for 'foo' '(' -- two tokens with a 
+space between them in the grammar -- the C<ws> rule will be called, and must
+permit a "no spaces" option: C<foo()>.
+
+The C<ws> token uses a cache to remember the most recently matched whitespace.
+This improves performance in the case where two tokens are repeatedly evaluated.
+
+=cut 
+
+token ws {
+	| <?{{	## Cache ws results.
+		$P0 = get_global '$!ws'
+		if null $P0 goto noshort
+		$P1 = $P0.'to'()
+		$P2 = match.'to'()
+		if $P1 != $P2 goto noshort
+		.return(1)
+	  noshort:
+		set_global '$!ws', match
+		.return(0)
+	}}>
+	| <!ww> <.WS_ALL>+
+	| <.WS_ALL>*
+}
+
+=token WS_ALL
+
+The C<WS_ALL> token is used to actually match white space elements. C<WS_ALL>
+recognizes several flavors of white space:
+
+=over 4
+
+=item * White space, as defined by the \s metacharacter.
+
+=item * C-style block comments: /* ... */
+
+=item * C-style line comments: // ...
+
+=item * POD documentation
+
+=back
+
+=cut
+
+token WS_ALL {
+	[ \h+				# WS
+	| \n
+	| '/*' .*? '*/'			# C_BLOCK_COMMENT
+	| '//' \N* [ \n | $ ]		# C_LINE_COMMENT
+	| <.POD>
+	]
+}
+
+=token POD
+
+The C<POD> token is used to recognize POD documentation as white space. The 
+pattern is complex enough that it deserves a rule of its own.
+
+=cut 
+
+regex POD {
+	^^ '='	[ [ 'cut' \h*: | 'end' [\h\N*]? ]
+		| 'for' [ \h \N+: ] \n [ \N+\n ]*:
+		| \w\N*: \n .*? \n '=' [ 'cut' \h*: | 'end' [\h\N*]? ]
+		]
+		[ \n | $ ]
+}
+
+=head3 Basic Literals
+
+There are literal constants for the basic types: integers, strings, floating 
+point numbers. Those tokens are defined here. In addition, there is a syntax 
+for specifying object literals. That is a multiple-token rule, specified elsewhere.
+
+=token INTEGER_LIT
+
+Close recognizes the Perl6 family of integer constants. This is a change from C
+in that the 0777 format for octal constants is missing. Instead, the following 
+notations are used:
+
+=over 4
+
+=item * 0b... prefixed constants are binary numbers.
+
+=item * 0o... (zero, oh) prefixed constants are octal numbers.
+
+=item * 0d... prefixed constants are decimal numbers.
+
+=item * 0x... prefixed constants are hexadecimal numbers.
+
+=item * Any non-prefixed sequence of digits is assumed to be decimal.
+
+=item * An underscore can be used to separate digits (1_000_000) in any notation.
+
+=back
+
+Note that Close will emit a warning if the 0777 syntax is used. Note also that 
+Close will accept the trailing 'U' and 'L' (and UL and LL and ...) indicators of C,
+but currently ignores them.
+
+=cut 
+
+token INTEGER_LIT {
+	[ 0	[ 'b' <[01]>+		[ _ <[01]>+ ]*
+		| 'o' <[0..7]>+		[ _ <[0..7]>+ ]*
+		| 'd' \d+		[ _ \d+ ]*
+		| 'x' <xdigit>+	[ _ <xdigit>+ ]*
+		]
+	| 0	$<bad_octal>=<[0..7]>+		# Gets a warning.
+	|	\d+			[ _ \d+ ]*	# Plain old number.
+	]
+	[ <[Uu]> [ L L? ]
+	| [ L L? ] <[Uu]>
+	]?
+	{*}
+}
+
+=token FLOAT_LIT
+
+Close recognizes only decimal floating point constants. Floating point constants
+must contain a decimal point or an C<E-scale>, and must be in one of the 
+following formats:
+
+=over 4
+
+=item * C<< .99 <exponent>? >> - A leading decimal point, some digits, exponent optional.
+
+=item * C<< 9_999.00 <exponent>? >> - Digits before and after the decimal, exponent optional.
+
+=item * C<< 99_999 <exponent> >> - No decimal point, exponent is required
+
+=back
+
+Note that while Close accepts the floating suffixes ( 'F', 'f', 'L', 'l'), but 
+currently ignores them.
+=cut
+
+token FLOAT_LIT {
+	[			'.' \d+[_\d+]*	<.EXPONENT>?
+	| \d+ [ _ \d+]*	'.' \d+[_\d+]*	<.EXPONENT>?
+	| \d+ [ _ \d+]*			<.EXPONENT>
+	]
+	[ <[ f F l L ]> ]
+	{*}
+}
+
+token EXPONENT {
+	<[Ee]> <[ + \- ]>? \d+ [ _ \d+ ]*
+}
+
+=token QUOTED_LIT
+
+Close recognizes three string formats. A string delimited with single quotes 
+( 'string' ) is processed with minimal escaping. The only special characters are
+the backslash, escaped as C<' \\ '>, and the single quote, escaped as C<' \' '>.
+ 
+A string with delimited with double quotes ( "string" ) is processed with all 
+escape sequences recognized. These include the standard \n, \r, etc. 
+ 
+=cut
+
+token QUOTED_LIT {
+	[ '\'' <string_literal: '\''> '\''
+	| '"' <string_literal: '"'> '"'
+	]
+	{*}
+}
+
+=token HERE_DOC_LIT
+
+Finally, a "here-doc" string may be indicated by the << prefix operator, 
+followed by a C<tag> in quotes (double or single). The following lines, up to 
+the first occurrence of C<tag>, are treated as the contents of the string. If 
+C<tag> is indented, matching indentation is stripped from the beginning 
+of each line of the string. If multiple tags are specified on a single line, the 
+processing for each subsequent tag begins immediately after the previous 
+tag is completed.
+
+    say(<<"HELLO", <<'WORLD');
+        Hello,
+        HELLO
+        world!
+    WORLD
+
+Note that the example above would print C<Hello,    world!> because the 
+first tag (HELLO) was indented -- causing indentation to be stripped before 
+the "Hello," but the second tag (WORLD) was not, causing indentation to be
+preserved before "    world!" 
+
+Note also that the type of quote used around the tag dictates the handling of 
+backslash escapes. The "HELLO" tag, above, would be processed as a double-quoted
+string, while the 'WORLD' tag would be processed as a single-quoted string.
+
+=cut
+
+token HERE_DOC_LIT {
+	'<<' <.ws> QUOTED
+	{*}
+}
+
+=token STRING_LIT
+
+The C<STRING> token unifies both forms of literal processing. This is the 
+token used to match arbitrary string literals. (C<QUOTED> is used to match
+other quoted forms, such as unusual identifier names.)
+
+=cut 
+
+token STRING_LIT {
+	| <QUOTED_LIT>		{*} #= QUOTED_LIT
+	| <HERE_DOC_LIT>	{*} #= HERE_DOC_LIT
+}
+
+=head3 Reserved words
+
+The set of reserved words in Close consists of built-in type names, syntactic
+elements, and future reserved words.
+
+=token RESERVED
+
+The C<RESERVED> token matches any of the reserved words in Close.
+
+=cut
+
+token RESERVED {
+	[ 'alias'		# Declaration
+	| 'asm'			# In-line assembly expression
+	| 'auto'		# Declaration
+	| 'break'		# Control flow in loops and switches.
+	| 'case'			# Reserved for switch statements.
+	| 'class'		# Declaration
+	| 'const'		# Storage specifier
+	| 'continue'		# Control flow in loops.
+	| 'default'		# Reserved for switch statements
+	| 'do'			# Loop syntax
+	| 'dynamic'		# Storage class
+	| 'else'			# if statement
+	| 'enum'		# Declaration
+	| 'extends'		# Declaration
+	| 'extern'		# Symbol scope
+	| 'float'		# Builtin type
+	| 'for'			# Loop syntax
+	| 'foreach'		# Loop syntax
+	| 'goto'			# Control flow
+	| 'hll'			# Directive
+	| 'if'			# if statement
+	| 'inline'		# Declaration
+	| 'int'			# Builtin type
+	| 'lexical'		# Storage class
+	| 'namespace'		# Directive
+	| 'pmc'			# Builtin type
+	| 'register'		# Storage class
+	| 'repeat'		# Loop syntax
+	| 'return'		# Control flow
+	| 'static'		# Declaration
+	| 'string'		# Builtin type
+	| 'switch'		# Reserved for switch statements
+	| 'tailcall'		# Control flow
+	| 'template'		# Declaration
+	| 'typedef'		# Declaration
+	| 'unless'		# Control flow
+	| 'void'			# Builtin type
+	| 'volatile'		# Storage specifier
+	| 'while'		# Loop syntax
+	] >>
+}
+
+token ALIAS		{ 'alias'		>> }
+token ASM		{ 'asm'			>> }
+token AUTO		{ 'auto' 		>> }
+token BREAK		{ 'break'		>> }
+token CASE		{ 'case'			>> }
+token CLASS		{ 'class'		>> }
+token CONST		{ 'const'		>> }
+token CONTINUE	{ 'continue'		>> }
+token DEFAULT	{ 'default'		>> }
+token DO		{ 'do'			>> }
+token DYNAMIC	{ 'dynamic' 		>> }
+token ELSE		{ 'else'			>> }
+token ENUM		{ 'enum'		>> }
+token EXTENDS	{ 'extends'		>> }
+token EXTERN	{ 'extern' 		>> }
+token FLOAT		{ [ 'num' 
+			| 'float'		] >> }
+token FOR		{ 'for'			>> }
+token FOREACH	{ 'foreach'		>> }
+token GOTO		{ 'goto'		>> }
+token HLL		{ 'hll'			>> }
+token IF		{ 'if'			>> }
+token INLINE	{ 'inline' 		>> }
+token INT		{ 'int'			>> }
+token LEXICAL	{ 'lexical' 		>> }
+token METHOD	{ 'method' 		>> }	
+token NAMESPACE	{ 'namespace'		>> }
+token PMC		{ 'pmc'		>> }
+token REGISTER	{ 'register' 		>> }
+token REPEAT	{ 'repeat'		>> }
+token RETURN	{ 'return'		>> }
+token STATIC	{ 'static' 		>> }
+token STRING	{ [ 'str' 
+			| 'string'		] >> }
+token STRUCT	{ 'struct'		>> }
+token SWITCH	{ 'switch'		>> }
+token TAILCALL	{ 'tailcall'		>> }
+token TEMPLATE	{ 'template'		>> }
+token TYPEDEF	{ 'typedef' 		>> }
+token UNION		{ 'union'		>> }
+token UNLESS	{ 'unless'		>> }
+token VOID		{ 'void' 		>> }
+token VOLATILE	{ 'volatile'		>> }
+token WHILE		{ 'while'		>> }
+
+=head3 Identifiers
+
+The identifiers used in Close match those used in C: alphabetic or underscore
+to start, followed optionally by alphabetic, underscore, or digits. Other names
+are constucted by aggregating identifiers with the scope operator (' :: ') or 
+the member access operator (' . ').  
+
+=token BAREWORD
+
+A bareword identifier may not have the same spelling as a reserved word (q.v.).
+
+=cut 
+
+token BAREWORD {
+	<!RESERVED> 
+	<.ident>
+	{*}
+}
+
+=pod
+
+However, because Close may be used with other languages, or may be used to
+help implement other languages, a special escape mechanism is available. A
+Close identifier may be specified as a C<QUOTED_LIT> token, as defined above,
+but with an C<alias> (q.v.).
+
+No reserved word may be used as an identifier, except when using the 
+special quoted form.
+
+=token IDENTIFIER
+
+An identifer can be either a C<QUOTED_LIT> or a C<BAREWORD>.
+
+=cut
+
+token IDENTIFIER {
+	| <BAREWORD>		{*} #= BAREWORD
+	| <QUOTED_LIT>		{*} #= QUOTED_LIT
+}
