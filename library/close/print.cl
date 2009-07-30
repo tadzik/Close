@@ -1,4 +1,4 @@
-hll close;
+# hll close;
 namespace ::;
 
 void print(pmc args ...)

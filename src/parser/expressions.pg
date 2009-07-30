@@ -4,18 +4,10 @@ rule expression {
 }
 
 rule primary_expr {
-	| '('
-		<expression>
-		[ ')'
-		|| <panic: "Missing ')' in expression" >
-		]
-		{*} #= expression
-	| <asm_expr>
-		{*} #= asm_expr
-	| <constant>
-		{*} #= constant
-	| <long_ident>
-		{*} #= long_ident
+	| '(' <expression> ')'		{*} #= expression
+	| <asm_expr>		{*} #= asm_expr
+	| <qualified_identifier>	{*} #= qualified_identifier
+	| <constant>			{*} #= constant
 }
 
 token constant {

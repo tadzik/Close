@@ -1,4 +1,4 @@
-hll close;
+# hll close;
 namespace ::;
 
 int _Crt_started = 0;
@@ -55,4 +55,4 @@ void crt_init()
 	#print("Loading done\n");
 }
 
-hll close;  # In case --combine is used.
+# hll close;  # In case --combine is used.

@@ -5,7 +5,7 @@ method expression($/, $key)				{ PASSTHRU($/, $key, 'expression'); }
 method primary_expr($/, $key)     {
 	my $past := $/{$key}.ast;
 
-	if $key eq 'long_ident' {
+	if $key eq 'qualified_identifier' {
 		# Warn if not in scope.
 		my $def := symbol_defined_anywhere($past);
 

@@ -1,5 +1,5 @@
 # $Id$
-hll close;
+# hll close;
 namespace ::;
 
 extern void print(pmc args...);

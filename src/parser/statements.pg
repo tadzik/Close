@@ -13,6 +13,7 @@ rule statement {
 	| <conditional_stmt>	{*} #= conditional_stmt
 	| <iteration_stmt>	{*} #= iteration_stmt
 	| <jump_stmt>		{*} #= jump_stmt
+	| <declaration_statement>	{*} #= declaration_statement
 	| <expression_stmt>	{*} #= expression_stmt
 	]
 	|| [ <!before '}' > <.panic: "Statement expected"> ]
@@ -33,6 +34,11 @@ semi-colon[;] is an expression statement.
 rule expression_stmt {
 	<expression>
 	[ ';' || <panic: "Missing ';' at end of expression statement" > ]
+	{*}
+}
+
+rule declaration_statement {
+	<declaration> ';'
 	{*}
 }
 

@@ -16,7 +16,7 @@ single C<translation_unit> and returns the PAST of that rule.
 =cut
 
 rule TOP {
-	<translation_unit> {*}
+	<translation_unit> {*} #= translation_unit
 }
 
 =rule block_statement
@@ -41,8 +41,8 @@ may only appear outside a function.
 =cut
 
 rule extern_statement {
-	| <namespace_definition>
-	| <declaration>
+	| <namespace_definition>	{*} #= namespace_definition
+	| <declaration_statement>	{*} #= declaration_statement
 #	| <namespace_directive>
 #	| <block_statement>
 }
@@ -91,119 +91,6 @@ rule simple_declaration {
 }
 
 ###########################################################################
-
-rule namespace_block {
-	[ 'namespace' <namespace_name>  ';' ]?
-	{*} #= open
-	<declaration>*
-	{*} #= close
-}
-
-# Note that a namespace_name is not the same as a long_ident.
-# Namespace names are "that part of the long_ident before the
-# trailing identifier." That means that '::' is a valid namespace
-# name, but not a valid long_ident.
-#
-
-token namespace_name {
-	[ [ $<root>='::' ]? <part=bareword> :: [ '::' <part=bareword> ]*
-	| [ $<root>='::' ]
-	| '[' ::  [$<root>='::' ]? [ <part=string_lit> [ ';' <part=string_lit> ]* ]?
-		[ ']' || <panic: 'Missing "]" in namespace name'> ]
-	]
-	{*}
-}
-
-# A long identifier is a variable, function, or class name that is qualified
-# with namespace information. Valid forms are Foo::Bar::baz (Perl-style),
-# and [ 'Foo' ; 'Bar' ; 'baz' ] (Parrot-style) for names whose namespaces are
-# within their HLL tree. For rooted names (names which may refer to
-# other HLL namespaces), valid forms are ::perl6::Foo::Bar::baz and
-# [ :: 'perl6' ; 'Foo' ; 'Bar' ; 'baz' ].
-#
-# Note that the form ::x is considered to be a name at the top of the HLL
-# namespace tree. That is, ::x is the same as ::close::x. There is no syntax
-# for specifying symbol names at the top level. (Note that namespace
-# names are not long identifiers.)
-#
-token long_ident {
-	[ [ $<root>='::' ]?
-		<part=bareword> :: [ '::' <part=bareword> ]*
-	| '[' ::
-		[ $<root>='::' ]?
-		<part=string_lit> [ ';' <part=string_lit> ]*
-		[ ']'
-		|| <panic: 'Missing "]" in long identifier'>
-		]
-	]
-	{*}
-}
-
-rule adverbs {
-	[ <adverb> ]*
-	{*}
-}
-
-rule adverb {
-	| [ $<extends>='extends' <args=long_ident> [ ',' <args=long_ident> ]* ] 
-	  {*}
-	| [
-		<t_adverb>		# matches ":something", with no space inside
-		[ '(' 
-			[ <args=string_lit> [ ',' <args=string_lit> ]* 
-			| <signature=string_literal: ')' >	# Support :multi(_, A)
-			]
-		')' ]?
-	]
-	{*}
-}
-
-token t_adverb {
-	| ':' <ident> 
-	| $<ident>='...'	# An alias for slurpy
-	| $<ident>='?'	# An alias for optional:  func(a, b, c? = 1)
-}
-
-token ws {
-	| <?{{								# Cache ws results.
-		$P0 = get_global '$!ws'
-		if null $P0 goto noshort
-		$P1 = $P0.'to'()
-		$P2 = match.'to'()
-		if $P1 != $P2 goto noshort
-		.return(1)
-	  noshort:
-		set_global '$!ws', match
-		.return(0)
-	}}>
-	| <!ww> <.WS_ALL>+
-	| <.WS_ALL>*
-}
-
-token WS_ALL {
-	[ \s+
-	| '#' \N* [ \n | $ ]		# Deprecated
-	| <.POD>			# Deprecated
-	| '/*' .*? '*/'			# <.C_BLOCK_COMMENT>
-	| '//' \N* [ \n | $ ]		# <.C_LINE_COMMENT>
-	]
-}
-
-regex POD {
-	^^ '='	[ [ 'cut' \h*: | 'end' [\h\N*]? ]
-		| 'for' [ \h \N+: ] \n [ \N+\n ]*:
-		| \w\N*: \n .*? \n '=' [ 'cut' \h*: | 'end' [\h\N*]? ]
-		]
-		[ \n | $ ]
-}
-
-#token C_BLOCK_COMMENT {
-#	'/*' .*? '*/'
-#}
-
-#token C_LINE_COMMENT {
-#	'//' \N* [ \n | $ ]
-#}
 
 token string_lit {
 	[ '\'' <string_literal: '\''> '\''

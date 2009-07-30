@@ -41,6 +41,8 @@ method conditional_stmt($/) {
     make $past;
 }
 
+method declaration_statement($/) { PASSTHRU($/, 'declaration', 'declaration_statement'); }
+
 method labeled_stmt($/, $key) {
 	my $past := PAST::Stmts.new(:name('labeled stmt'), :node($/));
 

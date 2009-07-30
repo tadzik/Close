@@ -66,17 +66,20 @@ GRAMMARS_PG := \
 	src/parser/tokens.pg
 
 ACTIONS_PM := \
+	src/parser/parse_utils.pm \
 	src/parser/actions.pm \
 	src/parser/builtin_actions.pm \
 	src/parser/declaration_actions.pm \
 	src/parser/expression_actions.pm \
-	src/parser/statement_actions.pm
+	src/parser/name_actions.pm \
+	src/parser/statement_actions.pm \
+	src/parser/token_actions.pm 
 
 BUILTINS_PIR := \
-  src/builtins/literals.pir \
-  src/builtins/optable.pir \
-  src/builtins/say.pir \
-  src/builtins/strings.pir
+	src/builtins/literals.pir \
+	src/builtins/optable.pir \
+	src/builtins/say.pir \
+	src/builtins/strings.pir
 
 LIBRARY_SRC := \
 	library/close/load.cl \
@@ -116,7 +119,7 @@ close.pbc: $(SOURCES)
 close@exe@: close.pbc
 	$(PBC_TO_EXE) close.pbc
 
-src/gen_grammar.pg: $(GRAMMARS_PG)
+src/gen_grammar.pg: $(GRAMMARS_PG) Makefile
 	cat $(GRAMMARS_PG) > src/gen_grammar.pg
 
 src/gen_grammar.pir: $(PERL6GRAMMAR) src/gen_grammar.pg
@@ -126,7 +129,7 @@ src/gen_grammar.pir: $(PERL6GRAMMAR) src/gen_grammar.pg
 
 #   src/parser/grammar-oper.pg
 
-src/gen_actions.pm: $(ACTIONS_PM)
+src/gen_actions.pm: $(ACTIONS_PM) Makefile
 	cat $(ACTIONS_PM) > src/gen_actions.pm
 
 src/gen_actions.pir: $(NQP) src/gen_actions.pm

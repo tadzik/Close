@@ -238,7 +238,7 @@ rule builtin_exists { 'exists' <index=postfix_expr> {*} }
 rule builtin_find_caller_lex { 'find_caller_lex' <name=expression> {*} }
 
 # if ( isa x, Class ) {... }
-rule builtin_isa { 'isa' <obj=expression> ',' <class=long_ident> {*} }
+rule builtin_isa { 'isa' <obj=expression> ',' <class=qualified_identifier> {*} }
 
 # if ( isntsame x, y ) {...}
 rule builtin_isntsame { 'isntsame' <arg1=expression> ',' <arg2=expression> {*} }
@@ -251,7 +251,7 @@ rule builtin_issame { 'issame' <arg1=expression> ',' <arg2=expression> {*} }
 
 # x = new Iterator, foo
 # FIXME: Add "new expression" support.
-rule builtin_new { 'new' <classname=long_ident> [ ',' <args1=expression> ]? {*} }
+rule builtin_new { 'new' <classname=qualified_identifier> [ ',' <args1=expression> ]? {*} }
 
 # pmc x = null;
 token builtin_null { 'null' {*} }

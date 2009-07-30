@@ -1,98 +1,196 @@
 # $Id$
 
+=pod
+
+MODULE: declarations.pg
+
+IMPORTS: declarator_name (names.pg)
+EXPORTS: declaration
+
+=cut
+
 # Probably should be "simple-declaration"
 rule declaration {
-	<decl_specifier>*		# Default to 'auto'.
-	<init_declarator_list>	# At least one of these, too.
+	<specifier>*		# Default to 'auto'.
+	<dclr_init_list>	# At least one of these, too.
+	{*}
 }
 
-rule decl_specifier {
-	| <spec=storage_class_specifier>	{*}
-	| <spec=type_specifier>		{*}
-	| <spec=function_specifier>	{*}
-}
+=rule cv_qualifier
 
-rule function_specifier {
-	| <spec=INLINE>		{*}
-	| <spec=METHOD>		{*}
-}
+One of the access qualifiers C<const> or C<volatile>. This rule is used in both
+L<#type_specifier> and L<#declarator> matching.
 
-rule storage_class_specifier {
-	| <spec=DYNAMIC>		{*}
-	| <spec=EXTERN>		{*}
-	| <spec=LEXICAL>		{*}
-	| <spec=REGISTER>	{*}
-	| <spec=STATIC>		{*}
-	| <spec=TYPEDEF>		{*}
-}
-
-rule type_specifier {
-	| <builtin_type>		{*}
-#	| <class_specifier>	{*}		# class/struct/union foo { ... }
-	| <cv_qualifier>	{*}
-#	| <enum_specifier>	{*}
-#	| <elaborated_type_specifier> {*}   # "struct foo"
-#	| <type_name>	{*}
-#	| <typename_specifier> {*}		# 'typename' othervar
-}
-
-rule builtin_type {
-	| <name=AUTO>		{*}
-	| <name=CLASS>		{*}
-	| <name=FLOAT>		{*}
-	| <name=INT>		{*}
-	| <name=PMC>		{*}
-	| <name=STRING>		{*}
-	| <name=VOID>		{*}
-}
+=cut
 
 rule cv_qualifier {
-	| <qualifier=CONST>	{*}
-	| <qualifier=VOLATILE>	{*}
+	| <token=CONST>		{*}
+	| <token=VOLATILE>	{*}
 }
 
-rule type_name {
-	<qualified_identifier>
-	{*}
+=rule dclr_array_or_hash
+
+Matches one of three possible syntaxes for declaring an array or hash. 
+
+=item # C<[ % ]>
+
+A hash is declared with a percent sign (the Perl hash sigil) inside brackets.
+
+=item # C<[ ]>
+
+A pair of empty brackets indicates an array of unspecified, indeterminate, or
+variable size.
+
+=item # C<[ expression ]>
+
+An expression inside brackets indicates an array of fixed size, determined by
+the value of expression at the time of initialization.
+
+=cut
+
+rule dclr_array_or_hash {
+	| $<hash>='%'		{*}
+	| <expression>		{*}
+	|				{*}
 }
 
-rule init_declarator_list {
-	<init_declarator> [ ',' <init_declarator> ]*
-	{*}
-}
+=rule dclr_atom
 
-rule init_declarator {
-	<declarator> <initializer>?
-	{*}
-}
+Matches either a C<declarator_name> (as in 'extern int Foo::x', the 'Foo::x'
+part) or another C<dclr_declarator> nested in parentheses.
 
-rule declarator {
-{{ say "Hello, declaraTOR!" }}
-	<decl_pointer>* <direct_declarator> <decl_postfix>
-	{*}
-}
+=cut
 
-rule decl_pointer {
-	'*' <cv_qualifier>*		{*}
-}
-
-rule direct_declarator {
-	| '(' <declarator> ')'		{*}
+rule dclr_atom {
+	| '(' <dclr_declarator> ')'		{*}
 	| <declarator_name>	{*}
 }
 
-rule decl_postfix {
-	| '(' <parameter_decl_list> ')'	{*}
-	| '[' <array_or_hash_decl> ']'	{*}
+=rule dclr_declarator
+
+A dclr_declarator is that part of the declaration specific to a single name. The 
+dclr_declarator includes the symbol name, as well as any prefix indicating
+the symbol is a pointer, and any suffix indicating the symbol is a function,
+array, or hash.
+
+=cut
+
+rule dclr_declarator {
+	# * const	->	myvar		-> (int x, string y)
+	<dclr_pointer>* <dclr_atom> <dclr_postfix>*
+	{*}
 }
 
-rule array_or_hash_decl {
-	[ $<hash>='%'		{*}
-	| <expression>		{*}
-	|				{*}
-	]
+=rule dclr_init
+
+An dclr_init is a C<dclr_declarator> optionally followed by an 
+C<dclr_initializer>.
+
+=cut
+
+rule dclr_init {
+	<dclr_declarator> <dclr_initializer>?
+	{*}
 }
 
-rule initializer {
-	<assign_expr>		{*}
+=rule dclr_init_list
+
+A list of at least one C<dclr_init>, separated by commas.
+
+=cut
+
+rule dclr_init_list {
+	<item=dclr_init> [ ',' <item=dclr_init> ]*
+}
+
+rule dclr_initializer {
+	'=' <expression>		{*}
+}
+
+rule dclr_param_list {
+	[ <param_list=declaration> [ ',' <param_list=declaration> ]* ]?
+	{*}
+}
+
+=rule dclr_pointer
+
+Matches a star ('*') -- the Close "pointer to something" indicator -- optionally 
+followed by C<cv_qualifier>s.
+
+=cut
+
+rule dclr_pointer {
+	$<token>='*' <cv_qualifier>*	{*}
+}
+
+=rule dclr_postfix
+
+Matches either an array or hash declaration (C<decl[%]>), or a function's 
+parameter declaration list (C<decl(int a, string b)>) after a dclr_declarator.
+
+=cut
+
+rule dclr_postfix {
+	| '(' <dclr_param_list> ')'		{*} #= dclr_param_list
+	| '[' <dclr_array_or_hash> ']'	{*} #= dclr_array_or_hash
+}
+
+=rule specifier
+
+Matches any form of type specifier. Storage class specifiers (keywords),
+type specifiers (builtins, or user defined types), and function specifiers
+(more keywords). Matches only one specifier -- the rule must be used in a
+qualified context with '*' or '+'.
+
+=cut
+
+rule specifier {
+	| <tspec_function_attr>	{*} #= tspec_function_attr
+	| <tspec_storage_class>	{*} #= tspec_storage_class
+	| <tspec_type_specifier>	{*} #= tspec_type_specifier
+}
+
+=rule tspec_builtin_type
+
+Matches any of the Close builtin types.
+
+=cut
+
+rule tspec_builtin_type {
+	| <token=AUTO>		{*}
+	#| <token=CLASS>		{*} # Really?
+	| <token=FLOAT>		{*}
+	| <token=INT>		{*}
+	| <token=PMC>		{*}
+	| <token=STRING>		{*}
+	| <token=VOID>		{*}
+}
+
+rule tspec_function_attr {
+	| <token=INLINE>		{*}
+	| <token=METHOD>	{*}
+}
+
+rule tspec_storage_class {
+	| <token=DYNAMIC>	{*}
+	| <token=EXTERN>		{*}
+	| <token=LEXICAL>		{*}
+	| <token=REGISTER>	{*}
+	| <token=STATIC>		{*}
+	| <token=TYPEDEF>	{*}
+}
+
+rule tspec_type_specifier {
+	| <tspec_builtin_type>		{*} #= tspec_builtin_type
+#	| <class_specifier>		{*}		# class/struct/union foo { ... }
+	| <cv_qualifier>		{*} #= cv_qualifier
+#	| <enum_specifier>	{*}
+#	| <elaborated_type_specifier> {*}   # "struct foo"
+#	| <tspec_type_name>	{*}
+#	| <typename_specifier> {*}		# 'typename' othervar
+}
+
+rule tspec_type_name {
+	<qualified_identifier>
+	{*}
 }

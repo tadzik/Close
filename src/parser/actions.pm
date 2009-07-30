@@ -1,28 +1,40 @@
 # $Id$
 
-=begin comments
+method TOP($/, $key) { PASSTHRU($/, $key, 'TOP'); }
 
-close::Grammar::Actions - ast transformations for close
+method extern_statement($/, $key) { PASSTHRU($/, $key, 'extern_statement'); }
 
-This file contains the methods that are used by the parse grammar
-to build the PAST representation of an close program.
-Each method below corresponds to a rule in F<src/parser/grammar.pg>,
-and is invoked at the point where C<{*}> appears in the rule,
-with the current match object as the first argument.  If the
-line containing C<{*}> also has a C<#= key> comment, then the
-value of the comment is passed as the second argument to the method.
-
-Note that the order of routines here should be the same as that of L<grammar.pg>,
-except that (1) some grammar rules have no corresponding method; and (2) any
-'extra' routines in this file come at the end, corresponding to the 'Implementation'
-pod section of the grammar.
-
-=end comments
-
-class close::Grammar::Actions;
-
-method TOP($/) {
-	make $<translation_unit>.ast;
+method namespace_definition($/, $key) {
+	if $key eq 'open' {
+		my $path := $<namespace_path>.ast;
+		
+		my $hll := $path<hll>;
+		
+		my @namespace_path;
+		
+		unless $path<is_rooted> {
+	say("Not rooted");
+			my $outer := current_lexical_scope();
+			@namespace_path := clone_array($outer.namespace());
+			
+			for $path.namespace() {
+				@namespace_path.push($_);
+			}
+		}
+		
+		open_namespace_definition($hll, @namespace_path);
+	}
+	else { # $key eq 'close'
+		my $past := close_namespace_definition();
+		
+		for $<extern_statement> {
+			$past.push($_.ast);
+		}
+		
+		DUMP($past, 'namespace_definition');
+		make $past;
+	}
+	
 }
 
 method translation_unit($/, $key) {
@@ -31,303 +43,18 @@ method translation_unit($/, $key) {
 		open_namespace_definition('close', new_array());
 	}
 	else {
-		my $past := compilation_unit_past();
-		#DUMP($past, "program");
+	say("Closing translation unit");
+		my $past := PAST::Block.new(:node($/), :blocktype('immediate'));
+		$past.name('translation unit');
+		
+		for $<extern_statement> {
+			$past.push($_.ast);
+		}
+		
+		#my $past := compilation_unit_past();
+		DUMP($past, "translation_unit");
 		make $past;
 	}
-}
-
-our %Unique_name;
-
-sub make_unique_name($category) {
-	unless %Unique_name{$category} {
-		%Unique_name{$category} := 0;
-	}
-	
-	my $name := $category ~ '_0000' ~ %Unique_name{$category}++;
-	$name := substr($name, 0, -4);
-	return $name;
-}
-	
-sub make_type_specifier($name, $noun, $scope) {
-	my $spec := PAST::Val.new(:value($name));
-	
-	for ('const', 'declarator', 'extern', 'label', 'typedef', 'volatile') {
-		$spec{'is_' ~ $_} := 0;
-	}
-	
-	$spec<is_specifier> := 1;
-	$spec<name> := $name;
-	$spec<noun> := $noun;
-	$spec<storage_class> := 'register';
-	$spec<decl_scope> := $scope;
-	
-	return ($spec);
-}
-
-sub make_aggregate($kind, $tag) {
-	unless $tag {
-		$tag := make_unique_name($kind);
-	}
-	
-	my $agg := PAST::Block.new(
-		:blocktype('immediate'),
-		:name($kind ~ ' ' ~ $tag));	# 'struct foo' or 'enum bar'
-	$agg<kind> := $kind;
-	$agg<tag> := $tag;
-	
-	return ($agg);
-}
-
-sub make_declarator($ref, $attr, $label) {
-	my $decl := PAST::Val.new(:value($label));
-	
-	for ('array', 'const', 'specifier', 'typedef', 'volatile') {
-		$decl{'is_' ~ $_} := 0;
-	}
-	
-	$decl{$attr} := 1;
-	$decl<is_declarator> := 1;
-	$decl<type> := $ref;
-}
-
-sub make_pointer_to($type, $const, $volatile) {
-	my $decl := make_declarator($type, 'is_pointer', 'pointer to');	
-	$decl<is_volatile> := 0;
-	$decl<is_const> := 0;
-	return ($decl);
-}
-
-sub make_function_returning($type) {
-	my $decl := make_declarator($type, 'is_function', 'function returning');	
-	return ($decl);
-}
-
-sub make_array_of($type, $elements) {
-	my $decl := make_declarator($type, 'is_array', 'array of');
-	
-	if $elements {
-		$decl<num_elements> := $elements;
-		$decl.value('array of ' ~ $elements);
-	}
-	
-	return ($decl);
-}
-
-sub make_hash_of($type) {
-	my $decl := make_declarator($type, 'is_hash', 'hash of');
-	return ($decl);
-}
-
-sub print_aggregate($agg) {
-	say(substr($agg<kind> ~ "        ", 0, 8),
-		substr($agg<tag> ~ "                  ", 0, 18));
-	
-	for $agg<symtable> {
-		print_symbol($agg.symbol($_)<decl>);
-	}
-}
-
-sub print_symbol($sym) {
-	if $sym<is_alias> {
-		say(substr($sym.name() ~ "                  ", 0, 18),
-			" ",
-			substr("is an alias for: " ~ "                  ", 0, 18),
-			" ",
-			substr($sym<alias_for><scope>.name() ~ '::' 
-				~ $sym<alias_for>.name() ~ "                              ", 0, 30));
-	}
-	else {
-		say(substr($sym.name() ~ "                  ", 0, 18),
-			" ",
-			substr($sym<pir_name> ~ "                  ", 0, 18),
-			" ",
-			$sym<scope>.name(), 
-			" ",
-			type_to_string($sym<type>));
-	}
-}
-
-sub type_to_string($type) {
-	my $str := '';
-	
-	unless $type {
-		return '(NULL)';
-	}
-	
-	while $type {
-		my $append;
-		
-		if $type<is_declarator> {
-			if $type<is_array> { 
-				$append := '[]';
-				if $type<num_elements> {
-					$append := '[' ~ $type<num_elements> ~ ']';
-				}
-			}
-			elsif $type<is_function> {
-				$append := '()';
-			}
-			elsif $type<is_hash> {
-				$append := '[%]';
-			}
-			elsif $type<is_pointer> {
-				$append := '*';
-			}
-			else {
-				$append := '<<unrecognized declarator: ' ~ $type.value() ~ '>>';
-			}
-		}
-		else {
-			$append := $type<name>
-				~ "\tS:" ~ substr($type<storage_class>, 0, 3)
-				~ "\tR:" ~ $type<register_class>;
-			
-			if $type<is_extern> {
-				$append := $append ~ ' extern';
-			}
-		}
-		
-		$str := $str ~ $append;
-		$type := $type<type>;
-	}
-	
-	return ($str);
-}
-
-sub make_new_symbol($name, $type, $scope) {
-	my $symbol := PAST::Var.new(:name($name));
-
-	for ('alias', 'duplicate', 'implicit') {
-		$symbol{'is_' ~ $_} := 0;
-	}
-
-	$symbol<pir_name> := $name;
-	$symbol<scope> := $scope;
-	$symbol<type> := $type;
-	
-	my $etype := $type;
-	
-	while $etype<is_declarator> {
-		$etype := $etype<type>;
-	}
-	
-	$symbol<etype> := $etype;
-	return ($symbol);
-}
-
-sub make_alias($name, $symbol, $scope) {
-	my $alias := make_new_symbol($name, Undef, $scope);
-	$alias<is_alias> := 1;
-	$alias<alias_for> := $symbol;
-	
-	if $symbol<has_aliases>{$scope} {
-		die("Cannot create second alias for symbol in same scope.");
-	}
-	
-	$symbol<has_aliases>{$scope} := $alias;
-	return ($alias);
-}
-
-sub same_type($type1, $type2) {
-	while $type1 && $type2 {
-		if $type1 =:= $type2 {
-			return 1;
-		}
-		elsif $type1<is_declarator> && $type2<is_declarator> {
-			if $type1<is_array> && $type2<is_array> {
-				if $type1<num_elements> != $type2<num_elements> {
-					return 0;
-				}
-			}
-			elsif $type1<is_function> && $type2<is_function> {
-				# FIXME: Compare args, somehow.
-				my $param := 0;
-				
-				while $type1<parameters>[$param] {
-					unless $type2<parameters>[$param] {
-						return 0;
-					}
-					
-					unless same_type($type1<parameters>[$param]<type>,
-						$type2<parameters>[$param]<type>) {
-						return 0;
-					}
-				}
-			}
-			elsif $type1<is_hash> && $type2<is_hash> {
-				# I got nothin', here.
-			}
-			elsif $type1<is_pointer> && $type2<is_pointer> {
-				if $type1<is_const> != $type2<is_const>
-					|| $type1<is_volatile> != $type2<is_volatile> {
-					return 0;
-				}
-			}
-		}
-		elsif $type1<is_specifier> && $type2<is_specifier> {
-			if $type1<noun> ne $type2<noun> {
-				return 0;
-			}
-			elsif $type1<is_const> != $type2<is_const>
-				|| $type1<is_volatile> != $type2<is_volatile> {
-				return 0;
-			}
-		}
-	}
-	
-	return 1;
-}
-
-sub open_pervasive_symbols() {
-	my $psym := PAST::Block.new(
-		:blocktype('immediate'),
-		:name("Pervasive Symbols"));
-	$psym<lstype> := 'pervasive scope';
-	
-	# Created predefined types.
-	
-	for ('auto:X', 'float:N', 'int:I', 'pmc:P', 'string:S', 'void:X') {
-		my @parts := split(':', $_);
-		my $name := @parts[0];
-		
-		my $type := make_type_specifier($name, $name, $psym);
-		$type<is_specifier> := 1;
-		$type<register_class> := @parts[1];
-		
-		my $symbol := make_new_symbol($name, $type, $psym);
-		
-		$psym.symbol($name, :decl($symbol));
-	}
-	
-	# FIXME: Move these to be typedefs in a standard namespace. (Then kill 'em.)
-	my $symbol := make_alias('num', $psym.symbol('float')<decl>, $psym);
-	$psym.symbol('num', :decl($symbol));
-	
-	$symbol := make_alias('str', $psym.symbol('string')<decl>, $psym);
-	$psym.symbol('str', :decl($symbol));
-	
-	say("BEHOLD!! A symbol table.");
-	for $psym<symtable> {
-		print_symbol($psym.symbol($_)<decl>);
-	}
-	
-	push_lexical_scope($psym);
-}
-
-sub open_namespace_definition($hll, @path) {
-	@path.unshift($hll);
-	my $block := get_past_block_of_path(@path);
-	push_lexical_scope($block);
-}
-
-method namespace_path($/) {
-	say("Namespace path: ", $/);
-}
-
-method declarator_name($/) {
-	say("Declarator name!");
-	say($/);
 }
 
 method hll_block($/, $key) {
@@ -340,6 +67,8 @@ method hll_block($/, $key) {
 	}
 }
 
+# FIXME: This is going away, but here is the "old way" for packing extern
+# statements into a block.
 method namespace_block($/, $key) {
 	if $key eq 'open' {
 		my $past;
@@ -401,64 +130,6 @@ method namespace_name($/) {
 	# $past.namespace(@parts);
 	# DUMP($past, "namespace_name");
 	# make $past;
-}
-
-method long_ident($/) {
-	my $past	:= PAST::Var.new(:node($/), :scope('register'));
-	my @parts	:= new_array();
-
-	for $<part> {
-		@parts.push(~$_);
-	}
-
-	# Last part is the variable/class/function name. ::part1::name
-	my $name := @parts.pop();
-	$past.name($name);
-
-	$past<is_rooted> := 0;
-	$past<hll> := current_hll_block().name();
-	
-	if +$<root> {
-		if +@parts {
-			$past<is_rooted> := 1;
-			$past<hll> := @parts.shift();
-		}
-		# else ::foo is just a ref to hll's empty nsp
-		
-		$past.namespace(@parts);
-		$past.scope('package');
-	}
-	else {
-		if +@parts {
-			$past.namespace(@parts);
-			$past.scope('package');
-		}
-		else {
-			# Unrooted, w/ no namespace: looks like "foo"
-			$past.namespace(current_namespace_block().namespace());
-		}
-	}
-
-	# Look up symbol, set scope accordingly if seen.
-	my $info := symbol_defined_anywhere($past);
-
-	if $info and $info<decl> {
-		$past<decl> := $info<decl>;
-
-		if $info<decl>.isa('PAST::Var') {
-			my $scope := $info<decl>.scope();
-
-			if $scope eq 'parameter' {
-				# See #701. Non-isdecl param ref must be lex
-				$scope := 'lexical';
-			}
-
-			$past.scope($scope);
-		}
-	}
-
-	#DUMP($past, "long_ident");
-	make $past;
 }
 
 our %adverb_aliases;
@@ -655,62 +326,9 @@ method short_ident($/) {
 	make $past;
 }
 
-method constant($/, $key)               { PASSTHRU($/, $key); }
-
-method string_lit($/) {
-	my $past := PAST::Val.new(
-		:node($/),
-		:returns('String'),
-		:value($<string_literal>.ast));
-	#DUMP($past, "string");
-	make $past;
-}
-
-method integer_lit($/) {
-    my $value := ~$/;
-
-    if substr($value, 0, 1) eq '0'
-        and my $second := substr($value, 1, 1)
-        and $second ge '0' and $second le '9' {
-        $/.panic("FATAL: Integer literals like "
-            ~ $value
-            ~ " are not interpreted as octal.\n"
-            ~ "Use 0o"
-            ~ substr($value, 1)
-            ~ " for that, or remove the leading zero");
-    }
-
-    my $past := PAST::Val.new(
-        :node($/),
-        :returns('Integer'),
-        :value($value));
-
-    #DUMP($past, "integer");
-    make $past;
-}
-
-method float_lit($/, $key) {
-    my $past := PAST::Val.new(
-        :node($/),
-        :returns('Num'),
-        :value(~$/));
-    #DUMP($past, "number");
-    make $past;
-}
+method constant($/, $key)               { PASSTHRU($/, $key, 'constant'); }
 
 ##### Implementation helpers
-
-sub DUMP($what, $name)
-{
-	PCT::HLLCompiler.dumper($what, $name);
-}
-
-sub PASSTHRU($/, $key) {
-	my $past := $/{$key}.ast;
-	#DUMP($past, "passing thru:" ~ $key);
-	#DUMP($/, "match");
-	make $past;
-}
 
 sub join($_delim, @parts) {
 	my $result := '';
@@ -1026,225 +644,6 @@ sub add_local_symbol($past) {
 	my $name := $past.name();
 	my $block := current_lexical_scope();
 	$block.symbol($name, :decl($past));
-}
-
-##################################################################
-
-=head4 Global symbol table management
-
-Global symbols are stored in set of PAST::Blocks maintained separately from
-PAST tree output by the parser.
-
-These blocks are organized in a tree that mirrors the Parrot namespace tree.
-The topmost, root level of the blocks is stored in C<our $Symbol_table>.
-
-Within the blocks, each child namespace is stored as a symbol entry. The
-symbol hash associated with each name is populated with these keys:
-
-	my $info := $block.symbol($name);
-
-=over 4
-
-=item * C<< $info<past> >> is the PAST block that will be output by the parser for
-this namespace. If a user closes and then re-opens a namespace using the
-namespace directive, all follow-on declarations should be added to the same
-block.
-
-=item * C<< $info<symbols> >> is the PAST block that contains info about child
-namespaces. This is the continuation of the symbol table tree. Thus,
-
-     my $child := $block.symbol($name)<symbols>;
-
-=item * C<< $info<class> >> will be something to do with classes. Duh.
-
-=item * C<< $info<init> >> is a PAST block representing a namespace init function.
-
-=back
-
-=cut
-
-sub add_global_symbol($sym) {
-	my @path := namespace_path_of_var($sym);
-	my $block := get_past_block_of_path(@path);
-
-	#say("Found block: ", $block.name());
-
-	my $name	:= $sym.name();
-	my $info	:= $block.symbol($name);
-
-	$block.symbol($name, :decl($sym));
-}
-
-sub _find_block_of_path(@_path) {
-	our $Symbol_table;
-
-	unless $Symbol_table {
-		$Symbol_table := PAST::Block.new(:name(""));
-		$Symbol_table<path> := '$';
-	}
-
-	my @path := clone_array(@_path);
-
-	my $block	:= $Symbol_table;
-	my $child	:= $Symbol_table;
-
-	#DUMP(@path, "find block of path");
-	while @path {
-		my $segment := @path.shift();
-
-		unless $block.symbol($segment) {
-			my $new_child := PAST::Block.new(:name($segment));
-			$new_child<path> := $block<path> ~ "/" ~ $segment;
-			$block.symbol($segment, :namespace($new_child));
-		}
-
-		$child := $block.symbol($segment);
-		$block := $child<namespace>;
-	}
-
-	#say("Found block: ", $block<path>);
-	return $child;
-}
-
-sub _get_namespaces_below($block, @results) {
-	for $block<symtable> {
-		#say("Child: ", $_);
-		my $child := $block.symbol($_);
-
-		if $child<past> {
-			@results.push($child<past>);
-			#DUMP($child<past>, "past");
-		}
-
-		_get_namespaces_below($child<namespace>, @results);
-	}
-}
-
-sub get_all_namespaces() {
-	our $Symbol_table;
-
-	my @results := new_array();
-
-	if $Symbol_table {
-		_get_namespaces_below($Symbol_table, @results);
-	}
-
-	return @results;
-}
-
-# Given a past symbol, return the symbol hash.
-sub get_global_symbol_info($sym) {
-	my @path := namespace_path_of_var($sym);
-	my $block := get_past_block_of_path(@path);
-
-	#say("Found block: ", $block.name());
-	my $name := $sym.name();
-	return $block.symbol($name);
-}
-
-sub _get_keyed_block_of_path(@_path, $key) {
-	#say("Get keyed block of path: ", join("::", @_path), ", key = ", $key);
-	my $block	:= _find_block_of_path(@_path);
-	my $result	:= $block{$key};
-
-	unless $result {
-		# Provide some defaults
-		my @path := clone_array(@_path);
-		my $name := '';
-
-		$result := PAST::Block.new();
-		$result.blocktype('immediate');
-		$result.hll(@path.shift());
-
-		# This wierd order is for hll root namespaces, which
-		# will have a hll, but no name and no path.
-		if +@path {
-			$name := @path.pop();
-			@path.push($name);
-		}
-
-		$result.name($name);
-		$result.namespace(@path);
-		$result<init_done> := 0;
-		$result<block_type> := $key;
-
-		$block{$key} := $result;
-	}
-
-	return $result;
-}
-
-sub get_class_info_if_exists(@path) {
-	my $block	:= _find_block_of_path(@path);
-	return $block<class>;
-}
-
-sub get_class_info_of_path(@path) {
-	my $class := _get_keyed_block_of_path(@path, 'class');
-
-	unless $class<init_done> {
-		$class.blocktype('declaration');
-		$class.pirflags(":init :load");
-		$class<is_class> := 1;
-		$class<adverbs><phylum> := 'close';
-		$class<init_done> := 1;
-		#DUMP($class, "class");
-	}
-
-	return $class;
-}
-
-sub get_class_init_of_path(@path) {
-	my $block := _get_keyed_block_of_path(@path, 'class_init');
-
-	unless $block<init_done> {
-		$block.blocktype('declaration');
-		$block.name('_init_class_' ~ $block.name());
-		#$block.pirflags(':init :load');
-		$block<init_done> := 1;
-		#DUMP($block, "class init");
-	}
-
-	return $block;
-}
-
-sub get_init_block_of_path(@_path) {
-	my $block := _get_keyed_block_of_path(@_path, 'init');
-
-	unless $block<init_done> {
-		$block.blocktype('declaration');
-		$block.name('_init_namespace_' ~ $block.name());
-		$block.pirflags(":anon :init :load");
-		$block<init_done> := 1;
-		
-		#DUMP($block, "namespace init block");
-	}
-
-	return $block;
-}
-
-sub get_past_block_of_path(@_path) {
-	my $block := _get_keyed_block_of_path(@_path, 'past');
-
-	unless $block<init_done> {
-		$block<init_done> := 1;
-	}
-
-	#DUMP($block, "namespace past");
-	return $block;
-}
-
-sub namespace_path_of_var($var) {
-	my @path := clone_array($var.namespace());
-	@path.unshift($var<hll>);
-	return @path;
-}
-
-sub is_local_function($fdecl) {
-	my @p1 := namespace_path_of_var($fdecl);
-	my @p2 := namespace_path_of_var(current_namespace_block());
-
-	return join('::', @p1) eq join('::', @p2);
 }
 
 ##################################################################
@@ -1590,91 +989,6 @@ sub compilation_unit_past()
 	}
 
 	return $past;
-}
-
-#################################################################
-
-=head4 Lexical Stack
-
-There is a stack of lexical elements. Each element is expected to be a
-PAST::Block, although it may be transformed after it leaves the stack.
-
-=cut
-
-sub close_lexical_scope($lstype) {
-	our @Outer_scopes;
-
-	my $old := @Outer_scopes.shift();
-
-	unless $lstype eq $old<lstype> {
-		DUMP($old, "popped");
-		DUMP(@Outer_scopes, "Outer_scopes");
-		die("Stack mismatch. Popped '" ~ $old<lstype>
-			~ "' but expected '" ~ $lstype ~ "'");
-	}
-
-	#say("Close ", $lstype, " scope. Before ", +@Outer_scopes, " on stack");
-	#DUMP($old, "last lex scope");
-	return $old;
-}
-
-sub current_lexical_scope() {
-	our @Outer_scopes;
-	return @Outer_scopes[0];
-}
-
-sub find_lexical_block_with_attr($name) {
-	our @Outer_scopes;
-
-	if @Outer_scopes {
-		for @Outer_scopes {
-			if $_{$name} {
-				return $_;
-			}
-		}
-	}
-
-	return undef;
-}
-
-sub open_lexical_scope($name, $lstype) {
-	my $new_scope := PAST::Block.new(
-		:blocktype('immediate'),
-		:name($name));
-
-	$new_scope<lstype> := $lstype;
-
-	my $hll := current_hll_block();
-
-	if $hll {
-		$new_scope.hll($hll.name());
-	}
-
-	my $namespace := current_namespace_block();
-
-	if $namespace {
-		$new_scope.namespace($namespace.namespace());
-	}
-
-	push_lexical_scope($new_scope);
-	return $new_scope;
-}
-
-sub push_lexical_scope($scope) {
-	our @Outer_scopes;
-
-	if !@Outer_scopes {
-		@Outer_scopes := new_array();
-	}
-
-	unless $scope.isa(PAST::Block) {
-		DUMP($scope, "bogus");
-		die("Attempt to push non-Block on lexical scope stack.");
-	}
-
-	@Outer_scopes.unshift($scope);
-	#say("Open ", $scope<lstype>, " scope: ", $scope.name(),
-	#	" Now ", +@Outer_scopes, " on stack");
 }
 
 #################################################################
