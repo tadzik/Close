@@ -19,52 +19,16 @@ rule TOP {
 	<translation_unit> {*} #= translation_unit
 }
 
-=rule block_statement
+=rule local_statement
 
 =cut
 
-rule block_statement {
+rule local_statement {
 	| <namespace_alias_definition>
 	| <using_directive>
 	| <using_declaration>
 	| <simple_declaration>
-	| <statement>
-}
-
-=rule extern_statement
-
-An C<extern_statement> is a statement that may appear outside a function. 
-Because "normal" statements are assumed to be part of a namespace or class 
-init block, all of them are permitted. In addition, a C<namespace_definition>
-may only appear outside a function.
-
-=cut
-
-rule extern_statement {
-	| <namespace_definition>	{*} #= namespace_definition
-	| <declaration_statement>	{*} #= declaration_statement
-#	| <namespace_directive>
-#	| <block_statement>
-}
-
-=rule namespace_definition
-
-A namespace definition is a block that assigns a namespace path to all the
-declarations contained in the block.
-
-    namespace Foo {
-        void bark();	// Defines Foo::bark();
-    }
-
-=cut
-
-rule namespace_definition {
-	<EXTERN>? <.NAMESPACE> <namespace_path> 
-	'{'
-		{*} #= open
-		<extern_statement>*
-	'}'
-	{*} #= close
+	| <local_statement>
 }
 
 =head5 C<translation_unit>
@@ -174,22 +138,3 @@ token builtin_function {
 
 # rule expression is defined in expressions.pg
 # rule built_in is defined in builtins.pg
-
-## rule hll_block {
-## 	[ 'hll' <hllname=short_ident> ';'
-## 	|| <?{{
-## 		$P0 = get_global '$Top_of_file'
-## 		.return ($P0)
-## 		}}>
-## 	]
-## 	{{
-## 		$P0 = box 1
-## 		set_global '$Top_of_hll_block', $P0
-## 		$P0 = box 0
-## 		set_global '$Top_of_file', $P0
-## 	}}
-## 	{*} #= open
-## 	<namespace_block>+
-## 	{*} #= close
-## }
-

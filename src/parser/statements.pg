@@ -6,17 +6,41 @@ $Rev$
 
 =cut
 
-rule statement {
-	[ <labeled_stmt>	{*} #= labeled_stmt
+=rule extern_statement
+
+An C<extern_statement> is a statement that may appear outside a function. 
+Because "normal" statements are assumed to be part of a namespace or class 
+init block, all of them are permitted. In addition, a C<namespace_definition>
+may only appear outside a function.
+
+=cut
+
+rule extern_statement {
+	| <namespace_definition>	{*} #= namespace_definition
+	| <declaration_statement>	{*} #= declaration_statement
+#	| <namespace_directive>
+	| <local_statement>		{*} #= local_statement
+}
+
+=rule local_statement
+
+A I<local_statement> is a statement that may appear in a local scope -- that is,
+inside a class or function declaration. The 'usual' coding statements are here,
+such as loops, goto, if/then/else, expressions, etc.
+
+=cut
+
+rule local_statement {
+	[ <labeled_stmt>		{*} #= labeled_stmt
 	| <null_stmt>		{*} #= null_stmt
-	| <compound_stmt>	{*} #= compound_stmt
+	| <compound_stmt>		{*} #= compound_stmt
 	| <conditional_stmt>	{*} #= conditional_stmt
-	| <iteration_stmt>	{*} #= iteration_stmt
+	| <iteration_stmt>		{*} #= iteration_stmt
 	| <jump_stmt>		{*} #= jump_stmt
 	| <declaration_statement>	{*} #= declaration_statement
-	| <expression_stmt>	{*} #= expression_stmt
+	| <expression_statement>	{*} #= expression_statement
 	]
-	|| [ <!before '}' > <.panic: "Statement expected"> ]
+	|| [ <!before '}' | $ > <.panic: "Statement expected"> ]
 }
 
 rule null_stmt {
@@ -31,7 +55,7 @@ semi-colon[;] is an expression statement.
 
 =cut
 
-rule expression_stmt {
+rule expression_statement {
 	<expression>
 	[ ';' || <panic: "Missing ';' at end of expression statement" > ]
 	{*}
@@ -45,7 +69,7 @@ rule declaration_statement {
 rule compound_stmt {
 	'{'
 		[ $<item>=<declaration>
-		| $<item>=<statement>
+		| $<item>=<local_statement>
 		]*
 	[ '}' || <panic: "Missing closing '}' in compound block" > ]
 	{*}
@@ -56,8 +80,8 @@ rule conditional_stmt {
 	[ '(' || <panic: "if/unless statements must have '(' ')' around test expression" > ]
 	<expression>
 	[ ')' || <panic: "missing ')' at end of test expression" > ]
-	$<then>=<statement>
-	[ 'else' $<else>=<statement> ]?
+	$<then>=<local_statement>
+	[ 'else' $<else>=<local_statement> ]?
 	{*}
 }
 
@@ -77,12 +101,12 @@ rule jump_stmt {
 
 rule labeled_stmt {
 	| [ <label> ]+
-		[ <statement>		{*} #= label
+		[ <local_statement>		{*} #= label
 		|| <panic: "A statement label must be followed by a statement" >
 		]
 
-	# | 'case' <label=expression> ':' <statement> {*} #= case
-	# | 'default' ':' <statement>       {*} #= default
+	# | 'case' <label=expression> ':' <local_statement> {*} #= case
+	# | 'default' ':' <local_statement>       {*} #= default
 }
 
 token label {
@@ -109,14 +133,14 @@ rule foreach_stmt {
 		<list=expression>
 		[ ')' || <panic: "Missing closing ')' in foreach statement" > ]
 	{*} #= open
-	<statement>
+	<local_statement>
 	{*} #= close
 }
 
 token t_foreach { 'foreach' >> }
 
 rule do_while_stmt {
-	'do' <statement>
+	'do' <local_statement>
 	$<kw>=[ 'while' | 'until' ]
 	[ '(' || <panic: "do...while/until statements must have '(' ')' around test expression" > ]
 	<expression>
@@ -130,7 +154,7 @@ rule while_do_stmt {
 	[ '(' || <panic: "while/until ... statements must have '(' ')' around test expression" > ]
 	<expression>
 	[ ')' || <panic: "missing ')' at end of test expression" > ]
-	<statement>
+	<local_statement>
 	{*}
 }
 

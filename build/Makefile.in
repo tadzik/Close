@@ -51,10 +51,11 @@ CLOSE_LIB_PBC := library/close/close_lib.pbc
 #OPS_DEPS := build/src/ops/Makefile.in $(OPS_DIR)/close.ops
 
 SOURCES := \
-  src/gen_grammar.pir \
-  src/gen_actions.pir \
-  src/gen_builtins.pir \
-  close.pir
+	src/gen_grammar.pir \
+	src/gen_actions.pir \
+	src/gen_builtins.pir \
+	src/gen_library.pir \
+	close.pir
 
 GRAMMARS_PG := \
 	src/parser/grammar.pg \
@@ -73,7 +74,7 @@ ACTIONS_PM := \
 	src/parser/expression_actions.pm \
 	src/parser/name_actions.pm \
 	src/parser/statement_actions.pm \
-	src/parser/token_actions.pm 
+	src/parser/token_actions.pm
 
 BUILTINS_PIR := \
 	src/builtins/literals.pir \
@@ -91,6 +92,7 @@ DOCS := README
 
 BUILD_CLEANUPS := \
   close.pbc \
+  "src/gen_*.pira" \
   "src/gen_*.pir" \
   src/gen_grammar.pm \
   src/gen_actions.pm \
@@ -111,6 +113,17 @@ build: \
   close.pbc \
   $(CLOSE_LIB_PBC)
 
+%.pir  : %.pira
+	@echo "* Stripping annotations from $<"
+	@grep -v '^.annotate' $< > $@
+
+%.pira : %.c\=
+	cl --target=pir --output=$@ $<
+
+%.pira : %.pg
+	@echo "* Compiling $< to PIRA"
+	@$(PARROT) $(PARROT_ARGS) $(PERL6GRAMMAR) --output=$@ $<
+	
 all: build close@exe@ installable
 
 close.pbc: $(SOURCES)
@@ -119,25 +132,48 @@ close.pbc: $(SOURCES)
 close@exe@: close.pbc
 	$(PBC_TO_EXE) close.pbc
 
-src/gen_grammar.pg: $(GRAMMARS_PG) Makefile
-	cat $(GRAMMARS_PG) > src/gen_grammar.pg
-
-src/gen_grammar.pir: $(PERL6GRAMMAR) src/gen_grammar.pg
-	$(PARROT) $(PARROT_ARGS) $(PERL6GRAMMAR) \
-	    --output=src/gen_grammar.pir \
-	    src/gen_grammar.pg
-
-#   src/parser/grammar-oper.pg
-
+src/gen_actions.pir: src/gen_actions.pm
+	@echo "**** Compiling gen_actions.pm to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP) --target=pir	\
+		--output=src/gen_actions.pira			\
+		src/gen_actions.pm
+	grep -v '.annotate' src/gen_actions.pira			\
+		> src/gen_actions.pir
+	
 src/gen_actions.pm: $(ACTIONS_PM) Makefile
+	@echo "**** Collecting gen_actions.pm"
 	cat $(ACTIONS_PM) > src/gen_actions.pm
 
-src/gen_actions.pir: $(NQP) src/gen_actions.pm
-	$(PARROT) $(PARROT_ARGS) $(NQP) --output=src/gen_actions.pir \
-	    --target=pir src/gen_actions.pm
-
 src/gen_builtins.pir: $(BUILTINS_PIR)
+	@echo "**** Collecting gen_builtins.pir"
 	$(CAT) $(BUILTINS_PIR) > src/gen_builtins.pir
+
+src/gen_grammar.pg: $(GRAMMARS_PG) Makefile
+	@echo "**** Collecting gen_grammar.pg"
+	@cat $(GRAMMARS_PG) > src/gen_grammar.pg
+
+src/gen_grammar.pir: src/gen_grammar.pg
+	@echo "**** Compiling gen_grammar.pg to PIR"
+	$(PARROT) $(PARROT_ARGS) $(PERL6GRAMMAR) \
+		--output=src/gen_grammar.pira  \
+		src/gen_grammar.pg
+	grep -v '.annotate' src/gen_grammar.pira \
+		> src/gen_grammar.pir
+	
+COMPILER_LIBS_PIR := \
+	library/close/Compiler/SymbolLookupVisitor.pir
+
+src/gen_library.pir: $(COMPILER_LIBS_PIR)
+	@echo "* Assembling gen_library.pir"
+	@cat $(COMPILER_LIBS_PIR) > src/gen_library.pir
+
+library/close/Compiler/SymbolLookupVisitor.pir: library/close/Compiler/SymbolLookupVisitor.pm
+	@echo "**** Compiling $< to PIRA"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/SymbolLookupVisitor.pira \
+		library/close/Compiler/SymbolLookupVisitor.pm
+	grep -v '^.annotate' library/close/Compiler/SymbolLookupVisitor.pira \
+		> library/close/Compiler/SymbolLookupVisitor.pir
 
 $(CLOSE_GROUP): $(PMC_DEPS)
 #	$(MAKE) $(PMC_DIR)
@@ -256,10 +292,6 @@ doc2wiki:
 		sudo trac-admin "$(TRAC_PATH)" wiki import "$$wfile" "$$wfile" ; \
 	done < INDEX
 
-%.pir : %.c\=
-	cl --target=pir --output=$*.pira $<
-	grep -v '^.annotate' $*.pira > $@
-	
 PCT_NODE_LIB_DIRS := \
 	-Llibrary/pct
 	

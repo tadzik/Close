@@ -55,7 +55,19 @@ recognizes several flavors of white space:
 
 token WS_ALL {
 	[ \h+				# WS
-	| \n
+	| \n	[ {*} #= start_heredoc
+			[
+				<?{{	$P0 = get_hll_global [ 'close' ; 'Grammar' ; 'Actions' ], '$Heredocs_open'
+					$I0 = $P0
+					.return($I0)
+				}}>
+				
+				[ $<lines>=[ \h* <ident> \h* [ \n | $ ] ]  {*} #= check_for_end
+				|| $<lines>=[ \N* \n ]
+				]
+			]*
+		 #{*} #= finish_heredoc
+		]
 	| '/*' .*? '*/'			# C_BLOCK_COMMENT
 	| '//' \N* [ \n | $ ]		# C_LINE_COMMENT
 	| <.POD>
@@ -171,10 +183,8 @@ escape sequences recognized. These include the standard \n, \r, etc.
 =cut
 
 token QUOTED_LIT {
-	[ '\'' <string_literal: '\''> '\''
-	| '"' <string_literal: '"'> '"'
-	]
-	{*}
+	| '\'' <string_literal: '\''> '\''		{*} #= single
+	| '"' <string_literal: '"'> '"'		{*} #= double
 }
 
 =token HERE_DOC_LIT
@@ -205,7 +215,7 @@ string, while the 'WORLD' tag would be processed as a single-quoted string.
 =cut
 
 token HERE_DOC_LIT {
-	'<<' <.ws> QUOTED
+	'<<' <.ws> <QUOTED_LIT>
 	{*}
 }
 
@@ -360,3 +370,26 @@ token IDENTIFIER {
 	| <BAREWORD>		{*} #= BAREWORD
 	| <QUOTED_LIT>		{*} #= QUOTED_LIT
 }
+
+=head3 Adverbs
+
+Adverbs are not reserved words because they are distinguished by the colon.
+
+=cut
+
+token	ADV_ANON		{ ':anon'	>> }
+token	ADV_EXTENDS	{ ':extends'	>> }
+token	ADV_FLAT		{ ':flat'		>> }
+token	ADV_INIT		{ ':init'		>> }
+token	ADV_LOAD		{ ':load'	>> }
+token	ADV_MAIN		{ ':main'	>> }
+token	ADV_METHOD	{ ':method'	>> }
+token	ADV_MULTI		{ ':multi'	>> }
+token	ADV_NAMED	{ ':named'	>> }
+token	ADV_OPTIONAL	{ [ '?'
+				| ':optional' ]	>> }
+token	ADV_OPT_FLAG	{ ':opt_flag'	>> }
+token	ADV_PHYLUM	{ ':phylum'	>> }
+token	ADV_SLURPY 	{ [ '...'
+				| ':slurpy' ]	>> }
+token	ADV_VTABLE	{ ':vtable'	>> }

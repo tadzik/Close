@@ -21,7 +21,7 @@ object.
 
 =cut
 
-.namespace [ 'close::Compiler' ]
+.namespace [ 'close' ; 'Compiler' ]
 
 #.loadlib 'close_group'
 
@@ -54,6 +54,7 @@ to the close compiler.
 .include 'src/gen_builtins.pir'
 .include 'src/gen_grammar.pir'
 .include 'src/gen_actions.pir'
+.include 'src/gen_library.pir'
 
 =back
 

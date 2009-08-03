@@ -4,39 +4,6 @@ method TOP($/, $key) { PASSTHRU($/, $key, 'TOP'); }
 
 method extern_statement($/, $key) { PASSTHRU($/, $key, 'extern_statement'); }
 
-method namespace_definition($/, $key) {
-	if $key eq 'open' {
-		my $path := $<namespace_path>.ast;
-		
-		my $hll := $path<hll>;
-		
-		my @namespace_path;
-		
-		unless $path<is_rooted> {
-	say("Not rooted");
-			my $outer := current_lexical_scope();
-			@namespace_path := clone_array($outer.namespace());
-			
-			for $path.namespace() {
-				@namespace_path.push($_);
-			}
-		}
-		
-		open_namespace_definition($hll, @namespace_path);
-	}
-	else { # $key eq 'close'
-		my $past := close_namespace_definition();
-		
-		for $<extern_statement> {
-			$past.push($_.ast);
-		}
-		
-		DUMP($past, 'namespace_definition');
-		make $past;
-	}
-	
-}
-
 method translation_unit($/, $key) {
 	if $key eq 'start' {
 		open_pervasive_symbols();
@@ -54,16 +21,9 @@ method translation_unit($/, $key) {
 		#my $past := compilation_unit_past();
 		DUMP($past, "translation_unit");
 		make $past;
-	}
-}
-
-method hll_block($/, $key) {
-	if $key eq 'open' {
-		my $name := $<hllname> ?? $<hllname>.ast.name() !! 'close';
-		open_hll($name);
-	}
-	else {
-		my $past := close_hll();
+		
+		my $visitor := close::Compiler::SymbolLookupVisitor.new();
+		$visitor.visit($past);
 	}
 }
 
@@ -473,38 +433,6 @@ sub symbol_defined_locally($past) {
 	return current_lexical_scope().symbol($name);
 }
 
-sub symbol_defined_anywhere($past) {
-	if $past.scope() ne 'package' {
-		our @Outer_scopes;
-
-		my $name := $past.name();
-		my $def;
-
-		for @Outer_scopes {
-			$def := $_.symbol($name);
-
-			if $def {
-				if $def<decl>.HOW.can($def<decl>, "scope") {
-					#say("--- FOUND: ", $def<decl>.scope());
-				}
-				elsif $def<decl>.isa("PAST::Block") {
-					#say("--- FOUND: Block");
-				}
-				else {
-					#say("--- FOUND in unrecognized object:");
-					#DUMP($def<decl>, "Declaration");
-					die("Unexpected data item");
-				}
-
-				return $def;
-			}
-		}
-	}
-
-	# Not any kind of local variable, parameter, etc. Try global.
-	return get_global_symbol_info($past);
-}
-
 #########
 
 ##### Legacy code - deprecated.
@@ -700,7 +628,7 @@ sub add_class_decl_p6object($class) {
 	#DUMP($past, "proto object");
 	# Add symbol declaration to namespace.
 	my @path		:= namespace_path_of_var($past);
-	my $ns_block	:= get_past_block_of_path(@path);
+	my $ns_block	:= get_namespace(@path);
 	$ns_block.push($past);
 	$ns_block.symbol($past.name(), :decl($past));
 }
@@ -735,7 +663,7 @@ sub make_init_class_sub($class) {
 
 sub make_init_class_sub_close($class) {
 	my @path		:= namespace_path_of_var($class);
-	my $ns_block	:= get_past_block_of_path(@path);
+	my $ns_block	:= get_namespace(@path);
 
 	my $init_class_sub := get_class_init_of_path(@path);
 	$init_class_sub.node($ns_block);
@@ -801,7 +729,7 @@ sub make_init_class_sub_close($class) {
 
 sub make_init_class_sub_p6object($class) {
 	my @path		:= namespace_path_of_var($class);
-	my $ns_block	:= get_past_block_of_path(@path);
+	my $ns_block	:= get_namespace(@path);
 
 	my $init_class_sub := get_class_init_of_path(@path);
 	$init_class_sub.node($ns_block);
@@ -1048,37 +976,42 @@ declarations in curly braces:
 
 # Close the namespace that a class block inserted on stack
 sub close_class() {
-	return close_namespace('class');
+	my $past := close_namespace('class');
+	DUMP($past, 'close_class');
+	return $past;
 }
 
 # Close the namespace currently on the stack.
 sub close_namespace($decl_mode) {
 	close_decl_mode($decl_mode);
 	my $past := close_lexical_scope('namespace');
-	#say("Closed namespace: ", $past.name());
+	DUMP($past, "close_namespace");
 	return $past;
 }
 
 sub current_namespace_block() {
-	return find_lexical_block_with_attr("is_namespace");
+	my $block := find_lexical_block_with_attr("is_namespace");
+	DUMP($block, 'current_namespace_block');
+	return $block;
 }
 
 sub open_namespace($past, $decl_mode) {
+DUMP($past, 'open_namespace');
 	my @path	:= namespace_path_of_var($past);
-	my $block	:= get_past_block_of_path(@path);
-	#say("Opening namespace: ", join('::', @path));
-	#DUMP($block, "namespace block");
+	my $block	:= get_namespace(@path);
 
 	$block<is_namespace> := 1;
 	$block<lstype> := 'namespace';
 
 	push_lexical_scope($block);
 	open_decl_mode($decl_mode);
+	DUMP($block, 'open_namespace');
 	return $block;
 }
 
 sub open_class($class) {
 	my $block := open_namespace($class, 'class');
+	DUMP($block, 'open_class');
 	return $block;
 }
 

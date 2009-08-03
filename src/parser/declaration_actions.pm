@@ -1,31 +1,4 @@
 # $Id$
-
-method declaration($/) {
-	# Convert individual declarators into type-chains
-	# Create Past Var entries for each declarator.
-	# Lookup init values for types where no dclr_initializer is provided.
-	# Set types for 'auto' decls with dclr_initializers.
-	my $past := PAST::VarList.new();
-	
-	# Modify $specifier to reflect all the specifiers we saw. 
-	# Attach errors to $past.
-	for $<specifier> {
-		$past<specifier> := merge_tspec_specifiers($past, $past<specifier>, $_.ast);
-	}
-	
-	# Merge the specifier in to the declarator. Attach errors, etc.
-	for $<dclr_init_list><item> {
-		my $declarator := $_.ast;
-
-		$declarator<etype><type> := $past<specifier>;
-		$declarator<etype> := $past<specifier>;
-		$past.push($_.ast);
-	}
-
-	DUMP($past, "declaration");
-	make $past;
-}
-
 =method cv_qualifier
 
 Creates a type-specifier entry, with "is_<?>" set to 1. Type-specifier is used 
@@ -189,7 +162,7 @@ method dclr_init($/) {
 	my $past := $<dclr_declarator>.ast;
 	
 	if $<dclr_initializer> {
-		$past<dclr_initializer> := $<dclr_initializer>.ast;
+		$past<dclr_initializer> := $<dclr_initializer>[0].ast;
 	}
 	
 	DUMP($past, "dclr_init");
@@ -248,11 +221,67 @@ method dclr_pointer($/) {
 
 =method dclr_postfix
 
-Passes through the array, hash, or function declarator PAST.
+Passes through the array, hash, or function declarator.
 
 =cut
 
 method dclr_postfix($/, $key) { PASSTHRU($/, $key, 'dclr_postfix'); }
+
+method declaration($/) {
+	# Convert individual declarators into type-chains
+	# Create Past Var entries for each declarator.
+	# Lookup init values for types where no dclr_initializer is provided.
+	# Set types for 'auto' decls with dclr_initializers.
+	my $past := PAST::VarList.new();
+	
+	# Modify $specifier to reflect all the specifiers we saw. 
+	# Attach errors to $past.
+	for $<specifier> {
+		$past<specifier> := merge_tspec_specifiers($past, $past<specifier>, $_.ast);
+	}
+	
+	# Merge the specifier in to the declarator. Attach errors, etc.
+	for $<dclr_init_list><item> {
+		my $declarator := $_.ast;
+
+		$declarator<etype><type> := $past<specifier>;
+		$declarator<etype> := $past<specifier>;
+		$past.push($_.ast);
+	}
+
+	DUMP($past, "declaration");
+	make $past;
+}
+
+method namespace_definition($/, $key) {
+	if $key eq 'open' {
+ 		my $path	:= $<namespace_path>.ast;
+		my $hll	:= $path<hll>;
+		my @namespace_path;
+		
+		unless $path<is_rooted> {
+			my $outer		:= current_lexical_scope();
+			@namespace_path	:= clone_array($outer.namespace());
+			
+			for $path.namespace() {
+				@namespace_path.push($_);
+			}
+		}
+		
+		open_namespace_definition($hll, @namespace_path);
+	}
+	else { # $key eq 'close'
+		my $past := close_namespace_definition();
+		
+		for $<extern_statement> {
+			$past.push($_.ast);
+		}
+		
+		DUMP($past, 'namespace_definition');
+		make $past;
+	}
+	
+}
 
 method specifier($/, $key) { PASSTHRU($/, $key, 'specifier'); }
 
@@ -264,6 +293,7 @@ Creates a type specifier with noun set to the type name.
 
 method tspec_builtin_type($/) {
 	my $past := new_tspec_type_specifier('noun', ~$<token>);
+	$past<is_builtin> := 1;
 	DUMP($past, "builtin_type");
 	make $past;
 }
@@ -293,6 +323,12 @@ method tspec_storage_class($/) {
 }
 
 method tspec_type_specifier($/, $key) { PASSTHRU($/, $key, 'tspec_type_specifier'); }
+
+method tspec_type_name($/) {
+	my $past := new_tspec_type_specifier('type_name', $<type_name>.ast);
+	DUMP($past, 'tspec_type_name');
+	make $past;
+}
 
 ################################################################
 
@@ -441,7 +477,7 @@ method declaration_done($/) {
 		if $<compound_stmt> {
 			# Remove all method blocks - put them in the namespace
 			my @path := namespace_path_of_var($past);
-			my $namespace := get_past_block_of_path(@path);
+			my $namespace := get_namespace(@path);
 
 			my $block := $<compound_stmt>.ast;
 			my $num_items := +@($block);

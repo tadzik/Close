@@ -1,22 +1,26 @@
 # $Id$
 
-method expression($/, $key)				{ PASSTHRU($/, $key, 'expression'); }
+method arg_adverb($/) {
+	my $past := make_token($<token>);
+	DUMP($past, "tspec_storage_class");
+	make $past;
+}
 
-method primary_expr($/, $key)     {
-	my $past := $/{$key}.ast;
+method arg_expr($/) {
+	my $past := $<expression>.ast;
+	$past.node($/);
 
-	if $key eq 'qualified_identifier' {
-		# Warn if not in scope.
-		my $def := symbol_defined_anywhere($past);
-
-		unless $def<decl> {
-			#$/.panic("Symbol '" ~ $past.name() ~ "' not defined in current scope");
-			say("Warning: Symbol '" ~ $past.name() ~ "' not defined in current scope");
-		}
-
+	if $<argname> {
+		$past.named(~$<argname>[0].ast.name());
 	}
 
-	#DUMP($past, "primary-expr");
+	#if +@($<adverbs>.ast) {
+	#	for @($<adverbs>.ast) {
+	#		arg_expr_add_adverb($/, $past, $_);
+	#	}
+	#}
+	
+	DUMP($past, 'arg_expr');
 	make $past;
 }
 
@@ -27,25 +31,7 @@ method arg_list($/) {
 		$past.push($_.ast);
 	}
 
-	make $past;
-}
-
-method arg_expr($/) {
-	my $past := $<expression>.ast;
-	$past.node($/);
-
-	if $<argname> {
-		#say("Got argname: ", ($<argname>[0]).ast.name());
-		$past.named(~$<argname>[0].ast.name());
-	}
-
-	if +@($<adverbs>.ast) {
-		for @($<adverbs>.ast) {
-			arg_expr_add_adverb($/, $past, $_);
-		}
-	}
-	
-	#DUMP($past, "arg_expr");
+	DUMP($past, 'arg_list');
 	make $past;
 }
 
@@ -93,8 +79,10 @@ method asm_contents($/) {
 	make $past;
 }
 
+method expression($/, $key) { PASSTHRU($/, $key, 'expression'); }
+
 method postfix_expr($/) {
-	my $past := $<primary_expr>.ast;
+	my $past := $<term>.ast;
 
 	# TODO: Am I doing anything with this? Yes, :flat.
 	for $<adjective> {
@@ -109,7 +97,7 @@ method postfix_expr($/) {
 		$past	:= $_.ast;
 
 		$past.unshift($lhs);
-		postfixup($past);
+		#postfixup($past);
 	}
 
 	#DUMP($past, "postfix_expr");
@@ -149,7 +137,7 @@ sub postfixup($past) {
 				# TODO: Need to fix up aliases, etc. here. For now, leave it be.
 			}
 		}
-		#DUMP($past, "fixed-up");
+		DUMP($past, "postfixup");
 	}
 }
 
@@ -391,3 +379,6 @@ sub binary_op($/) {
 	#DUMP($past, "binary_op:" ~ $pirop);
 	make $past;
 }
+
+method term($/, $key)     { PASSTHRU($/, $key, 'term'); }
+

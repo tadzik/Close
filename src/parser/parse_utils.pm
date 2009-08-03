@@ -23,18 +23,91 @@ pod section of the grammar.
 
 class close::Grammar::Actions;
 
+our @Outer_scopes;
+
+sub clone_current_scope() {
+	my @clone := clone_array(@Outer_scopes);
+	return @clone;
+}
+
+sub close_lexical_scope($lstype) {
+	my $old := @Outer_scopes.shift();
+
+	unless $lstype eq $old<lstype> {
+		DUMP($old, "popped");
+		DUMP(@Outer_scopes, "Outer_scopes");
+		die("Stack mismatch. Popped '" ~ $old<lstype>
+			~ "' but expected '" ~ $lstype ~ "'");
+	}
+
+	#say("Close ", $lstype, " scope. Before ", +@Outer_scopes, " on stack");
+	#DUMP($old, "last lex scope");
+	return $old;
+}
+
+sub current_lexical_scope() {
+	return @Outer_scopes[0];
+}
+
+sub symbol_defined_anywhere($past) {
+	if $past.scope() ne 'package' {
+		our @Outer_scopes;
+
+		my $name := $past.name();
+		my $def;
+
+		for @Outer_scopes {
+			$def := $_.symbol($name);
+
+			if $def {
+				if $def<decl>.HOW.can($def<decl>, "scope") {
+					#say("--- FOUND: ", $def<decl>.scope());
+				}
+				elsif $def<decl>.isa("PAST::Block") {
+					#say("--- FOUND: Block");
+				}
+				else {
+					#say("--- FOUND in unrecognized object:");
+					#DUMP($def<decl>, "Declaration");
+					die("Unexpected data item");
+				}
+
+				return $def;
+			}
+		}
+	}
+
+	# Not any kind of local variable, parameter, etc. Try global.
+	return get_global_symbol_info($past);
+}
+
+
+sub BACKTRACE() {
+	Q:PIR {{
+	backtrace
+	}};
+}
+
 our %Dump;
+
 %Dump<BAREWORD>		:= 0;
 %Dump<FLOAT_LIT>		:= 0;
-%Dump<HERE_DOC_LIT>	:= 1;
+%Dump<HERE_DOC_LIT>	:= 0;
 %Dump<IDENTIFIER>		:= 0;
 %Dump<INTEGER_LIT>		:= 0;
 %Dump<QUOTED_LIT>		:= 0;
-%Dump<STRING_LIT>		:= 1;
+%Dump<STRING_LIT>		:= 0;
 %Dump<TOP>			:= 0;
-%Dump<assign_expr_rvalue>	:= 1;
+%Dump<WS_ALL>			:= 0;
+%Dump<arg_adverb>		:= 1;
+%Dump<arg_expr>			:= 1;
+%Dump<assemble_qualified_path> := 0;
+%Dump<assign_expr_rvalue>	:= 0;
 %Dump<built_in>			:= 0;
+%Dump<check_typename>		:= 1;
+%Dump<close_namespace>	:= 1;
 %Dump<constant>			:= 0;
+%Dump<create_namespace_block> := 1;
 %Dump<cv_qualifier>		:= 1;
 %Dump<dclr_array_or_hash>	:= 1;
 %Dump<dclr_atom>		:= 1;
@@ -45,26 +118,36 @@ our %Dump;
 %Dump<dclr_param_list>		:= 1;
 %Dump<dclr_pointer>		:= 1;
 %Dump<dclr_postfix>		:= 1;
-%Dump<decl_suffix>		:= 0;
+%Dump<decl_suffix>		:= 1;
 %Dump<declaration>		:= 1;
-%Dump<declaration_statement>	:= 0;
-%Dump<declarator>		:= 0;
-%Dump<declarator_name>	:= 0;
+%Dump<declaration_statement>	:= 1;
+%Dump<declarator>		:= 1;
+%Dump<declarator_name>	:= 1;
 %Dump<extern_statement>	:= 0;
-%Dump<expression>		:= 1;
+%Dump<expression>		:= 0;
+%Dump<expression_statement>	:= 0;
+%Dump<find_default_hll>		:= 1;
+%Dump<get_namespace>		:= 0;
 %Dump<init_declarator>		:= 1;
-%Dump<dclr_initializer>		:= 1;
 %Dump<iteration_statement>	:= 1;
+%Dump<local_statement>		:= 0;
 %Dump<namespace_name>	:= 0;
 %Dump<namespace_path>	:= 0;
+%Dump<open_namespace>	:= 1;
 %Dump<parameter_decl_list>	:= 1;
-%Dump<statement>		:= 0;
-%Dump<translation_unit>		:= 0;
-%Dump<tspec_builtin_type>	:= 1;
+%Dump<postfixup>			:= 1;
+%Dump<qualified_identifier>	:= 1;
+%Dump<resolve_qualified_identifier> := 1;
+%Dump<specifier>			:= 1;
+%Dump<term>			:= 0;
+%Dump<translation_unit>		:= 1;
+%Dump<tspec_builtin_type>	:= 0;
 %Dump<tspec_function_attr>	:= 1;
-%Dump<tspec_storage_class>	:= 1;
+%Dump<tspec_storage_class>	:= 0;
 %Dump<tspec_type_name>	:= 1;
-%Dump<tspec_type_specifier>	:= 1;
+%Dump<tspec_type_specifier>	:= 0;
+
+%Dump{'SymbolLookupVisitor::visit_varref'}	:= 1;
 
 sub DUMP($what, $key)
 {
@@ -117,6 +200,252 @@ Adds a warning to the message queue of the C<$past> node.
 
 sub add_warning($past, $text) {
 	add_message($past, 'warning', $text);
+}
+
+=sub PAST::Var assemble_qualified_path($/)
+
+Creates and returns a PAST::Var populated by the contents of a Match object.
+The sub-fields used are:
+
+=item * hll_name - the language name found after the 'hll:' prefix (optional)
+
+=item * root - the '::' indicating the name is rooted (optional)
+
+=item * path - the various path elements
+
+Returns a new PAST::Var with C<node>, C<name>, C<is_rooted>, and 
+C<hll> set (or not) appropriately.
+
+=cut
+
+sub assemble_qualified_path($/) {
+	my $past	:= PAST::Var.new(:node($/));
+	my @parts	:= new_array();
+	
+	for $<path> {
+		@parts.push($_.ast.value());
+	}
+		
+	# 'if' here is to handle namespaces, too. A root-only namespace
+	# ('::') has no name.
+	if +@parts {
+		$past.name(@parts.pop());
+	}
+	
+	if $<root> {
+		$past<is_rooted> := 1;
+		
+		if $<hll_name> {
+			$past<hll> := ~ $<hll_name>;
+		}
+		
+		# Rooted + empty @parts -> '::x'
+		$past<namespace> := @parts;
+	}
+	else {
+		$past<is_rooted> := 0;
+		
+		# Rootless + empty @parts -> 'x'
+		if +@parts {
+			$past.namespace(@parts);
+		}
+	}
+
+	DUMP($past, 'assemble_qualified_path');
+	return ($past);
+}
+
+=sub Boolean check_typename($past)
+
+Checks the current lexical stack for a type definition matching C<$past>. If 
+C<$past> is a rooted identifier, looks for a class with that name. Else looks for
+any kind of typedef -- a class, a typedef record, etc.
+
+Returns 1 if a matching type name is found, 0 otherwise.
+
+=cut
+
+sub check_typename($past) {
+	my @results := lookup_qualified_identifier($past);
+	
+	for @results {
+		if $_<is_typedef> || $<is_class> {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+=sub void clean_up_heredoc($past, @lines)
+
+Chops off leading whitespace, as determined by the final line. Concatenates all
+but the last line of C<@lines> and sets the C<value()> attribute of the C<$past>
+value. 
+
+=cut
+
+sub clean_up_heredoc($past, @lines) {
+	my $closing := @lines.pop();
+	
+	my $target_indent := 0;
+
+	Q:PIR {
+		.local int indent, offset
+		indent = 0
+		offset = 0
+		.local string closing
+		$P0 = find_lex '$closing'
+		closing = $P0
+		
+	offset_loop:
+		$S0 = substr  closing, offset, 1
+		inc offset
+		if $S0 != "\t" goto not_tab
+		
+		$I0 = indent % 8
+		indent += 8
+		indent -= $I0
+		goto offset_loop
+		
+	not_tab:
+		if $S0 != ' ' goto got_indent
+		inc indent
+		goto offset_loop
+		
+	got_indent:
+		$P0 = find_lex '$target_indent'
+		$P0 = indent
+	};
+	
+	#say("fixing up heredoc: chomp indent of ", $indent);
+	my $text := '';
+	
+	if $target_indent > 0 {
+		for @lines {		
+			my $length	:= 0;
+			# $length := strlen $_
+			Q:PIR {
+				$P0 = find_lex '$length'
+				$P1 = find_lex '$_'
+				$S0 = $P1
+				$I0 = length $S0
+				$P0 = $I0
+			};
+			
+			my $indent	:= 0;
+			my $offset	:= 0;
+			my $stop 	:= 0;
+			my $message := 0;
+			
+			while $offset < $length 
+				&& $indent < $target_indent 
+				&& ! $stop {
+				
+				my $chr; # $chr := $_[$offset]
+				Q:PIR {
+					$P0 = find_lex '$offset'
+					$I0 = $P0
+					$P1 = find_lex '$_'
+					$S0 = substr $P1, $I0, 1
+					$P0 = find_lex '$chr'
+					$P0 = $S0
+				};
+				
+				$offset ++;
+				
+				if $chr eq "\t" {
+					my $delta := $indent % 8;
+					$indent := $indent + 8 - $delta;
+				}
+				elsif $chr eq ' ' {
+					$indent ++;
+				}
+				else {
+					$offset --;
+					$stop := 1;
+					add_warning($past, 
+						'Indentation inside here-doc '
+						~ $past.name()
+						~ ' is not always greater than closing tag.');
+				}
+			}
+
+			Q:PIR {
+				$P0 = find_lex '$offset'
+				$I0 = $P0
+				$P1 = find_lex '$length'
+				$I1 = $P1
+				$I1 -= $I0
+				$P2 = find_lex '$_'
+				$S2 = $P2
+				$S2 = substr $S2, $I0, $I1
+				$P0 = find_lex '$text'
+				$S0 = $P0
+				$S0 = concat $S0, $S2
+				$P0 = $S0
+			};
+		}
+	}
+	else {
+		$text := join('', @lines);
+	}
+	
+	$past.value($text);
+	DUMP($past, 'clean_up_heredoc');
+}
+		
+=sub PAST::Block create_namespace_block(@_path)
+
+Creates and returns a new PAST block to store namespace details.
+
+=cut
+
+sub create_namespace_block(@_path) {
+	my $block := PAST::Block.new();
+
+	$block.blocktype('immediate');
+	$block.hll(@_path[0]);
+	$block<lstype> := 'namespace';
+	$block.name('hll: ' ~ join(' :: ', @_path));
+
+	my $nsp := clone_array(@_path);
+	$nsp.shift();
+	$block.namespace($nsp);
+
+	$block<path> := clone_array(@_path);
+
+	DUMP($block, "create_namespace_block");
+	return $block;
+}
+
+=sub PAST::Block get_namespace(@target)
+
+Looks up the PAST block used to store namespace information for the C<@target> 
+path. Creates and initializes blocks as needed. C<@target> must begin with the 
+HLL name. Returns the found or created PAST block.
+
+=cut
+
+our $Namespace_root := PAST::Block.new(:name('namespace root block'));
+
+sub get_namespace(@target) {
+	my $namespace := $Namespace_root;
+	my @path := new_array();
+	
+	for @target {
+		@path.push($_);
+		
+		unless $namespace.symbol($_) 
+			&& $namespace.symbol($_)<namespace> {
+			$namespace.symbol($_, :namespace(create_namespace_block(@path)));
+		}
+		
+		$namespace := $namespace.symbol($_)<namespace>;
+	}
+
+	DUMP($namespace, 'get_namespace');
+	return $namespace;
 }
 
 =sub PAST::Val immediate_token($string)
@@ -328,6 +657,7 @@ sub make_tspec_type_specifier($name, $noun, $scope) {
 }
 
 our $Merge_specifier_fields := (
+	'is_builtin',
 	'is_const',
 	'is_inline', 
 	'is_method',
@@ -369,13 +699,10 @@ sub open_namespace_definition($hll, @_path) {
 	}
 	
 	@path.unshift($hll);
-	
-	my $block := get_past_block_of_path(@path);
-	$block<hll> := $hll;
-	$block<lstype> := 'namespace';
-	push_lexical_scope($block);
-	
+
 	# FIXME: Confirm that block isn't already on stack.
+	DUMP(@path, 'open_namespace_definition');
+	push_lexical_scope(get_namespace(@path));
 }
 
 =sub void open_pervasive_symbols()
@@ -501,46 +828,10 @@ sub type_to_string($type) {
 	return ($str);
 }
 
-
-#################################################################
-
-=head4 Lexical Stack
-
-There is a stack of lexical elements. Each element is expected to be a
-PAST::Block, although it may be transformed after it leaves the stack.
-
-=cut
-
-sub close_lexical_scope($lstype) {
-	our @Outer_scopes;
-
-	my $old := @Outer_scopes.shift();
-
-	unless $lstype eq $old<lstype> {
-		DUMP($old, "popped");
-		DUMP(@Outer_scopes, "Outer_scopes");
-		die("Stack mismatch. Popped '" ~ $old<lstype>
-			~ "' but expected '" ~ $lstype ~ "'");
-	}
-
-	#say("Close ", $lstype, " scope. Before ", +@Outer_scopes, " on stack");
-	#DUMP($old, "last lex scope");
-	return $old;
-}
-
-sub current_lexical_scope() {
-	our @Outer_scopes;
-	return @Outer_scopes[0];
-}
-
 sub find_lexical_block_with_attr($name) {
-	our @Outer_scopes;
-
-	if @Outer_scopes {
-		for @Outer_scopes {
-			if $_{$name} {
-				return $_;
-			}
+	for @Outer_scopes {
+		if $_{$name} {
+			return $_;
 		}
 	}
 
@@ -548,8 +839,57 @@ sub find_lexical_block_with_attr($name) {
 }
 
 sub find_default_hll() {
-	my $block := find_lexical_block_with_attr('hll');
-	return $block<hll>;
+	my $hll	:= 'close';	# Default, when nothing is open yet.
+	my $block	:= find_lexical_block_with_attr('hll');
+	
+	if $block {
+		$hll := $block<hll>;
+	}
+
+	DUMP($hll, 'find_default_hll');
+}
+
+sub get_path_of_id($id) {
+	my @path := clone_array($id.namespace());
+	@path.unshift($id<hll>);
+	@path.push($id.name());
+	return @path;
+}
+
+=sub PAST::Node[] lookup_qualified_identifier($ident)
+
+Given a qualified identifier -- a name that may or may not be prefixed with type
+or namespace names -- looks up the possible matches for the identifier using the
+current lexical scope stack. If the identifier is rooted, the only the rooted
+path is used to search for candidates.
+
+Returns an array of candidates. Note that because namespaces and symbols do
+not share a namespace, any path, no matter how explicit, can potentially resolve
+to both a namespace and a symbol. (Perl6 uses this to create a proto-object with
+the same name as the namespace.)
+
+=cut
+
+sub lookup_qualified_identifier($ident) {
+	my @candidates;
+	my @ident := get_path_of_id($ident);
+	
+	if $ident<is_rooted> {
+		# Potential problem if no symbol information exists for name when it gets used.
+		my @hll_root := new_array();
+		@hll_root.push(@ident[0]);
+		my $nsp := get_namespace(@hll_root);
+		@candidates := resolve_qualified_identifier($nsp, @ident);
+	}
+	else {
+		for @Outer_scopes {
+			my @idpath := clone_array(@ident);
+			@candidates := resolve_qualified_identifier($_, @idpath);
+		}
+	}
+
+	DUMP(@candidates, 'lookup_qualified_identifier');
+	return @candidates;
 }
 
 sub open_lexical_scope($name, $lstype) {
@@ -576,8 +916,6 @@ sub open_lexical_scope($name, $lstype) {
 }
 
 sub push_lexical_scope($scope) {
-	our @Outer_scopes;
-
 	if !@Outer_scopes {
 		@Outer_scopes := new_array();
 	}
@@ -592,6 +930,62 @@ sub push_lexical_scope($scope) {
 	#	" Now ", +@Outer_scopes, " on stack");
 }
 
+
+=sub void resolve_qualified_identifier($root, @identifier)
+
+Returns a list of candidates that match the components in the given qualified
+C<@identifier> relative to C<$root>. 
+
+There are three possible ways to decode 'B' in a scenario like C<B::C>. The 
+first is that B might be a namespace. The second is that B might be an aggregate
+type -- a class, struct, union, or enum. And the third is that B might be an 
+alias for another type.
+
+If B is a namespace, then our options are still open for C -- it could be anything.
+
+If B is an aggregate, then C gets resolved as a member, a method, or a member
+type (e.g., C<typedef int C> within the class). In any case, B must have a 
+symtable entry for C.
+
+If B is an alias for another type or namespace, see above.
+
+=cut
+
+sub resolve_qualified_identifier($root, @identifier) {
+	my @candq := new_array();
+	@candq.push($root);
+	
+	for @identifier {
+		my $id_part := $_;
+		my $num_cands := +@candq;
+
+		while $num_cands-- {
+			my $scope	:= @candq.shift();
+			my $sym	:= $scope.symbol($id_part);
+	
+			# Handle functions, variables, types.
+			if $sym && $sym<decl> {
+				if $sym<decl><is_alias> {
+					@candq.push($sym<decl><alias_for>);
+				}
+				elsif $sym<decl><decl> {
+					@candq.push($sym<decl>);
+				}
+				else {
+					say("WTF? Symbol ", $id_part, " with no decl nor alias?");
+				}
+			}
+			
+			# Handle namespaces
+			if $sym && $sym<namespace> {
+				@candq.push($sym<namespace>);
+			}
+		}
+	}
+
+	DUMP(@candq, 'resolve_qualified_identifier');
+	return @candq;
+}
 
 ##################################################################
 
@@ -630,7 +1024,7 @@ namespaces. This is the continuation of the symbol table tree. Thus,
 
 sub add_global_symbol($sym) {
 	my @path := namespace_path_of_var($sym);
-	my $block := get_past_block_of_path(@path);
+	my $block := get_namespace(@path);
 
 	#say("Found block: ", $block.name());
 
@@ -700,7 +1094,7 @@ sub get_all_namespaces() {
 # Given a past symbol, return the symbol hash.
 sub get_global_symbol_info($sym) {
 	my @path := namespace_path_of_var($sym);
-	my $block := get_past_block_of_path(@path);
+	my $block := get_namespace(@path);
 
 	#say("Found block: ", $block.name());
 	my $name := $sym.name();
@@ -788,17 +1182,6 @@ sub get_init_block_of_path(@_path) {
 	return $block;
 }
 
-sub get_past_block_of_path(@_path) {
-	my $block := _get_keyed_block_of_path(@_path, 'past');
-
-	unless $block<init_done> {
-		$block<init_done> := 1;
-	}
-
-	DUMP($block, "get_past_block_of_path");
-	return $block;
-}
-
 sub namespace_path_of_var($var) {
 	my @path := clone_array($var.namespace());
 	@path.unshift($var<hll>);
@@ -812,4 +1195,3 @@ sub is_local_function($fdecl) {
 
 	return join('::', @p1) eq join('::', @p2);
 }
-

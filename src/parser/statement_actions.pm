@@ -6,9 +6,9 @@ method null_stmt($/) {
     make $past;
 }
 
-method expression_stmt($/) {
+method expression_statement($/) {
     my $past := $<expression>.ast;
-    #DUMP($past, "expression_stmt");
+    DUMP($past, 'expression_statement');
     make $past;
 }
 
@@ -50,7 +50,7 @@ method labeled_stmt($/, $key) {
 		$past.push($_.ast);
 	}
 
-	$past.push($<statement>.ast);
+	$past.push($<local_statement>.ast);
 
 	#DUMP($past, "labeled stmt");
 	make $past;
@@ -66,6 +66,9 @@ method label($/) {
 	#DUMP($past, "label");
 	make $past;
 }
+
+method local_statement($/, $key) { PASSTHRU($/, $key, 'local_statement'); 
+say("*** local statement: ", ~$/); }
 
 method jump_stmt($/, $key) {
 	my $past;
@@ -218,7 +221,7 @@ method foreach_stmt($/, $key) {
 		:viviself($iterator));
 	my $iter_read := PAST::Var.new(
 		:name($iter_name),
-		:node($<statement>),
+		:node($<local_statement>),
 		:scope('register'));
 
 	# Store the iterator setup in the initialization part of the PAST
@@ -226,27 +229,27 @@ method foreach_stmt($/, $key) {
 
 	my $while := PAST::Op.new(
 		:name('foreach-while'),
-		:node($<statement>),
+		:node($<local_statement>),
 		:pasttype('while'));
 
 	# While condition: while (iter) {...}
 	$while.push($iter_read);
 
 	# Insert a "index = shift iter" into while block
-	my $body := PAST::Stmts.new(:node($<statement>));
+	my $body := PAST::Stmts.new(:node($<local_statement>));
 	my $shift := PAST::Op.new(
-		:node($<statement>),
+		:node($<local_statement>),
 		:pasttype('bind'));
 	$shift.push($index_var);
 	$shift.push(
 		PAST::Op.new(
 			:name('shift-iterator'),
-			:node($<statement>),
+			:node($<local_statement>),
 			:pasttype('inline'),
 			:inline('    %r = shift %0'),
 			$iter_read));
 	$body.push($shift);
-	$body.push($<statement>.ast);
+	$body.push($<local_statement>.ast);
 	$while.push($body);
 	$past.push($while);
 
@@ -260,7 +263,7 @@ method do_while_stmt($/) {
     my $keyword := substr(~$<kw>, 0, 5);
     $past.pasttype('repeat_' ~ $keyword);
     $past.push($<expression>.ast);
-    $past.push($<statement>.ast);
+    $past.push($<local_statement>.ast);
     #DUMP($past, $past.pasttype());
     make $past;
 }
@@ -270,7 +273,7 @@ method while_do_stmt($/) {
 	my $keyword := substr(~$<kw>, 0, 5);
 	$past.pasttype($keyword);
 	$past.push($<expression>.ast);
-	$past.push($<statement>.ast);
+	$past.push($<local_statement>.ast);
 
 	#DUMP($past, $past.pasttype());
 	make $past;

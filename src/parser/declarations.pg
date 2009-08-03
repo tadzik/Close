@@ -2,19 +2,19 @@
 
 =pod
 
-MODULE: declarations.pg
+=head1 Module: declarations.pg
 
-IMPORTS: declarator_name (names.pg)
-EXPORTS: declaration
+=head1 Imports:
+
+=item declarator_name (names.pg)
+
+=head1 Exports:
+
+=item declaration
+
+=item namespace_definition
 
 =cut
-
-# Probably should be "simple-declaration"
-rule declaration {
-	<specifier>*		# Default to 'auto'.
-	<dclr_init_list>	# At least one of these, too.
-	{*}
-}
 
 =rule cv_qualifier
 
@@ -135,6 +135,45 @@ rule dclr_postfix {
 	| '[' <dclr_array_or_hash> ']'	{*} #= dclr_array_or_hash
 }
 
+=rule declaration
+
+Matches the standard C-like variable patterns: 
+
+    int foo;
+    int a = 1, b = 2;
+    extern void f();
+
+This should probably be called 'simple-declaration', since there are other 
+declarations (like functions, namespaces, etc.) available.
+
+=cut
+
+rule declaration {
+	<specifier>+
+	<dclr_init_list>	# At least one of these, too.
+	{*}
+}
+
+=rule namespace_definition
+
+A namespace definition is a block that assigns a namespace path to all the
+declarations contained in the block.
+
+    namespace Foo {
+        void bark();	// Defines Foo::bark();
+    }
+
+=cut
+
+rule namespace_definition {
+	<EXTERN>? <.NAMESPACE> <namespace_path> 
+	'{'
+		{*} #= open
+		<extern_statement>*
+	'}'
+	{*} #= close
+}
+
 =rule specifier
 
 Matches any form of type specifier. Storage class specifiers (keywords),
@@ -181,16 +220,16 @@ rule tspec_storage_class {
 }
 
 rule tspec_type_specifier {
-	| <tspec_builtin_type>		{*} #= tspec_builtin_type
-#	| <class_specifier>		{*}		# class/struct/union foo { ... }
+	| <tspec_builtin_type>	{*} #= tspec_builtin_type
+#	| <class_specifier>			{*} #= class_specifier
 	| <cv_qualifier>		{*} #= cv_qualifier
-#	| <enum_specifier>	{*}
-#	| <elaborated_type_specifier> {*}   # "struct foo"
-#	| <tspec_type_name>	{*}
-#	| <typename_specifier> {*}		# 'typename' othervar
+#	| <enum_specifier>			{*} #= enum_specifier
+#	| <elaborated_type_specifier>	{*} #= elaborated_type_specifier
+#	| <typename_specifier>		{*} #= typename_specifier
+	# type-name is the only pattern that does not have a keyword.
+	| <tspec_type_name>		{*} #= tspec_type_name
 }
 
-rule tspec_type_name {
-	<qualified_identifier>
-	{*}
+token tspec_type_name {
+	<type_name> {*}
 }
