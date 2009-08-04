@@ -41,7 +41,7 @@ method visit_varlist($node) {
 	}
 
 	if $spec<type_name> {
-		#$spec<type> := lookup_qualified_identifier($node, $spec<type_name>);
+		$spec<type> := lookup_qualified_identifier($node, $spec<type_name>);
 		return $node;
 	}
 	
@@ -49,13 +49,85 @@ method visit_varlist($node) {
 	my $typename := $spec<noun>;
 }
 
-method visit_vardecl($node) {
-	say("Visited vardecl");
+sub get_type_specifier_of_node($node) {
+	my $spec := $node<type>;
+	
+	unless $spec {
+		die("Don't know how to find linkage of symbol: ", $node.name());
+	}
+		
+	while ! $spec<is_specifier> {
+		unless $spec<type> {
+			die("Cannot locate specifier of symbol: ", $node.name());
+		}
+			
+		$spec := $spec<type>;
+	}
+
+	close::Grammar::Actions::DUMP($spec, 'SymbolLookupVisitor::get_type_specifier_of_node');
+	return $spec;
 }
 
+method visit_vardecl($node) {
+	if $node.scope() {
+		return $node;		# Nothing to do here.
+	}
+	
+	my $spec	:= get_type_specifier_of_node($node);
+	my $sc	:= $spec<storage_class>;
+	
+	if $sc {
+		if	$sc eq 'extern' or $sc eq 'static' {
+			$node.scope('package'); 
+		}
+		elsif	$sc eq 'lexical' or $sc eq 'dynamic' { 
+			$node.scope('lexical'); 
+		}
+		elsif	$sc eq 'register' {
+			$node.scope('register'); 
+		}
+		else { 
+			die("Unrecognized storage class: ", $sc); 
+		}
+	}
+	elsif $node<type><is_function> {
+			$node.scope('package');
+	}
+	else {
+		my $block := $node<block>;
+		
+		# Default linkage per block type.
+		if $block<is_namespace> { $node.scope('package'); }
+		elsif $block<is_class> { $node.scope('attribute'); }
+		elsif $block<is_function> { $node.scope('register'); }
+		else				{ die("Unrecognized containing block type: ", $block.name()); }
+	}
+	
+	close::Grammar::Actions::DUMP($node, 'SymbolLookupVisitor::visit_vardecl');
+	return $node;
+}
+
+# FIXME: This is wrong. Should find decl, then take scope from decl.
 method visit_varref($node) {
 	my @results := close::Grammar::Actions::lookup_qualified_identifier($node);
-	close::Grammar::Actions::DUMP(@results, 'SymbolLookupVisitor::visit_varref');
+	if +@results {
+		my $result := @results.shift();
+		
+		while $result<is_namespace> && +@results {
+			$result := @results.shift();
+		}
+		
+		if $result<is_namespace> {
+			close::Grammar::Actions::die("Only matching symbol is a namespace. WTF");
+		}
+
+		$node.scope($result.scope());
+		close::Grammar::Actions::DUMP($node, 'SymbolLookupVisitor::visit_varref');
+	}
+	else {
+		close::Grammar::Actions::add_error($node, 
+			'Reference to undeclared symbol');
+	}
 }
 
 method visit_op($node) {

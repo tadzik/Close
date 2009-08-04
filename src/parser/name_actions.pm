@@ -47,6 +47,8 @@ method namespace_path($/) {
 
 method qualified_identifier($/) {
 	my $past := assemble_qualified_path($/);
+	$past<searchpath> := clone_current_scope();
+	
 	DUMP($past, "qualified_identifier");
 	make $past;
 }

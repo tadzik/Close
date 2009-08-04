@@ -17,7 +17,6 @@ may only appear outside a function.
 
 rule extern_statement {
 	| <namespace_definition>	{*} #= namespace_definition
-	| <declaration_statement>	{*} #= declaration_statement
 #	| <namespace_directive>
 	| <local_statement>		{*} #= local_statement
 }
@@ -68,9 +67,7 @@ rule declaration_statement {
 
 rule compound_stmt {
 	'{'
-		[ $<item>=<declaration>
-		| $<item>=<local_statement>
-		]*
+		$<item>=<local_statement>
 	[ '}' || <panic: "Missing closing '}' in compound block" > ]
 	{*}
 }

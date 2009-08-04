@@ -41,7 +41,13 @@ method conditional_stmt($/) {
     make $past;
 }
 
-method declaration_statement($/) { PASSTHRU($/, 'declaration', 'declaration_statement'); }
+method declaration_statement($/) { 
+	my $past	:= $<declaration>.ast;
+	my $block	:= current_lexical_scope();
+	add_declaration_to_scope($block, $past);
+	DUMP($past, 'declaration_statement');
+	make $past;
+}
 
 method labeled_stmt($/, $key) {
 	my $past := PAST::Stmts.new(:name('labeled stmt'), :node($/));

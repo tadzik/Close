@@ -23,6 +23,33 @@ pod section of the grammar.
 
 class close::Grammar::Actions;
 
+=sub add_declaration_to_scope($scope, $declaration)
+
+Hooks a declaration in to a scope block. Adds the declaration to the block's 
+children -- the declaration is a PAST::VarList. Adds each individual
+declarator to the block's symbol table. Returns nothing.
+
+=cut
+
+sub add_declaration_to_scope($scope, $declaration) {
+	$scope.push($declaration);
+say("Adding declaration to ", $scope.name());
+	for @($declaration) {
+		my $name := $_.name();
+say("Adding ", $name, " to scope");		
+		if $scope.symbol($name)<decl> {
+			# FIXME: Add error to scope? To decl?
+			die("Symbol " ~ $name ~ " already declared in scope " ~ $scope.name());
+		}
+		
+		# FIXME: Check for visible symbol, emit masking warning.
+		
+		$scope.symbol($name, :decl($_));
+	}
+	
+	DUMP($scope, 'add_declaration_to_scope');
+}
+
 our @Outer_scopes;
 
 sub clone_current_scope() {
@@ -90,20 +117,21 @@ sub BACKTRACE() {
 
 our %Dump;
 
-%Dump<BAREWORD>		:= 0;
-%Dump<FLOAT_LIT>		:= 0;
-%Dump<HERE_DOC_LIT>	:= 0;
-%Dump<IDENTIFIER>		:= 0;
-%Dump<INTEGER_LIT>		:= 0;
-%Dump<QUOTED_LIT>		:= 0;
-%Dump<STRING_LIT>		:= 0;
-%Dump<TOP>			:= 0;
+%Dump<BAREWORD>			:= 0;
+%Dump<FLOAT_LIT>			:= 0;
+%Dump<HERE_DOC_LIT>		:= 0;
+%Dump<IDENTIFIER>			:= 0;
+%Dump<INTEGER_LIT>			:= 0;
+%Dump<QUOTED_LIT>			:= 0;
+%Dump<STRING_LIT>			:= 0;
+%Dump<TOP>				:= 0;
 %Dump<WS_ALL>			:= 0;
-%Dump<arg_adverb>		:= 1;
-%Dump<arg_expr>			:= 1;
-%Dump<assemble_qualified_path> := 0;
-%Dump<assign_expr_rvalue>	:= 0;
-%Dump<built_in>			:= 0;
+%Dump<add_declaration_to_scope>	:= 1;
+%Dump<arg_adverb>			:= 1;
+%Dump<arg_expr>			:= 0;
+%Dump<assemble_qualified_path>	:= 0;
+%Dump<assign_expr_rvalue>		:= 0;
+%Dump<built_in>				:= 0;
 %Dump<check_typename>		:= 1;
 %Dump<close_namespace>	:= 1;
 %Dump<constant>			:= 0;
@@ -128,15 +156,17 @@ our %Dump;
 %Dump<expression_statement>	:= 0;
 %Dump<find_default_hll>		:= 1;
 %Dump<get_namespace>		:= 0;
-%Dump<init_declarator>		:= 1;
-%Dump<iteration_statement>	:= 1;
+%Dump<get_path_of_id>		:= 0;
+%Dump<get_linkage_of_symbol>	:= 1;
+%Dump<init_declarator>			:= 1;
+%Dump<iteration_statement>		:= 1;
 %Dump<local_statement>		:= 0;
-%Dump<namespace_name>	:= 0;
-%Dump<namespace_path>	:= 0;
-%Dump<open_namespace>	:= 1;
-%Dump<parameter_decl_list>	:= 1;
+%Dump<namespace_name>		:= 0;
+%Dump<namespace_path>		:= 0;
+%Dump<open_namespace>		:= 1;
+%Dump<parameter_decl_list>		:= 1;
 %Dump<postfixup>			:= 1;
-%Dump<qualified_identifier>	:= 1;
+%Dump<qualified_identifier>	:= 0;
 %Dump<resolve_qualified_identifier> := 1;
 %Dump<specifier>			:= 1;
 %Dump<term>			:= 0;
@@ -147,7 +177,9 @@ our %Dump;
 %Dump<tspec_type_name>	:= 1;
 %Dump<tspec_type_specifier>	:= 0;
 
-%Dump{'SymbolLookupVisitor::visit_varref'}	:= 1;
+%Dump{'SymbolLookupVisitor::visit_varref'}				:= 1;
+%Dump{'SymbolLookupVisitor::visit_vardecl'}			:= 1;
+%Dump{'SymbolLookupVisitor::get_type_specifier_of_node'}	:= 1;
 
 sub DUMP($what, $key)
 {
@@ -269,7 +301,7 @@ sub check_typename($past) {
 	my @results := lookup_qualified_identifier($past);
 	
 	for @results {
-		if $_<is_typedef> || $<is_class> {
+		if $_<is_typedef> || $_<is_class> {
 			return 1;
 		}
 	}
@@ -406,13 +438,14 @@ sub create_namespace_block(@_path) {
 
 	$block.blocktype('immediate');
 	$block.hll(@_path[0]);
+	$block<is_namespace> := 1;
 	$block<lstype> := 'namespace';
 	$block.name('hll: ' ~ join(' :: ', @_path));
 
 	my $nsp := clone_array(@_path);
 	$nsp.shift();
 	$block.namespace($nsp);
-
+	
 	$block<path> := clone_array(@_path);
 
 	DUMP($block, "create_namespace_block");
@@ -457,9 +490,7 @@ is the value. Returns the new token.
 =cut
 
 sub immediate_token($string) {
-	my $token := PAST::Val.new(
-		:returns('String'), 
-		:value($string));
+	my $token := PAST::Val.new(:returns('String'),  :value($string));
 	return $token;
 }
 
@@ -490,34 +521,41 @@ sub make_new_symbol($name, $type, $scope) {
 	my $symbol := PAST::Var.new(:name($name));
 
 	for ('alias', 'duplicate', 'implicit') {
-		$symbol{'is_' ~ $_} := 0;
+		$symbol{'is_' ~ $_}	:= 0;
 	}
 
-	$symbol<pir_name> := $name;
-	$symbol<scope> := $scope;
-	$symbol<type> := $type;
+	$symbol<pir_name>	:= $name;
+	$symbol<block>		:= $scope;
+	$symbol<searchpath>	:= clone_current_scope();
 	
-	my $etype := $type;
-	
-	while $etype<is_declarator> {
-		$etype := $etype<type>;
+	if $type {
+		my $etype		:= $type;
+		
+		while $etype<is_declarator> {
+			$etype	 	:= $etype<type>;
+		}
+		
+		$symbol<type>	:= $type;
+		$symbol<etype>	:= $etype;
 	}
 	
-	$symbol<etype> := $etype;
-	return ($symbol);
+	$scope.symbol($name, :decl($symbol));
+	DUMP($symbol, 'make_new_symbol');
+	return $symbol;
 }
 
 sub make_alias($name, $symbol, $scope) {
-	my $alias := make_new_symbol($name, Undef, $scope);
+	my $alias := make_new_symbol($name, undef, $scope);
 	$alias<is_alias> := 1;
 	$alias<alias_for> := $symbol;
-	
+
 	if $symbol<has_aliases>{$scope} {
 		die("Cannot create second alias for symbol in same scope.");
 	}
 	
 	$symbol<has_aliases>{$scope} := $alias;
-	return ($alias);
+	DUMP($alias, 'make_alias');
+	return $alias;
 }
 
 sub same_type($type1, $type2) {
@@ -661,6 +699,7 @@ our $Merge_specifier_fields := (
 	'is_const',
 	'is_inline', 
 	'is_method',
+	'is_typedef',
 	'is_volatile',
 	'noun', 
 	'storage_class', 
@@ -720,36 +759,34 @@ sub open_pervasive_symbols() {
 		:blocktype('immediate'),
 		:name("Pervasive Symbols"));
 	$psym<lstype> := 'pervasive scope';
+
+	
+	# Put it on the stack now, so make_new_symbol can clone stack.
+	push_lexical_scope($psym);
+	$Pervasive_symbols := $psym;
 	
 	# Created predefined types.
 	
 	for ('auto:X', 'float:N', 'int:I', 'pmc:P', 'string:S', 'void:X') {
 		my @parts := split(':', $_);
 		my $name := @parts[0];
+		my $rtype := @parts[1];
 		
 		my $type := make_tspec_type_specifier($name, $name, $psym);
 		$type<is_specifier> := 1;
-		$type<register_class> := @parts[1];
+		$type<register_class> := $rtype;
 		
-		my $symbol := make_new_symbol($name, $type, $psym);
-		
-		$psym.symbol($name, :decl($symbol));
+		my $bug := make_new_symbol($name, $type, $psym);
 	}
 	
 	# FIXME: Move these to be typedefs in a standard namespace. (Then kill 'em.)
-	my $symbol := make_alias('num', $psym.symbol('float')<decl>, $psym);
-	$psym.symbol('num', :decl($symbol));
-	
-	$symbol := make_alias('str', $psym.symbol('string')<decl>, $psym);
-	$psym.symbol('str', :decl($symbol));
+	my $bug := make_alias('num', $psym.symbol('float')<decl>, $psym);
+	$bug := make_alias('str', $psym.symbol('string')<decl>, $psym);
 	
 	say("BEHOLD!! A symbol table.");
 	for $psym<symtable> {
 		print_symbol($psym.symbol($_)<decl>);
 	}
-	
-	push_lexical_scope($psym);
-	$Pervasive_symbols := $psym;
 }
 
 sub print_aggregate($agg) {
@@ -767,7 +804,7 @@ sub print_symbol($sym) {
 			" ",
 			substr("is an alias for: " ~ "                  ", 0, 18),
 			" ",
-			substr($sym<alias_for><scope>.name() ~ '::' 
+			substr($sym<alias_for><block>.name() ~ '::' 
 				~ $sym<alias_for>.name() ~ "                              ", 0, 30));
 	}
 	else {
@@ -775,7 +812,7 @@ sub print_symbol($sym) {
 			" ",
 			substr($sym<pir_name> ~ "                  ", 0, 18),
 			" ",
-			$sym<scope>.name(), 
+			$sym<block>.name(), 
 			" ",
 			type_to_string($sym<type>));
 	}
@@ -851,8 +888,13 @@ sub find_default_hll() {
 
 sub get_path_of_id($id) {
 	my @path := clone_array($id.namespace());
-	@path.unshift($id<hll>);
 	@path.push($id.name());
+	
+	if $id<hll> {
+		@path.unshift($id<hll>);
+	}
+	
+	DUMP(@path, 'get_path_of_id');
 	return @path;
 }
 
@@ -882,9 +924,17 @@ sub lookup_qualified_identifier($ident) {
 		@candidates := resolve_qualified_identifier($nsp, @ident);
 	}
 	else {
-		for @Outer_scopes {
+		say("Not rooted");
+		#for @Outer_scopes {
+		for $ident<searchpath> {
+			say("Searching in ", $_.name());
 			my @idpath := clone_array(@ident);
 			@candidates := resolve_qualified_identifier($_, @idpath);
+			
+			if +@candidates {
+				DUMP(@candidates, 'lookup_qualified_identifier');
+				return @candidates;
+			}
 		}
 	}
 
@@ -957,28 +1007,35 @@ sub resolve_qualified_identifier($root, @identifier) {
 	
 	for @identifier {
 		my $id_part := $_;
+		say("Part: ", $id_part);
 		my $num_cands := +@candq;
-
+		say("# candidates at this level: ", $num_cands);
+		
 		while $num_cands-- {
 			my $scope	:= @candq.shift();
-			my $sym	:= $scope.symbol($id_part);
-	
-			# Handle functions, variables, types.
-			if $sym && $sym<decl> {
-				if $sym<decl><is_alias> {
-					@candq.push($sym<decl><alias_for>);
-				}
-				elsif $sym<decl><decl> {
-					@candq.push($sym<decl>);
-				}
-				else {
-					say("WTF? Symbol ", $id_part, " with no decl nor alias?");
-				}
+			say("Scope: ", $scope.name());
+			if ! $scope.isa(PAST::Block) {
+				say("Dead end at ", $scope.name());
 			}
-			
-			# Handle namespaces
-			if $sym && $sym<namespace> {
-				@candq.push($sym<namespace>);
+			else {
+				my $sym	:= $scope.symbol($id_part);
+		
+				# Handle functions, variables, types.
+				if $sym && $sym<decl> {
+					if $sym<decl><is_alias> {
+						say("Found alias");
+						@candq.push($sym<decl><alias_for>);
+					}
+					else {
+						say("Found plain symbol");
+						@candq.push($sym<decl>);
+					}
+				}
+				
+				# Handle namespaces
+				if $sym && $sym<namespace> {
+					@candq.push($sym<namespace>);
+				}
 			}
 		}
 	}

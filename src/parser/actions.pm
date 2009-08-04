@@ -18,12 +18,13 @@ method translation_unit($/, $key) {
 			$past.push($_.ast);
 		}
 		
+		my $visitor := close::Compiler::SymbolLookupVisitor.new();
+		$visitor.visit($past);
+
 		#my $past := compilation_unit_past();
 		DUMP($past, "translation_unit");
 		make $past;
 		
-		my $visitor := close::Compiler::SymbolLookupVisitor.new();
-		$visitor.visit($past);
 	}
 }
 
