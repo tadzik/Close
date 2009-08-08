@@ -1,4 +1,5 @@
 # $Id$
+
 =method cv_qualifier
 
 Creates a type-specifier entry, with "is_<?>" set to 1. Type-specifier is used 
@@ -7,12 +8,23 @@ because a cv_qualifier is a valid type specifier by itself.
 =cut
 
 method cv_qualifier($/) {
-	my $past := new_tspec_type_specifier('is_' ~ $<token>, 1);
-	$past.name(~$<token>);
-	DUMP($past, "cv_qualifier");
+	my $past := close::Compiler::Types::new_specifier(:name(~$<token>));
+	$past{'is_' ~ $<token>} := 1;
+	DUMP($past);
 	make $past;
 }
 
+=method dclr_alias
+
+Just another kind of declarator.
+
+=cut
+
+method dclr_alias($/) {
+	my $past := close::Compiler::Types::new_dclr_alias($<alias>.ast);
+	DUMP($past);
+	make $past;
+}
 =method dclr_array_or_hash
 
 Constructs an immediate token to represent the type-declarator,
@@ -35,7 +47,7 @@ method dclr_array_or_hash($/) {
 	}
 	$past.node($/);
 	
-	DUMP($past, "array_or_hash_decl");
+	DUMP($past);
 	make $past;
 }
 
@@ -60,6 +72,8 @@ method dclr_atom($/) {
 
 method dclr_declarator($/) {	
 	my $past := $<dclr_atom>.ast;
+	NOTE("Processing declarator: ", $past.name());
+	DUMP($past);
 	
 	unless $past<etype> {
 		$past<etype> := $past;
@@ -72,6 +86,7 @@ method dclr_declarator($/) {
 	# read left to right, so foo()[] is a function returning an array. 
 	# The declarator chain here should be 'foo'->function->array.
 	for $<dclr_postfix> {
+		NOTE("Adding postfix declarator: ", $_.ast.name());
 		$last_dclr<type> := $_.ast;
 		$last_dclr := $_.ast;
 	}
@@ -85,6 +100,7 @@ method dclr_declarator($/) {
 	$last_dclr := $past<etype><type>;
 	
 	for $<dclr_pointer> {
+		NOTE("Adding pointer declarator: ", $_.ast.name());
 		# Reverse pointers by "inserting" them in at back of list.
 		$_.ast<type> := $past<etype><type>;
 		$past<etype><type> := $_.ast;
@@ -98,79 +114,25 @@ method dclr_declarator($/) {
 		$past<etype> := $last_dclr;
 	}
 	
-	DUMP($past, "declarator");
+	NOTE("Declarator fixed up (specifiers not added yet)");
+	DUMP($past);
 	make $past;
 }
 	
-method declarator2($/) {
-	# Get name and other info from the identifier ast.
-	my $symbol		:= $<name>.ast;
-	my $decl		:= current_declaration();
-
-	# If the declarator is a sub(), uplift the params block
-	# to be the declarator past.
-	if $decl<params> && $decl<params><is_function> {
-		my $block		:= $decl<params>;
-		#DUMP($block, "uplift block");
-		# params<is_function> should be set by param_list
-		#$block<is_function> := $decl<is_function>;
-		$block.node($decl);
-		$block<params> := 'uplifted';
-		$block.pirflags($decl<pirflags>);
-		$block<rtype>	:= $decl<rtype>;
-		$block<scope>	:= $decl.scope();
-		$decl		:= replace_current_declaration($block);
-	}
-	elsif $decl<is_class> {
-		# Clone array to separate class namespace from enclosing nsp.
-		# (Else "nsp X { class C {" modifies X.namespace() because the
-		# long-ident inherits the nsp)
-		$symbol.namespace(clone_array($symbol.namespace()));
-		$symbol.namespace().push($symbol.name());
-
-		my @path := namespace_path_of_var($symbol);
-		my $block := get_class_info_of_path(@path);
-
-		$block.node($decl);
-		$block.pirflags($decl<pirflags>);
-		$block<rtype>	:= $decl<rtype>;
-		$block<scope>	:= $decl.scope();
-
-		$decl		:= replace_current_declaration($block);
-		#DUMP($decl, "class decl (after swap)");
-	}
-
-	$decl<is_rooted>	:= $symbol<is_rooted>;
-	$decl<hll>		:= $symbol<hll>;
-	$decl.name($symbol.name());
-	$decl.namespace($symbol.namespace());
-
-	# FIXME: I think this is wrong for pkg vars. Test?
-	unless $decl<is_class> {
-		# say("Saw declarator for ", $decl.name());
-		add_local_symbol($decl);
-	}
-
-	make $decl;
-}
-
-=method dclr_init($/)
+=method dclr_alias_init($/)
 
 =cut
 
-method dclr_init($/) {
+method dclr_alias_init($/) {
 	my $past := $<dclr_declarator>.ast;
 	
 	if $<dclr_initializer> {
 		$past<dclr_initializer> := $<dclr_initializer>[0].ast;
 	}
 	
-	DUMP($past, "dclr_init");
+	DUMP($past);
 	make $past;
 }
-
-# method dclr_init_list
-# does not exist. See L<#declaration>.
 
 =method dclr_initializer($/)
 
@@ -178,25 +140,47 @@ Passes through the C<expression>.
 
 =cut
 
-method dclr_initializer($/) { PASSTHRU($/, 'expression', 'dclr_initializer'); }
+method dclr_initializer($/) { PASSTHRU($/, 'expression'); }
 
 =method dclr_param_list
 
-Creates a PAST::Block to serve as the function container. Adds all the parameter
-declarations to the block. Returns the block.
+Creates a function-returning declarator, which is set as the PAST result of 
+the rule. The declarator contains a PAST::Block to represent the function's 
+parameter scope.
 
 =cut
 
-method dclr_param_list($/) {
-	my $past := new_dclr_function();
-	$past.node($/);
-	
-	for $<param_list> {
-		$past.push($_.ast);
+method dclr_param_list($/, $key) {
+	if $key eq 'open' {
+		NOTE('Begin function parameter list');
+		my $past	:= close::Compiler::Types::function_returning();
+		$past.node(	$/);
+		my $block	:= $past<parameter_scope>;
+		
+		close::Compiler::Scopes::push($block);
+
+		NOTE("Pushed new scope on stack: ", $block.name());
+		DUMP($past);
 	}
-	
-	DUMP($past, "parameter_decl_list");	
-	make $past;
+	elsif $key eq 'close' {
+		my $block	:= close::Compiler::Scopes::pop('function parameter');
+		my $past	:= $block<function_decl>;
+		
+		NOTE("Popped scope from stack: ", $block.name());
+		
+		for $<param_list> {
+			NOTE('Adding parameter to function: ', $_.ast.name());
+			$past.push($_.ast);
+			close::Compiler::Scopes::add_declarator($block, $_.ast);
+		}
+		
+		NOTE('End function parameter list: ', +@($past), ' parameters');
+		DUMP($past);
+		make $past;
+	}
+	else {
+		$/.panic('Unrecognized $key in action dclr_param_list: ' ~ $key);
+	}
 }
 
 =method dclr_pointer
@@ -212,10 +196,10 @@ method dclr_pointer($/) {
 	$past.name(~$/);
 	
 	for $<cv_qualifier> {
-		$past := merge_tspec_specifiers($past, $past, $_.ast);
+		$past := close::Compiler::Types::merge_specifiers($past, $past, $_.ast);
 	}
 
-	DUMP($past, 'dclr_pointer');
+	DUMP($past);
 	make $past;
 }
 
@@ -225,65 +209,252 @@ Passes through the array, hash, or function declarator.
 
 =cut
 
-method dclr_postfix($/, $key) { PASSTHRU($/, $key, 'dclr_postfix'); }
+method dclr_postfix($/, $key) { PASSTHRU($/, $key); }
 
-method declaration($/) {
-	# Convert individual declarators into type-chains
-	# Create Past Var entries for each declarator.
-	# Lookup init values for types where no dclr_initializer is provided.
-	# Set types for 'auto' decls with dclr_initializers.
-	my $past := PAST::VarList.new();
+method declaration($/, $key) {
+	if $key eq 'specifiers' {
+		NOTE("Processing specifiers");
+		# Create a temporary block on scope stack, so symbol names
+		# are visible to later declarations in this same structure.
+		# e.g., typedef int X, X* PX; // X must be visible after comma
+		my $block		:= close::Compiler::Scopes::new('declaration');
+		$block.name(	'temporary declaration');
+		my $past		:= PAST::VarList.new();
+		$block<varlist> 	:= $past;
+
+		# Modify $specifier to reflect all the specifiers we saw. 
+		# Attach errors to $past.
+		for $<specifier> {
+			$past<specifier> := close::Compiler::Types::merge_specifiers($past, $past<specifier>, $_.ast);
+		}
+		
+		close::Compiler::Scopes::push($block);
+		
+		NOTE("Pushed temporary varlist scope on stack.");
+		DUMP($block);
+	}
+	elsif $key eq 'declarators' {
+		NOTE("Processing declarators");
+		# Once the declaration is complete, the temporary block is 
+		# discarded. At that point, though, the PAST returned is a 
+		# varlist, and whoever requested the varlist should merge the 
+		# symbols in with their own symbol table. (E.g., a declaration
+		# statement, or a parameter list, or whatever.)
+		my $block	:= close::Compiler::Scopes::pop('declaration');
+		my $past	:= $block<varlist>;
+		my $spec	:= $past<specifier>;
+		
+		NOTE("Popped ", $block<lstype>, " scope '", $block.name(), "'");
+		
+		# Convert individual declarators into type-chains
+		# Create Past Var entries for each declarator.
+		# Lookup init values for types where no dclr_initializer is provided.
+		# Set types for 'auto' decls with dclr_initializers.
+			
+		# Merge the specifier in to the declarator. Attach errors, etc.
+		for $<symbol> {
+			my $declarator := $_.ast;
+			NOTE("Merging specifier with declarator '", $declarator.name(), "'");
+			$declarator := 
+				close::Compiler::Types::add_specifier_to_declarator($spec, $declarator);
+			$past.push($declarator);
+		}
+
+		if +@($block) {
+			$/.panic("Unexpected elements added to temporary VarList block");
+		}
+
+		NOTE("done");
+		DUMP($past);
+		make $past;
+	}
+	else {
+		$/.panic('Unrecognized $key in action symbol_declaration: ' ~ $key);
+	}
+}
+
+method declarator_part($/) {
+	my $past := $<dclr_declarator>.ast;
+	NOTE("Assembling declarator ", $past.name());
 	
-	# Modify $specifier to reflect all the specifiers we saw. 
-	# Attach errors to $past.
-	for $<specifier> {
-		$past<specifier> := merge_tspec_specifiers($past, $past<specifier>, $_.ast);
+	if $<dclr_alias> {
+		$past<alias> := $<dclr_alias>.ast;
 	}
 	
-	# Merge the specifier in to the declarator. Attach errors, etc.
-	for $<dclr_init_list><item> {
-		my $declarator := $_.ast;
-
-		$declarator<etype><type> := $past<specifier>;
-		$declarator<etype> := $past<specifier>;
-		$past.push($_.ast);
+	if $<dclr_initializer> {
+		NOTE("Adding initializer");
+		my $initializer := $<dclr_initializer>[0].ast;
+		DUMP($initializer);
+		$past<dclr_initializer> := $initializer;
 	}
+	
+	if $<body> {
+		# Where is the block for this?
+		ASSERT($past<type><is_function>, "It's a function, unless it's a class or something.");
+		my $body := $<body>[0].ast;
+		$past<type><parameter_scope>.push($body);
+	}
+	
+	NOTE("done");
+	DUMP($past);
+	make $past;
+}
 
-	DUMP($past, "declaration");
+=method namespace_alias_declaration
+
+Edits the enclosing block of this node, creating an alias for the namespace
+name given.
+
+=cut
+
+method namespace_alias_declaration($/) {
+	my $ns_name := $<namespace>.ast;
+	my $past := $<alias>.ast;
+
+	$past.isdecl(1);
+	$past<is_alias> := 1;
+	$past<alias_for> := $ns_name;
+	
+	DUMP($past);
 	make $past;
 }
 
 method namespace_definition($/, $key) {
 	if $key eq 'open' {
+		# FIXME: This should be a function, maybe part of the namespace_path target.
  		my $path	:= $<namespace_path>.ast;
 		my $hll	:= $path<hll>;
 		my @namespace_path;
 		
 		unless $path<is_rooted> {
-			my $outer		:= current_lexical_scope();
-			@namespace_path	:= clone_array($outer.namespace());
-			
-			for $path.namespace() {
-				@namespace_path.push($_);
-			}
+			my $parent		:= close::Compiler::Scopes::fetch_current_namespace();
+			@namespace_path	:= Array::concat($parent<path>, $path.namespace());
 		}
 		
-		open_namespace_definition($hll, @namespace_path);
+		NOTE("Opening namespace: hll: ", Array::join(' :: ', @namespace_path));
+		my $namespace := close::Compiler::Namespaces::fetch(@namespace_path);
+		close::Compiler::Scopes::push($namespace);
 	}
 	else { # $key eq 'close'
-		my $past := close_namespace_definition();
+		my $past := close::Compiler::Scopes::pop('namespace');
 		
 		for $<extern_statement> {
 			$past.push($_.ast);
 		}
 		
-		DUMP($past, 'namespace_definition');
+		DUMP($past);
 		make $past;
 	}
-	
 }
 
-method specifier($/, $key) { PASSTHRU($/, $key, 'specifier'); }
+method param_adverb($/) {
+	my $past := make_token($<token>);
+	DUMP($past);
+	make $past;
+}
+
+=method parameter_declaration
+
+=cut
+
+method parameter_declaration($/) {
+	my $past := $<parameter>.ast;
+	my $specifier;
+
+	for $<specifier> {
+		$specifier := close::Compiler::Types::merge_specifiers($past, $specifier, $_.ast);
+	}
+
+	close::Compiler::Types::add_specifier_to_declarator($specifier, $past);
+	
+	for $<adverbs> {
+		my $adv := $_.ast;
+		$past<adverbs>{$adv.value()} := $adv;
+	}
+	
+	if $<initializer> {
+		$past<initializer> := $<initializer>.ast;
+	}
+	
+	# Done by declarator_name
+	# Declare object in current scope, which should be a parameter block.
+	#my $scope := close::Compiler::Scopes::current();
+	#ASSERT($scope<lstype> eq 'function parameter',
+	#	'Expected current scope to be function parameter');
+	#close::Compiler::Scopes::declare_object($scope, $past);
+	ASSERT(
+		close::Compiler::Scopes::get_object(
+			close::Compiler::Scopes::current(), $past.name()) =:= $past,
+		'Expected current scope would already have this parameter declared (by <declarator_name>)');
+		
+	DUMP($past);
+	make $past;
+}
+
+method specifier($/, $key) { PASSTHRU($/, $key); }
+
+method symbol_declaration($/, $key) {
+	if $key eq 'specifiers' {
+		NOTE("Processing specifiers");
+		# Create a temporary block on scope stack, so symbol names
+		# are visible to later declarations in this same structure.
+		# e.g., typedef int X, X* PX; // X must be visible after comma
+		my $block		:= close::Compiler::Scopes::new('varlist');
+		$block.name(	'symbol_declaration temp block');
+		my $past		:= PAST::VarList.new();
+		$block<varlist> 	:= $past;
+
+		# Modify $specifier to reflect all the specifiers we saw. 
+		# Attach errors to $past.
+		for $<specifier> {
+			$past<specifier> := close::Compiler::Types::merge_specifiers($past, $past<specifier>, $_.ast);
+		}
+		
+		close::Compiler::Scopes::push($block);
+		
+		NOTE("Pushed temporary varlist scope on stack.");
+		DUMP($block);
+	}
+	elsif $key eq 'declarators' {
+		NOTE("Processing declarators");
+		# Once the declaration is complete, the temporary block is 
+		# discarded. At that point, though, the PAST returned is a 
+		# varlist, and whoever requested the varlist should merge the 
+		# symbols in with their own symbol table. (E.g., a declaration
+		# statement, or a parameter list, or whatever.)
+		my $block	:= close::Compiler::Scopes::pop('varlist');
+		my $past	:= $block<varlist>;
+		my $spec	:= $past<specifier>;
+		
+		NOTE("Popped ", $block<lstype>, " scope '", $block.name(), "'");
+		
+		# Convert individual declarators into type-chains
+		# Create Past Var entries for each declarator.
+		# Lookup init values for types where no dclr_initializer is provided.
+		# Set types for 'auto' decls with dclr_initializers.
+			
+		# Merge the specifier in to the declarator. Attach errors, etc.
+		for $<dclr_init_list><item> {
+			my $declarator := $_.ast;
+			
+			NOTE("Merging specifier with declarator '", $declarator.name(), "'");
+			$declarator := 
+				close::Compiler::Types::add_specifier_to_declarator($spec, $declarator);
+			$past.push($declarator);
+		}
+
+		if +@($block) {
+			$/.panic("Unexpected elements added to temporary VarList block");
+		}
+
+		NOTE("done");
+		DUMP($past);
+		make $past;
+	}
+	else {
+		$/.panic('Unrecognized $key in action symbol_declaration: ' ~ $key);
+	}
+}
 
 =method tspec_builtin_type
 
@@ -292,9 +463,10 @@ Creates a type specifier with noun set to the type name.
 =cut
 
 method tspec_builtin_type($/) {
-	my $past := new_tspec_type_specifier('noun', ~$<token>);
-	$past<is_builtin> := 1;
-	DUMP($past, "builtin_type");
+	my $past := close::Compiler::Types::new_specifier(
+		:is_builtin(1),
+		:noun(~$<token>));
+	DUMP($past);
 	make $past;
 }
 
@@ -305,8 +477,9 @@ Creates a token around the keyword.
 =cut
 
 method tspec_function_attr($/) {
-	my $past := new_tspec_type_specifier('is_' ~ $<token>, 1);
-	DUMP($past, "tspec_function_attr");
+	my $past := close::Compiler::Types::new_specifier();
+	$past{'is_' ~ $<token>} := 1;
+	DUMP($past);
 	make $past;
 }
 
@@ -317,244 +490,15 @@ Creates a token around the keyword.
 =cut
 
 method tspec_storage_class($/) {
-	my $past := new_tspec_type_specifier('storage_class', ~$<token>);
-	DUMP($past, "tspec_storage_class");
+	my $past := close::Compiler::Types::new_specifier(:storage_class(~$<token>));
+	DUMP($past);
 	make $past;
 }
 
-method tspec_type_specifier($/, $key) { PASSTHRU($/, $key, 'tspec_type_specifier'); }
+method tspec_type_specifier($/, $key) { PASSTHRU($/, $key); }
 
 method tspec_type_name($/) {
-	my $past := new_tspec_type_specifier('type_name', $<type_name>.ast);
-	DUMP($past, 'tspec_type_name');
+	my $past := close::Compiler::Types::new_specifier(:type_name($<type_name>.ast));
+	DUMP($past);
 	make $past;
-}
-
-################################################################
-
-# 1. Declaring an uninitialized attribute:   attribute int foo;
-#  - causes an add-attr entry in the class-init function, plus a symbol table entry
-# for the class block.
-# 2. Declaring an initialized attribute:  attribute int foo = 0;
-#  - causes an add-attr entry in the class-init function, plus a symbol table entry
-#  - for the class block, plus an initialization step in the _init or _new method,
-#  - or however it's enacted.
-# 3. Declaring a method: int foo() :method {...}
-#  - causes an add-method entry in the class-init function, plus a symbol table
-#  - entry for the class block.
-# 4. Declaring a non-method: int foo() {...}
-#  - causes an entry in the namespace, not the class. (?)
-#
-
-method declaration2($/, $key) {
-	my $lstype;
-	my $dclr_mode := 'ERROR: in declaration()';
-
-	if $key eq 'body_open' {
-		# Put PAST::Block back on stack as either function body
-		# or class block.
-		my $block := current_declaration();
-
-		if $block<is_extern> {
-			$/.panic("You cannot use 'extern' with a definition");
-		}
-
-		if $block<is_function> {
-			$lstype := 'function body';
-			$dclr_mode := 'local';
-
-			if $block<adverbs> && $block<adverbs><method>
-				or $block<is_vtable> {
-				# Create a 'self' lexical automatically.
-				my $auto_self := PAST::Var.new(
-					:isdecl(1),
-					:name('self'),
-					:node($/),
-					:scope('register'));
-				add_local_symbol($auto_self);
-				# Don't lexify it. Just remember that it was declared.
-				#$block[0].push($auto_self);
-			}
-		}
-		elsif $block<is_class> {
-			$lstype := 'class body';
-			$dclr_mode := 'class';
-		}
-		else {
-			DUMP($block, "current_decl");
-			$/.panic("Blocks can only be used "
-				~ "in class and function definitions");
-
-		}
-
-		#say("Opening declaration of " ~ $lstype ~ " " ~ $block.name());
-		open_decl_mode($dclr_mode);
-		$block<lstype> := $lstype;
-		push_lexical_scope($block);
-
-		if $block<is_class> {
-			# Open namespace inside class decl. so methods
-			# will be part of nsp block
-
-			open_class($block);
-		}
-	}
-	elsif $key eq 'body_close' {
-		my $block := current_declaration();
-
-		if $block<is_function> {
-			$lstype := 'function body';
-			$dclr_mode := 'local';
-		}
-		elsif $block<is_class> {
-			close_class();
-			$lstype := 'class body';
-			$dclr_mode := 'class';
-		}
-
-		#say("Closing declaration of " ~ $lstype ~ " " ~ $block.name());
-		close_decl_mode($dclr_mode);
-		close_lexical_scope($lstype);
-	}
-	else {
-		self.declaration_done($/);
-	}
-}
-
-# Called by 'declaration' when end of decl is reached.
-method declaration_done($/) {
-	my $lstype;
-	my $dclr_mode := 'ERROR: in declaration()';
-	
-	# This code has to deal with every single kind of declaration. Yikes.
-	my $past := close_declaration();
-
-	# Got any adverbs?
-	if +@($<adverbs>.ast) {
-		for @($<adverbs>.ast) {
-			dclr_add_adverb($/, $past, $_);
-		}
-	}
-	
-	# FIXME: This is wrong, for classes at least. Need to insert declaring name
-	# into parent namespace before block open, so block guts can refer to it.
-	
-	# One important thing is to establish the namespace for the
-	# symbol. Use scope to determine what to do:
-	if $past<scope> eq 'package' {
-		if !$past<is_class> {
-			add_global_symbol($past);
-		}
-		else {
-			add_class_decl($past);
-		}
-	} elsif $past<scope> eq 'attribute' {
-		# TODO: Do I pass dclr_initializer in here?
-		add_class_attribute($past);
-	}
-
-	if $<dclr_initializer> {
-		# FIXME: Is this wrong? Should this be an assignment ?
-		$past.viviself($<dclr_initializer>[0].ast);
-		$past.lvalue(1);
-	}
-	elsif $past<is_function> {
-		# Definition or declaration?
-		if $<compound_stmt> {
-			$past.push($<compound_stmt>.ast);
-		}
-		else {
-			$past<is_decl_only> := 1;
-			$past := PAST::Op.new(
-				:node($past),
-				:name($past.name() ~ " (decl)"),
-				:pasttype('null'));
-		}
-		
-		#DUMP($past, "function: " ~ $past.name);
-	}
-	elsif $past<is_class> {
-		if $<compound_stmt> {
-			# Remove all method blocks - put them in the namespace
-			my @path := namespace_path_of_var($past);
-			my $namespace := get_namespace(@path);
-
-			my $block := $<compound_stmt>.ast;
-			my $num_items := +@($block);
-			my $node;
-
-			while $num_items-- {
-				$node := $block.shift();
-
-				if $node.isa(PAST::Block) {
-					#say("Adding method ", $node.name(), " to nsp block ", $namespace.name());
-					$namespace.push($node);
-				}
-				else {
-					# FIXME: I don't know what to do with these.
-					say("Recycling unknown node");
-					$block.push($node);
-				}
-			}
-		}
-
-		$past := PAST::Op.new(:node($/), :pasttype('null'));
-	}
-
-	#DUMP($past, "declaration (now closed)");
-	#say("Done with <declaration>: ", $past.name());
-	make $past;
-}
-
-method specifiers($/) {
-	my $past := open_declaration($/);
-
-	### Storage specifier
-
-	my $storage;
-
-	if $<storage_spec> {
-		$storage := ~$<storage_spec>[0];
-
-		if $storage eq 'extern' {
-			$past<is_extern> := 1;
-			$storage := 'package';
-		}
-		elsif $storage eq 'static' {
-			$past<is_static> := 1;
-			$storage := 'package';
-		}
-	}
-	else {
-		$storage := get_default_storage_spec();
-		#say("Using default storage spec: ", $storage);
-	}
-
-	$past.scope($storage);
-
-	### Type qualifiers
-
-	if $<type_qualifier> {
-		my $tq := ~$<type_qualifier>;
-
-		if $tq eq 'const' {
-			$past<is_const> := 1;
-		}
-	}
-
-	### Type specifier (not optional)
-
-	my $type := ~$<type_spec>;
-	#say("Type specifier: ", $type);
-	$past<type> := $type;
-
-	my $rtype;
-
-	if $type eq 'class' { $rtype := "P"; $past<is_class> := 1; }
-	elsif $type eq 'int'  { $rtype := "I"; }
-	elsif $type eq 'num'  { $rtype := "N"; }
-	elsif $type eq 'pmc'  { $rtype := "P"; }
-	elsif $type eq 'str' || $type eq 'string'  { $rtype := "S"; }
-	elsif $type eq 'void' { $rtype := "v"; }
-	else { $rtype := "P"; }
 }

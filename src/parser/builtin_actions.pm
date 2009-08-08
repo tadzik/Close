@@ -1,6 +1,6 @@
 # $Id$
 
-method built_in($/, $key)                { PASSTHRU($/, $key, 'built_in'); }
+method built_in($/, $key)                { PASSTHRU($/, $key); }
 
 method builtin_clone($/) {
 	my $past := PAST::Op.new(
@@ -9,7 +9,7 @@ method builtin_clone($/) {
 		:pasttype('inline'),
 		:inline('    %r = clone %0'));
 	$past.push($<obj>.ast);
-	#DUMP($past, "builtin_clone");
+	#DUMP($past);
 	make $past;
 }
 
@@ -38,7 +38,7 @@ method builtin_concat($/) {
 	}
 
 	$past.inline($inline);
-	#DUMP($past, "builtin_concat");
+	#DUMP($past);
 	make $past;
 }
 
@@ -49,7 +49,7 @@ method builtin_elements($/) {
 		:pasttype('pirop'),
 		:pirop('elements IP'),
 		$<arr>.ast);
-	#DUMP($past, "builtin-elements");
+	#DUMP($past);
 	make $past;
 }
 
@@ -70,7 +70,7 @@ method builtin_exists($/) {
 	$past.push($index[0]);
 	$past.push($index[1]);
 	
-	#DUMP($past, "builtin-exists");
+	#DUMP($past);
 	make $past;
 }
 
@@ -83,7 +83,7 @@ method builtin_find_caller_lex($/) {
 	
 	$past.push($<name>.ast);
 	
-	#DUMP($past, "builtin-find_caller_lex");
+	#DUMP($past);
 	make $past;
 }
 
@@ -101,24 +101,24 @@ method builtin_isa($/) {
 	# (Probably for PMCs, maybe for some kind of 'a::b' paths?)
 	$past.push($<obj>.ast);
 	
-	my $nsp := clone_array($<class>.ast.namespace());
+	my $nsp := Array::clone($<class>.ast.namespace());
 	$nsp.push($<class>.ast.name());
 	
 	if  $<class>.ast<is_rooted> {
 		$nsp.unshift($<class>.ast<hll>);
 	} 
 	else {
-		$nsp.unshift(current_hll_block().name());
+		$nsp.unshift(close::Compiler::Scopes::fetch_current_hll());
 	}
 		
-	my $class_key := join('::', $nsp);
+	my $class_key := Array::join('::', $nsp);
 	my $class := PAST::Op.new(
 		:node($<class>),
 		:pasttype('inline'),
 		:inline("\t$P0 = split '::', '" ~ $class_key ~ "'\n"
 			~ "\t%r = get_root_namespace $P0\n"));
 	$past.push($class);
-	#DUMP($past, "expr: isa");
+	#DUMP($past);
 	make $past;
 }
 
@@ -130,7 +130,7 @@ method builtin_isntsame($/) {
 		:pirop('isntsame IPP'));
 	$past.push($<arg1>.ast);
 	$past.push($<arg2>.ast);
-	#DUMP($past, "expr: isntsame");
+	#DUMP($past);
 	make $past;
 }
 
@@ -142,7 +142,7 @@ method builtin_isnull($/) {
 		:pirop('isnull'));
 
 	$past.push($<expression>.ast);
-	#DUMP($past, "expr: isnull");
+	#DUMP($past);
 	make $past;
 }
 
@@ -154,7 +154,7 @@ method builtin_issame($/) {
 		:pirop('issame IPP'));
 	$past.push($<arg1>.ast);
 	$past.push($<arg2>.ast);
-	#DUMP($past, "expr: issame");
+	#DUMP($past);
 	make $past;
 }
 
@@ -191,7 +191,7 @@ method builtin_new($/) {
 		$past.push($<args1>[0].ast);
 	}
 
-	#DUMP($past, "prefix-new-expr");
+	#DUMP($past);
 	make $past;
 }
 
@@ -213,7 +213,7 @@ method builtin_pop($/) {
 		:inline('    %r = pop %0'));
 	$past.push($<arr>.ast);
 
-	#DUMP($past, "builtin-pop");
+	#DUMP($past);
 	make $past;
 }
 
@@ -251,7 +251,7 @@ method builtin_shift($/) {
 		$<arr>.ast);
 	#$past.push($<arr>.ast);
 
-	#DUMP($past, "builtin-shift");
+	#DUMP($past);
 	make $past;
 }
 
@@ -263,7 +263,7 @@ method builtin_split($/) {
 		:pirop('split Pss'));
 	$past.push($<delim>.ast);
 	$past.push($<str>.ast);
-	#DUMP($past, "builtin-split");
+	#DUMP($past);
 	make $past;
 }
 
@@ -275,7 +275,7 @@ method builtin_typeof($/) {
 		:pasttype('pirop'),
 		:pirop('typeof SP'));
 	$past.push($obj);
-	#DUMP($past, "builtin-typeof");
+	#DUMP($past);
 	make $past;
 }
 
@@ -300,7 +300,7 @@ method builtin_unshift($/) {
 		$past := $past.pop();
 	}
 
-	#DUMP($past, "builtin-unshift");
+	#DUMP($past);
 	make $past;
 }
 

@@ -1,29 +1,34 @@
-method statement($/, $key)              { PASSTHRU($/, $key, 'statement'); }
+# $Id$
 
-method null_stmt($/) {
-    my $past := PAST::Op.new(:node($/), :pasttype('null'));
-    #DUMP($past, "null stmt");
-    make $past;
-}
+method statement($/, $key)              { PASSTHRU($/, $key); }
 
-method expression_statement($/) {
-    my $past := $<expression>.ast;
-    DUMP($past, 'expression_statement');
-    make $past;
-}
+method extern_statement($/, $key) { PASSTHRU($/, $key); }
 
-method compound_stmt($/) {
-	my $past := PAST::Stmts.new(:node($/), :name("compound_stmt"));
-
-	for $<item> {
-		#DUMP($_.ast, "item in block");
-		$past.push($_.ast);
-	}
-
+method null_statement($/) {
+	my $past := PAST::Op.new(:node($/), :pasttype('null'));
+	DUMP($past);
 	make $past;
 }
 
-method conditional_stmt($/) {
+method expression_statement($/) {
+	my $past := $<expression>.ast;
+	DUMP($past);
+	make $past;
+}
+
+method compound_statement($/) {
+	my $past := PAST::Stmts.new(:node($/), :name("compound statement"));
+
+	for $<item> {
+		DUMP($_.ast);
+		$past.push($_.ast);
+	}
+
+	DUMP($past);
+	make $past;
+}
+
+method conditional_statement($/) {
     my $keyw;
     $keyw := (substr($<kw>, 0, 2) eq 'if')
         ?? 'if'
@@ -37,19 +42,13 @@ method conditional_stmt($/) {
         $past.push($<else>[0].ast);     # else
     }
 
-    #DUMP($past, $keyw ~ " statement");
+    DUMP($past);
     make $past;
 }
 
-method declaration_statement($/) { 
-	my $past	:= $<declaration>.ast;
-	my $block	:= current_lexical_scope();
-	add_declaration_to_scope($block, $past);
-	DUMP($past, 'declaration_statement');
-	make $past;
-}
+method declaration_statement($/, $key) { PASSTHRU($/, $key); }
 
-method labeled_stmt($/, $key) {
+method labeled_statement($/, $key) {
 	my $past := PAST::Stmts.new(:name('labeled stmt'), :node($/));
 
 	for $<label> {
@@ -58,25 +57,24 @@ method labeled_stmt($/, $key) {
 
 	$past.push($<local_statement>.ast);
 
-	#DUMP($past, "labeled stmt");
+	DUMP($past);
 	make $past;
 }
 
 method label($/) {
-	my $label := ~$<bareword>;
+	my $label := ~$<BAREWORD>;
 	my $past := PAST::Op.new(
 		:name('label: ' ~ $label),
 		:node($/),
 		:pasttype('inline'),
 		:inline($label ~ ":\n"));
-	#DUMP($past, "label");
+	DUMP($past);
 	make $past;
 }
 
-method local_statement($/, $key) { PASSTHRU($/, $key, 'local_statement'); 
-say("*** local statement: ", ~$/); }
+method local_statement($/, $key) { PASSTHRU($/, $key); }
 
-method jump_stmt($/, $key) {
+method jump_statement($/, $key) {
 	my $past;
 
 	if $key eq 'goto' {
@@ -144,7 +142,7 @@ method jump_stmt($/, $key) {
 
 		$inline := $inline ~ ")\n";
 		$past.inline($inline);
-		#DUMP($past, "tailcall");
+		DUMP($past);
 	}
 	else {
 		$/.panic("Unanticipated type of jump statement: '"
@@ -152,136 +150,105 @@ method jump_stmt($/, $key) {
 			~ "' - you need to implement it!");
 	}
 
-	#DUMP($past, $key);
+	DUMP($past);
 	make $past;
 }
 
-method iteration_statement($/, $key)         { PASSTHRU($/, $key, 'iteration_statement'); }
+method foreach_statement($/) {
+	NOTE("started");
+	my $iter	:= $<header><loop_var>.ast;
+	DUMP($iter);
+	my $list	:= $<header><list>.ast;
+	DUMP($list);
+	my $body	:= $<body>.ast;
+	DUMP($body);
 
-method foreach_stmt($/, $key) {
-	if $key eq 'index' {
-		open_decl_mode('parameter');
-		return 0;
+	my $iter_ref	:= $iter;
+	
+	if $iter.isa(PAST::VarList) {
+		# Need to add this declaration to containing block.
+		# FIXME: How to solve (finally) nested blocks problem?
+		# Change this to a declaration in parent block, and a Var ref here.
+		# Do that later?
+		$iter_ref := PAST::Var.new(:name($iter.name()), :lvalue(1));
 	}
-
-	my $index_var := $<index>.ast;
-
-	if $key eq 'open' {
-		close_decl_mode('parameter');
-
-		if $index_var.isdecl() {
-			if $index_var.scope() eq 'parameter' {
-				$index_var.scope('register');
-			}
-
-			add_local_symbol($index_var);
-		}
-		else {
-			my $info := symbol_defined_locally($index_var);
-
-			if !$info {
-				$/.panic("Symbol '"
-					~ $index_var.name()
-					~ "' is not defined locally.");
-			}
-			else {
-				$index_var.scope($info<decl>.scope());
-			}
-		}
-
-		return 0;
-	}
-
-	my $index_ref;
-
-	# Eventual past is { ... initialization ... while-loop }
-	my $past := PAST::Stmts.new(:name('foreach-loop'), :node($/));
-
-	if $index_var.isdecl() {
-		$past.push($index_var);
-
-		# Replace decl of  index var with new ref-only node.
-		$index_var := PAST::Var.new(
-			:lvalue(1),
-			:name($index_var.name()),
-			:node($index_var),
-			:scope('register'));
-	}
-
-	my $iter_name	:= make_temporary_name('foreach_'
-		~ $index_var.name() ~ '_iter');
-
-	my $iterator	:= PAST::Op.new(
+	
+	my $past := PAST::Stmts.new(:name('foreach loop'), :node($/));
+	my $iterator := PAST::Op.new(
 		:inline("    %r = iter %0"),
-		:name('new-iterator'),
-		:node($<index>),
-		:pasttype('inline'));
-	$iterator.push($<list>.ast);
-
-	my $iter_temp	:= PAST::Var.new(
+		:name("new-iterator"),
+		:node($<header><loop_var>),
+		:pasttype("inline"));
+	$iterator.push($list);
+	my $iter_name := make_temporary_name('foreach_' ~ $iter_ref.name() ~ '_iter');
+	# FIXME: This isn't enough. Need to do a bind, or assign, rather than a viviself, because
+	# reusing vars should not trigger auto-vivification.
+	my $iter_tempvar := PAST::Var.new(
 		:isdecl(1),
 		:lvalue(1),
 		:name($iter_name),
-		:node($<list>),
+		:node($<header><loop_var>),
 		:scope('register'),
 		:viviself($iterator));
-	my $iter_read := PAST::Var.new(
-		:name($iter_name),
-		:node($<local_statement>),
-		:scope('register'));
+	$past.push($iter_tempvar);
 
-	# Store the iterator setup in the initialization part of the PAST
-	$past.push($iter_temp);
-
+	# $past now looks like:
+	# $P0 = <list>
+	# it = iter $P0
+	# .local pmc tempvar
+	# tempvar = it
+	
 	my $while := PAST::Op.new(
 		:name('foreach-while'),
-		:node($<local_statement>),
+		:node($<body>),
 		:pasttype('while'));
 
-	# While condition: while (iter) {...}
-	$while.push($iter_read);
+	my $iter_read := PAST::Var.new(
+		:name($iter_name),
+		:node($<body>),
+		:scope('register'));
 
-	# Insert a "index = shift iter" into while block
-	my $body := PAST::Stmts.new(:node($<local_statement>));
+	$while.push($iter_read);
+	
+	my $block := PAST::Stmts.new(:name('foreach-body'), :node($<body>));
 	my $shift := PAST::Op.new(
-		:node($<local_statement>),
+		:node($<header><loop_var>),
 		:pasttype('bind'));
-	$shift.push($index_var);
+	$shift.push($iter_tempvar);
 	$shift.push(
 		PAST::Op.new(
-			:name('shift-iterator'),
-			:node($<local_statement>),
-			:pasttype('inline'),
 			:inline('    %r = shift %0'),
+			:name('shift-iterator'),
+			:node($<header><loop_var>),
+			:pasttype('inline'),
 			$iter_read));
-	$body.push($shift);
-	$body.push($<local_statement>.ast);
-	$while.push($body);
+	$block.push($shift);
+	$block.push($body);
+	$while.push($block);
 	$past.push($while);
 
-	#DUMP($past, "foreach-stmt");
+	NOTE("Foreach generates Stmts( init, while (condition, stmts( shift, block)))");
+	DUMP($past);
 	make $past;
-
 }
 
-method do_while_stmt($/) {
+method do_while_statement($/) {
     my $past := PAST::Op.new(:name('do-while-loop'), :node($/));
     my $keyword := substr(~$<kw>, 0, 5);
     $past.pasttype('repeat_' ~ $keyword);
     $past.push($<expression>.ast);
     $past.push($<local_statement>.ast);
-    #DUMP($past, $past.pasttype());
+    DUMP($past);
     make $past;
 }
 
-method while_do_stmt($/) {
+method while_do_statement($/) {
 	my $past := PAST::Op.new(:name('while-do-loop'), :node($/));
 	my $keyword := substr(~$<kw>, 0, 5);
 	$past.pasttype($keyword);
 	$past.push($<expression>.ast);
 	$past.push($<local_statement>.ast);
 
-	#DUMP($past, $past.pasttype());
+	DUMP($past);
 	make $past;
 }
-

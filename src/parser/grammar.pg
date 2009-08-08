@@ -19,18 +19,6 @@ rule TOP {
 	<translation_unit> {*} #= translation_unit
 }
 
-=rule local_statement
-
-=cut
-
-rule local_statement {
-	| <namespace_alias_definition>
-	| <using_directive>
-	| <using_declaration>
-	| <simple_declaration>
-	| <local_statement>
-}
-
 =head5 C<translation_unit>
 
 A I<translation unit> is a compiled file, with all of the ancillary included 
@@ -38,7 +26,7 @@ bits that may appear. Essentialy, whatever is needed to produce a C<.pbc>
 file as output.
 
 In Close, a translation unit is defined as a sequence of zero or more 
-C<extern_stmt> items. These may be plain old code, namespace blocks,
+C<extern_statement> items. These may be plain old code, namespace blocks,
 variables, classes, or functions.
 
 =cut
@@ -49,92 +37,3 @@ rule translation_unit {
 	[ $ || <panic: 'Syntax error'> ]
 	{*} #= finish
 }
-
-rule simple_declaration {
-	# What is currently in declaration.pg/declaration, I think.
-}
-
-###########################################################################
-
-token string_lit {
-	[ '\'' <string_literal: '\''> '\''
-	| '"' <string_literal: '"'> '"'
-	]
-	{*}
-}
-
-token integer_lit {
-	[
-	| 0	[ 'b' <[01]>+	[ _ <[01]>+ ]*
-		| 'o' <[0..7]>+	[ _ <[0..7]>+ ]*
-		| 'd' \d+			[ _ \d+ ]*
-		| 'x' <xdigit>+	[ _ <xdigit>+ ]*
-		]
-	| \d+ [ _ \d+ ]*
-	]
-	{*}
-	<.integer_u_or_l_suffix>?
-}
-
-token integer_u_or_l_suffix {
-	| <[Uu]> [ <[Ll]> <[Ll]>? ]?
-	| <[Ll]> <[Ll>? <[Uu]>?
-}
-
-token float_lit {
-	[				'.' \d+[_\d+]*	<.Escale>?
-	| \d+[_\d+]*	'.' \d+[_\d+]*	<.Escale>?
-	| \d+[_\d+]*					<.Escale>
-	]
-	{*} #= float_lit
-}
-
-token Escale {
-	<[Ee]> <[ + \- ]>? \d+[_\d+]*
-}
-
-token short_ident {
-	[ <id=bareword> | <id=string_lit> ]
-	{*}
-}
-
-token bareword {
-	<!reserved_word>
-	<.ident>
-}
-
-token reserved_word {
-	<.keyword>
-}
-
-token keyword {
-	| <.language_element>
-	| <.builtin_function>
-}
-
-token language_element {
-	[ 'asm'
-	| 'const'
-	| 'else'
-	| 'extern'
-	| 'for'
-	| 'foreach'
-	| 'if'
-	# | 'lexical'
-	| 'register'
-	| 'return'
-	#| 'self' Can't be prohibited, else it were a function. 
-	| 'sub'
-	| 'tailcall'
-	| 'unless'
-	| 'void'
-	] >>
-}
-
-token builtin_function {
-	[ 'null'
-	] >>
-}
-
-# rule expression is defined in expressions.pg
-# rule built_in is defined in builtins.pg

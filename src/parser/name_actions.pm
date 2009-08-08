@@ -8,9 +8,58 @@ resulting PAST::Var IS NOT RESOLVED.
 =cut
 
 method declarator_name($/) {
-	my $past := assemble_qualified_path($/);
+	my $past 	:= assemble_qualified_path($/);
+	NOTE("Creating declarator: ", $past.name());
 	$past<isdecl> := 1;
-	DUMP($past, "declarator_name");
+	
+	# NOTE: Because the parser may decide to use a different parse of 
+	# this symbol (for example, a symbol declaration and a function
+	# definition are ambiguous until the ';' or '{' B<after> the 
+	# parameter list) you must use a temporary scope for declarations
+	# and other stuff that will invoke this rule.
+	close::Compiler::Scopes::add_declarator_to_current($past);
+	# TODO: Maybe add a warning if it's already defined? "Repeated decl of name..."
+	DUMP($past);
+	make $past;
+}
+
+method namespace_name($/, $key) { PASSTHRU($/, $key); }
+
+method namespace_path($/) {
+	my $past := assemble_qualified_path($/);
+
+	# Namespace might be empty for ::, or for single-element paths.
+	unless $past.namespace() {
+		$past.namespace(Array::empty());
+	}
+	
+	# Name might be empty for hll-root only path.
+	if $past.name() {
+		$past.namespace().push($past.name());
+	}
+
+	DUMP($past);
+	make $past;
+}
+
+method new_alias_name($/) {
+	my $past := PAST::Var.new(:name($<alias>.ast.name()), :node($/));
+	DUMP($past);
+	make $past;
+}
+
+method qualified_identifier($/) {
+	my $past := assemble_qualified_path($/);
+	#$past<searchpath> := clone_current_scope();
+	
+	DUMP($past);
+	make $past;
+}
+
+method simple_identifier($/) {
+	my $past := PAST::Var.new(:name($<BAREWORD>.ast.value()), :node($/));
+	NOTE("Found simple identifier: '", $past.name(), "'");
+	DUMP($past);
 	make $past;
 }
 
@@ -20,35 +69,12 @@ method type_name($/, $key) {
 	my $past := $<qualified_identifier>.ast;
 	
 	if $key eq 'check_typename' {
-		$Is_valid_type_name := check_typename($past);
-		say("Checked typename ", $past.name(), ", valid = ", $Is_valid_type_name);
+		$Is_valid_type_name := close::Compiler::Types::is_typename($past);
+		NOTE("Checked for typename '", $past.name(), "', valid = ", $Is_valid_type_name);
 		return 0;
 	}
-	
-	DUMP($past, 'type_name');
-	make $past;
-}
-
-method namespace_name($/, $key) { PASSTHRU($/, $key, 'namespace_name'); }
-
-method namespace_path($/) {
-	my $past := assemble_qualified_path($/);
-	if $past.name() {
-		my $ns := $past.namespace();
-		unless $ns {
-			$ns := new_array();
-		}
-		$ns.push($past.name());
-		$past.namespace($ns);
+	else {
+		DUMP($past);
+		make $past;
 	}
-	DUMP($past, 'namespace_path');
-	make $past;
-}
-
-method qualified_identifier($/) {
-	my $past := assemble_qualified_path($/);
-	$past<searchpath> := clone_current_scope();
-	
-	DUMP($past, "qualified_identifier");
-	make $past;
 }

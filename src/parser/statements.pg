@@ -30,22 +30,34 @@ such as loops, goto, if/then/else, expressions, etc.
 =cut
 
 rule local_statement {
-	[ <labeled_stmt>		{*} #= labeled_stmt
-	| <null_stmt>		{*} #= null_stmt
-	| <compound_stmt>		{*} #= compound_stmt
-	| <conditional_stmt>	{*} #= conditional_stmt
-	| <iteration_stmt>		{*} #= iteration_stmt
-	| <jump_stmt>		{*} #= jump_stmt
+	[ <labeled_statement>	{*} #= labeled_statement
+	| <null_statement>		{*} #= null_statement
+	| <compound_statement>	{*} #= compound_statement
+	| <conditional_statement>	{*} #= conditional_statement
+	| <do_while_statement>	{*} #= do_while_statement
+	| <while_do_statement>	{*} #= while_do_statement
+	| <foreach_statement>	{*} #= foreach_statement
+	| <jump_statement>	{*} #= jump_statement
 	| <declaration_statement>	{*} #= declaration_statement
 	| <expression_statement>	{*} #= expression_statement
 	]
 	|| [ <!before '}' | $ > <.panic: "Statement expected"> ]
 }
 
-rule null_stmt {
+rule null_statement {
 	';'
 	{*}
 }
+
+rule declaration_statement {
+	| <namespace_alias_declaration> ';'	{*} #= namespace_alias_declaration
+	| <using_namespace_directive> ';'		{*} #= using_directive
+	| <using_declaration> ';'			{*} #= using_declaration
+	| <declaration> [ ';' | <?after '}' <.ws> > ]	{*} #= declaration
+#	| <symbol_declaration> ';'			{*} #= symbol_declaration
+#	| <function_definition>			{*} #= function_definition
+}
+
 
 =head4 Expression Statement
 
@@ -60,30 +72,21 @@ rule expression_statement {
 	{*}
 }
 
-rule declaration_statement {
-	<declaration> ';'
+rule compound_statement {
+	'{' ~ '}' <item=local_statement>*
 	{*}
 }
 
-rule compound_stmt {
-	'{'
-		$<item>=<local_statement>
-	[ '}' || <panic: "Missing closing '}' in compound block" > ]
-	{*}
-}
-
-rule conditional_stmt {
+rule conditional_statement {
 	$<kw>=[ 'if' | 'unless' ]
-	[ '(' || <panic: "if/unless statements must have '(' ')' around test expression" > ]
-	<expression>
-	[ ')' || <panic: "missing ')' at end of test expression" > ]
+	'(' ~ ')' <expression>
 	$<then>=<local_statement>
 	[ 'else' $<else>=<local_statement> ]?
 	{*}
 }
 
-rule jump_stmt {
-	| 'goto' <label=bareword>
+rule jump_statement {
+	| 'goto' <label=BAREWORD>
 		[ ';' || <panic: "Missing ';' at end of goto statement" > ]
 		{*}	#= goto
 	| 'return' <retval=expression>? 
@@ -96,7 +99,7 @@ rule jump_stmt {
 	# | break [ <loop> ]? ';'             {*} #= break
 }
 
-rule labeled_stmt {
+rule labeled_statement {
 	| [ <label> ]+
 		[ <local_statement>		{*} #= label
 		|| <panic: "A statement label must be followed by a statement" >
@@ -107,38 +110,27 @@ rule labeled_stmt {
 }
 
 token label {
-	<bareword> ':' <!before ':'>
+	<BAREWORD> ':' <!before ':'>
 	{*}
 }
 
-rule iteration_stmt {
-	| <do_while_stmt>	{*} #= do_while_stmt
-	| <while_do_stmt>	{*} #= while_do_stmt
-	| <foreach_stmt>	{*} #= foreach_stmt
+rule foreach_header {
+	# NB: decl before ident, to avoid typedefs messing up syntax: for (T t : x)
+	[ <loop_var=declaration> || <loop_var=simple_identifier> ]
+	':'
+	<list=expression>
 }
 
-rule foreach_stmt {
-	<.t_foreach>
-		[ '(' || <panic: "Missing opening '(' in foreach statement" > ]
-		{*} #= index
-		[	[ <index=declaration> ::
-			| <index=short_ident> ::
-			]
-		|| <panic: "foreach (item: list) iterations must use a local variable" >
-		]
-		[ ':' || <panic: "Missing ':' in foreach (item: list) statement" > ]
-		<list=expression>
-		[ ')' || <panic: "Missing closing ')' in foreach statement" > ]
-	{*} #= open
-	<local_statement>
-	{*} #= close
+rule foreach_statement {
+	<.FOREACH>
+	'(' ~ ')' <header=foreach_header>
+	<body=local_statement>
+	{*}
 }
 
-token t_foreach { 'foreach' >> }
-
-rule do_while_stmt {
-	'do' <local_statement>
-	$<kw>=[ 'while' | 'until' ]
+rule do_while_statement {
+	<.DO> <local_statement>
+	$<kw>=[ <WHILE> | <UNTIL> ]
 	[ '(' || <panic: "do...while/until statements must have '(' ')' around test expression" > ]
 	<expression>
 	[ ')' || <panic: "missing ')' at end of test expression" > ]
@@ -146,7 +138,7 @@ rule do_while_stmt {
 	{*}
 }
 
-rule while_do_stmt {
+rule while_do_statement {
 	$<kw>=[ 'while' | 'until' ]
 	[ '(' || <panic: "while/until ... statements must have '(' ')' around test expression" > ]
 	<expression>

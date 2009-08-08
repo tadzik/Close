@@ -1,21 +1,5 @@
 # $Id$
 
-=pod
-
-=head1 Module: declarations.pg
-
-=head1 Imports:
-
-=item declarator_name (names.pg)
-
-=head1 Exports:
-
-=item declaration
-
-=item namespace_definition
-
-=cut
-
 =rule cv_qualifier
 
 One of the access qualifiers C<const> or C<volatile>. This rule is used in both
@@ -26,6 +10,28 @@ L<#type_specifier> and L<#declarator> matching.
 rule cv_qualifier {
 	| <token=CONST>		{*}
 	| <token=VOLATILE>	{*}
+}
+
+=rule dclr_alias
+
+Matches a declarator alias, as in C<extern int '$Line' alias line;>
+
+=cut
+
+rule dclr_alias {
+	<.ALIAS> <alias=new_alias_name> {*}
+}
+
+=rule dclr_alias_init
+
+An dclr_alias_init is a C<dclr_declarator> optionally followed by an 
+C<dclr_initializer>.
+
+=cut
+
+rule dclr_alias_init {
+	<dclr_declarator> <dclr_alias>? <dclr_initializer>?
+	{*}
 }
 
 =rule dclr_array_or_hash
@@ -62,7 +68,8 @@ part) or another C<dclr_declarator> nested in parentheses.
 =cut
 
 rule dclr_atom {
-	| '(' <dclr_declarator> ')'		{*}
+	| :dba('nested declarator')
+	    '(' ~ ')' <dclr_declarator>	{*}
 	| <declarator_name>	{*}
 }
 
@@ -81,26 +88,14 @@ rule dclr_declarator {
 	{*}
 }
 
-=rule dclr_init
-
-An dclr_init is a C<dclr_declarator> optionally followed by an 
-C<dclr_initializer>.
-
-=cut
-
-rule dclr_init {
-	<dclr_declarator> <dclr_initializer>?
-	{*}
-}
-
 =rule dclr_init_list
 
-A list of at least one C<dclr_init>, separated by commas.
+A list of at least one C<dclr_alias_init>, separated by commas.
 
 =cut
 
 rule dclr_init_list {
-	<item=dclr_init> [ ',' <item=dclr_init> ]*
+	<item=dclr_alias_init> [ ',' <item=dclr_alias_init> ]*
 }
 
 rule dclr_initializer {
@@ -108,8 +103,9 @@ rule dclr_initializer {
 }
 
 rule dclr_param_list {
-	[ <param_list=declaration> [ ',' <param_list=declaration> ]* ]?
-	{*}
+	{*} #= open
+	[ <param_list=parameter_declaration> [ ',' | <?before ')'> ] ]*
+	{*} #= close
 }
 
 =rule dclr_pointer
@@ -131,26 +127,34 @@ parameter declaration list (C<decl(int a, string b)>) after a dclr_declarator.
 =cut
 
 rule dclr_postfix {
-	| '(' <dclr_param_list> ')'		{*} #= dclr_param_list
-	| '[' <dclr_array_or_hash> ']'	{*} #= dclr_array_or_hash
+	| :dba('function parameter list')
+	    '(' ~ ')' <dclr_param_list>		{*} #= dclr_param_list
+	| :dba('hash or array declaration')
+	    '[' ~ ']' <dclr_array_or_hash>		{*} #= dclr_array_or_hash
 }
 
-=rule declaration
+=rule function_definition
 
-Matches the standard C-like variable patterns: 
-
-    int foo;
-    int a = 1, b = 2;
-    extern void f();
-
-This should probably be called 'simple-declaration', since there are other 
-declarations (like functions, namespaces, etc.) available.
+Matches a function header with attached curly block.
 
 =cut
 
-rule declaration {
+rule function_definition {
 	<specifier>+
-	<dclr_init_list>	# At least one of these, too.
+	<dclr_declarator> <dclr_alias>?
+	<compound_statement>
+	{*}
+}
+
+=rule namespace_alias_declaration
+
+Declares an alias for a namespace. 
+
+=cut
+
+rule namespace_alias_declaration {
+	<.NAMESPACE> <namespace_name> 
+	<.ALIAS> <alias=new_alias_name>
 	{*}
 }
 
@@ -174,6 +178,32 @@ rule namespace_definition {
 	{*} #= close
 }
 
+=rule param_adverb
+
+Matches the adverbs that may appear in a parameter declaration.
+
+=cut
+
+rule param_adverb {
+	| <token=ADV_NAMED>		{*}
+	| <token=ADV_OPTIONAL>	{*}
+	| <token=ADV_SLURPY>		{*}
+}
+
+=rule parameter_declaration
+
+Matches a single parameter declaration, with optional trailing tokens.
+
+=cut
+
+rule parameter_declaration {
+	<specifier>+
+	<parameter=dclr_declarator> 
+	[ $<adverbs>=<param_adverb> ]*
+	<initializer=dclr_initializer>?
+	{*}
+}
+
 =rule specifier
 
 Matches any form of type specifier. Storage class specifiers (keywords),
@@ -187,6 +217,21 @@ rule specifier {
 	| <tspec_function_attr>	{*} #= tspec_function_attr
 	| <tspec_storage_class>	{*} #= tspec_storage_class
 	| <tspec_type_specifier>	{*} #= tspec_type_specifier
+}
+
+=rule symbol_declaration
+
+Matches the standard C-like variable patterns: 
+
+    int foo;
+    int a = 1, b = 2;
+    extern void f();
+
+=cut
+
+rule symbol_declaration {
+	<specifier>+		{*} #= specifiers
+	<dclr_init_list>	{*} #= declarators
 }
 
 =rule tspec_builtin_type
@@ -232,4 +277,30 @@ rule tspec_type_specifier {
 
 token tspec_type_name {
 	<type_name> {*}
+}
+
+rule using_namespace_directive {
+	<.USING> <.NAMESPACE> <namespace=namespace_name>
+}
+
+rule using_declaration {
+	<.USING> <qualified_identifier>
+	# FIXME: Add alias. (General alias rule needed.)
+}
+
+rule declarator_part {
+	<dclr_declarator>
+	<dclr_alias>?
+	[ '=' <dclr_initializer>
+	| <body=compound_statement>
+	]?
+	{*}
+}
+	
+rule declaration {
+	<specifier>+		
+	{*} #= specifiers
+	<symbol=declarator_part>
+	[ ',' <symbol=declarator_part> ]*	
+	{*} #= declarators
 }

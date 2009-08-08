@@ -2,7 +2,7 @@
 
 method BAREWORD($/) {
 	my $past := make_token($/);	
-	DUMP($past, "BAREWORD");
+	DUMP($past);
 	make $past;
 }
 
@@ -10,11 +10,11 @@ method FLOAT_LIT($/) {
 	my $past := make_token($/);
 	$past.returns('Num');
 
-	DUMP($past, "FLOAT_LIT");
+	DUMP($past);
 	make $past;
 }
 
-method IDENTIFIER($/, $key) { PASSTHRU($/, $key, "IDENTIFIER"); }
+method IDENTIFIER($/, $key) { PASSTHRU($/, $key); }
 
 method INTEGER_LIT($/) {
 	my $past := make_token($/);
@@ -22,14 +22,14 @@ method INTEGER_LIT($/) {
 	
 	if $<bad_octal> {
 		add_warning($past, 
-			join('', "Integer literals like '", 
+			Array::join('', "Integer literals like '", 
 				$past.value(),
 				"' are *not* interpreted as ",
 				"octal. Use the 0o (zero-oh) ",
 				"prefix for octal literals."));
 	}
 
-	DUMP($past, "INTEGER_LIT");
+	DUMP($past);
 	make $past;
 }
 
@@ -38,11 +38,11 @@ method QUOTED_LIT($/, $key) {
 	$past.name($<string_literal>.ast);
 	$past.node($/);
 	$past<quote> := $key;
-	DUMP($past, "QUOTED_LIT");
+	DUMP($past);
 	make $past;
 }
 
-method STRING_LIT($/, $key) { PASSTHRU($/, $key, 'STRING_LIT'); }
+method STRING_LIT($/, $key) { PASSTHRU($/, $key); }
 
 our @Heredocs_waiting := new_array();
 our $Heredocs_open := 0;
@@ -69,7 +69,7 @@ method HERE_DOC_LIT($/) {
 		@Heredocs_waiting.push($past);
 	}
 	
-	DUMP(@Heredocs_waiting, "HERE_DOC_LIT");
+	DUMP(@Heredocs_waiting);
 	make $past;
 }
 
@@ -87,7 +87,7 @@ method WS_ALL($/, $key) {
 				@lines.push(~ $<lines>.shift());
 			}
 			clean_up_heredoc($past, @lines);
-			DUMP($past, 'WS_ALL');
+			DUMP($past);
 		}		
 	}
 	elsif $key eq 'start_heredoc' {

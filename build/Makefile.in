@@ -38,6 +38,7 @@ POD2MAN       := pod2man
 #IF(parrot_is_shared and not(cygwin or win32)):export LD_RUN_PATH := @blib_dir@:$(LD_RUN_PATH)
 PARROT        := $(BIN_DIR)/parrot@exe@
 PBC_TO_EXE    := $(BIN_DIR)/pbc_to_exe@exe@
+STRIP_PIRA	:= grep -v '^.annotate'
 #IF(darwin):
 #IF(darwin):# MACOSX_DEPLOYMENT_TARGET must be defined for OS X compilation/linking
 #IF(darwin):export MACOSX_DEPLOYMENT_TARGET := @osx_version@
@@ -49,22 +50,6 @@ CLOSE_LIB_PBC := library/close/close_lib.pbc
 
 #PMC_DEPS := build/src/pmc/Makefile.in $(PMC_DIR)/close.pmc
 #OPS_DEPS := build/src/ops/Makefile.in $(OPS_DIR)/close.ops
-
-SOURCES := \
-	src/gen_grammar.pir \
-	src/gen_actions.pir \
-	src/gen_builtins.pir \
-	src/gen_library.pir \
-	close.pir
-
-GRAMMARS_PG := \
-	src/parser/grammar.pg \
-	src/parser/builtins.pg \
-	src/parser/declarations.pg \
-	src/parser/expressions.pg \
-	src/parser/names.pg \
-	src/parser/statements.pg \
-	src/parser/tokens.pg
 
 ACTIONS_PM := \
 	src/parser/parse_utils.pm \
@@ -82,13 +67,41 @@ BUILTINS_PIR := \
 	src/builtins/say.pir \
 	src/builtins/strings.pir
 
+COMPILER_LIBS_PIR := \
+	library/close/Compiler/Array.pir			\
+	library/close/Compiler/Config.pir			\
+	library/close/Compiler/Dumper.pir		\
+	library/close/Compiler/Messages.pir		\
+	library/close/Compiler/Namespaces.pir		\
+	library/close/Compiler/Scopes.pir			\
+	library/close/Compiler/String.pir			\
+	library/close/Compiler/SymbolLookupVisitor.pir	\
+	library/close/Compiler/Symbols.pir		\
+	library/close/Compiler/Types.pir
+
+DOCS := README
+
+GRAMMARS_PG := \
+	src/parser/grammar.pg \
+	src/parser/builtins.pg \
+	src/parser/declarations.pg \
+	src/parser/expressions.pg \
+	src/parser/names.pg \
+	src/parser/statements.pg \
+	src/parser/tokens.pg
+
 LIBRARY_SRC := \
 	library/close/load.cl \
 	library/close/print.cl \
 	library/close/ok.cl \
 	library/close/string.cl
 
-DOCS := README
+SOURCES := \
+	src/gen_grammar.pir \
+	src/gen_actions.pir \
+	src/gen_builtins.pir \
+	src/gen_library.pir \
+	close.pir
 
 BUILD_CLEANUPS := \
   close.pbc \
@@ -104,6 +117,9 @@ BUILD_CLEANUPS := \
 #IF(win32):  "setup-parrot-*.exe" \
   installable_close@exe@
 
+LIB_CLEANUPS := \
+	$(COMPILER_LIBS_PIR)
+	
 TEST_CLEANUPS :=
 
 # the default target
@@ -111,17 +127,17 @@ build: \
   $(CLOSE_OPS) \
   $(CLOSE_GROUP) \
   close.pbc \
-  $(CLOSE_LIB_PBC)
+  #$(CLOSE_LIB_PBC)
 
 %.pir  : %.pira
 	@echo "* Stripping annotations from $<"
-	@grep -v '^.annotate' $< > $@
+	@$(STRIP_PIRA) $< > $@
 
 %.pira : %.c\=
 	cl --target=pir --output=$@ $<
 
 %.pira : %.pg
-	@echo "* Compiling $< to PIRA"
+	@echo "* Compiling $< to PIR"
 	@$(PARROT) $(PARROT_ARGS) $(PERL6GRAMMAR) --output=$@ $<
 	
 all: build close@exe@ installable
@@ -137,7 +153,7 @@ src/gen_actions.pir: src/gen_actions.pm
 	$(PARROT) $(PARROT_ARGS) $(NQP) --target=pir	\
 		--output=src/gen_actions.pira			\
 		src/gen_actions.pm
-	grep -v '.annotate' src/gen_actions.pira			\
+	$(STRIP_PIRA) src/gen_actions.pira			\
 		> src/gen_actions.pir
 	
 src/gen_actions.pm: $(ACTIONS_PM) Makefile
@@ -157,23 +173,102 @@ src/gen_grammar.pir: src/gen_grammar.pg
 	$(PARROT) $(PARROT_ARGS) $(PERL6GRAMMAR) \
 		--output=src/gen_grammar.pira  \
 		src/gen_grammar.pg
-	grep -v '.annotate' src/gen_grammar.pira \
+	$(STRIP_PIRA) src/gen_grammar.pira \
 		> src/gen_grammar.pir
 	
-COMPILER_LIBS_PIR := \
-	library/close/Compiler/SymbolLookupVisitor.pir
-
-src/gen_library.pir: $(COMPILER_LIBS_PIR)
+src/gen_library.pir: $(COMPILER_LIBS_PIR) Makefile
 	@echo "* Assembling gen_library.pir"
 	@cat $(COMPILER_LIBS_PIR) > src/gen_library.pir
 
+library/close/Compiler/Array.pir: library/close/Compiler/Array.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/Array.pira \
+		library/close/Compiler/Array.pm
+	$(STRIP_PIRA) library/close/Compiler/Array.pira \
+		> library/close/Compiler/Array.pir
+	$(RM_F) library/close/Compiler/Array.pira
+
+library/close/Compiler/Config.pir: library/close/Compiler/Config.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/Config.pira \
+		library/close/Compiler/Config.pm
+	$(STRIP_PIRA) library/close/Compiler/Config.pira \
+		> library/close/Compiler/Config.pir
+	$(RM_F) library/close/Compiler/Config.pira
+
+library/close/Compiler/Dumper.pir: library/close/Compiler/Dumper.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/Dumper.pira \
+		library/close/Compiler/Dumper.pm
+	$(STRIP_PIRA) library/close/Compiler/Dumper.pira \
+		> library/close/Compiler/Dumper.pir
+	$(RM_F) library/close/Compiler/Dumper.pira
+
+library/close/Compiler/Messages.pir: library/close/Compiler/Messages.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/Messages.pira \
+		library/close/Compiler/Messages.pm
+	$(STRIP_PIRA) library/close/Compiler/Messages.pira \
+		> library/close/Compiler/Messages.pir
+	$(RM_F) library/close/Compiler/Messages.pira
+
+library/close/Compiler/Namespaces.pir: library/close/Compiler/Namespaces.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/Namespaces.pira \
+		library/close/Compiler/Namespaces.pm
+	$(STRIP_PIRA) library/close/Compiler/Namespaces.pira \
+		> library/close/Compiler/Namespaces.pir
+	$(RM_F) library/close/Compiler/Namespaces.pira
+
+library/close/Compiler/String.pir: library/close/Compiler/String.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/String.pira \
+		library/close/Compiler/String.pm
+	$(STRIP_PIRA) library/close/Compiler/String.pira \
+		> library/close/Compiler/String.pir
+	$(RM_F) library/close/Compiler/String.pira
+
+library/close/Compiler/Scopes.pir: library/close/Compiler/Scopes.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/Scopes.pira \
+		library/close/Compiler/Scopes.pm
+	$(STRIP_PIRA) library/close/Compiler/Scopes.pira \
+		> library/close/Compiler/Scopes.pir
+	$(RM_F) library/close/Compiler/Scopes.pira
+
 library/close/Compiler/SymbolLookupVisitor.pir: library/close/Compiler/SymbolLookupVisitor.pm
-	@echo "**** Compiling $< to PIRA"
+	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/SymbolLookupVisitor.pira \
 		library/close/Compiler/SymbolLookupVisitor.pm
-	grep -v '^.annotate' library/close/Compiler/SymbolLookupVisitor.pira \
+	$(STRIP_PIRA) library/close/Compiler/SymbolLookupVisitor.pira \
 		> library/close/Compiler/SymbolLookupVisitor.pir
+	$(RM_F) library/close/Compiler/SymbolLookupVisitor.pira
+
+library/close/Compiler/Symbols.pir: library/close/Compiler/Symbols.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/Symbols.pira \
+		library/close/Compiler/Symbols.pm
+	$(STRIP_PIRA) library/close/Compiler/Symbols.pira \
+		> library/close/Compiler/Symbols.pir
+	$(RM_F) library/close/Compiler/Symbols.pira
+
+library/close/Compiler/Types.pir: library/close/Compiler/Types.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/Types.pira \
+		library/close/Compiler/Types.pm
+	$(STRIP_PIRA) library/close/Compiler/Types.pira \
+		> library/close/Compiler/Types.pir
+	$(RM_F) library/close/Compiler/Types.pira
 
 $(CLOSE_GROUP): $(PMC_DEPS)
 #	$(MAKE) $(PMC_DIR)
@@ -264,12 +359,12 @@ testclean:
 clean:
 #	$(MAKE) $(OPS_DIR) clean
 #	$(MAKE) $(PMC_DIR) clean
-	$(RM_F) $(TEST_CLEANUPS) $(BUILD_CLEANUPS)
+	$(RM_F) $(TEST_CLEANUPS) $(BUILD_CLEANUPS) $(LIB_CLEANUPS)
 
 realclean:
 #	$(MAKE) $(OPS_DIR) realclean
 #	$(MAKE) $(PMC_DIR) realclean
-	$(RM_F) $(TEST_CLEANUPS) $(BUILD_CLEANUPS) Makefile
+	$(RM_F) $(TEST_CLEANUPS) $(BUILD_CLEANUPS) $(LIB_CLEANUPS) Makefile
 
 distclean: realclean
 

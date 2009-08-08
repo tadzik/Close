@@ -39,7 +39,7 @@ The C<new_alias_name> token is used only in declarations.
 =cut
 
 rule new_alias_name {
-	<BAREWORD> {*}
+	<alias=BAREWORD> {*}
 }
 
 =head3 High-level Language Names
@@ -207,6 +207,10 @@ rule type_name {
 #####
 
 
+token short_ident {
+	[ <id=BAREWORD> | <id=QUOTED_LIT> ]
+	{*}
+}
 
 =head3 Adverbs
 
@@ -223,15 +227,6 @@ an identifier: C<:method> is one example.
 # name, but not a valid qualified_identifier.
 #
 
-token namespace_name2 {
-	[ [ $<root>='::' ]? <part=bareword> :: [ '::' <part=bareword> ]*
-	| [ $<root>='::' ]
-	| '[' ::  [$<root>='::' ]? [ <part=string_lit> [ ';' <part=string_lit> ]* ]?
-		[ ']' || <panic: 'Missing "]" in namespace name'> ]
-	]
-	{*}
-}
-
 rule adverbs {
 	[ <adverb> ]*
 	{*}
@@ -243,7 +238,7 @@ rule adverb {
 	| [
 		<t_adverb>		# matches ":something", with no space inside
 		[ '(' 
-			[ <args=string_lit> [ ',' <args=string_lit> ]* 
+			[ <args=QUOTED_LIT> [ ',' <args=QUOTED_LIT> ]* 
 			| <signature=string_literal: ')' >	# Support :multi(_, A)
 			]
 		')' ]?

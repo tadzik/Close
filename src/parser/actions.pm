@@ -1,96 +1,41 @@
 # $Id$
 
-method TOP($/, $key) { PASSTHRU($/, $key, 'TOP'); }
-
-method extern_statement($/, $key) { PASSTHRU($/, $key, 'extern_statement'); }
+method TOP($/, $key) { PASSTHRU($/, $key); }
 
 method translation_unit($/, $key) {
 	if $key eq 'start' {
-		open_pervasive_symbols();
-		open_namespace_definition('close', new_array());
+	say("*** TRANSLATION UNIT STARTS");
+		my $config := close::Compiler::Config.new();
+		$config.read('close.cfg');
+		
+		NOTE("Begin translation unit!");
+		
+		my $pervasive := close::Compiler::Scopes::fetch_pervasive_scope();
+		close::Compiler::Scopes::push($pervasive);
+
+		my @root_nsp_path := Array::new('close');
+		my $root_nsp := close::Compiler::Namespaces::fetch(@root_nsp_path);
+		close::Compiler::Scopes::push($root_nsp);
+		
+		close::Compiler::Scopes::print_symbol_table($pervasive);
 	}
 	else {
-	say("Closing translation unit");
-		my $past := PAST::Block.new(:node($/), :blocktype('immediate'));
-		$past.name('translation unit');
-		
+		my $past := close::Compiler::Scopes::pop('namespace');
+
 		for $<extern_statement> {
 			$past.push($_.ast);
 		}
 		
-		my $visitor := close::Compiler::SymbolLookupVisitor.new();
-		$visitor.visit($past);
-
-		#my $past := compilation_unit_past();
-		DUMP($past, "translation_unit");
-		make $past;
+		my $pervasive := close::Compiler::Scopes::pop('pervasive scope');
 		
+		close::Compiler::Scopes::dump_stack();
+		
+		# This should be a separate compiler phase. Later.
+		my $new_past := close::Compiler::SymbolLookupVisitor::update($past);
+		
+		DUMP($past);
+		make $past;		
 	}
-}
-
-# FIXME: This is going away, but here is the "old way" for packing extern
-# statements into a block.
-method namespace_block($/, $key) {
-	if $key eq 'open' {
-		my $past;
-
-		if $<namespace_name> {
-			$past := $<namespace_name>.ast;
-		}
-		else {
-			$past := PAST::Block.new();
-			$past.hll(current_hll_block().name());
-		}
-
-		open_namespace($past, 'extern');
-	}
-	else {
-		my $past		:= close_namespace('extern');
-		my @path		:= namespace_path_of_var($past);
-		my $init_load	:= get_init_block_of_path(@path);
-
-		#say("Closed namespace ", $past.name());
-		$init_load.node($/);
-
-		for $<declaration> {
-			my $decl := $_.ast;
-
-			if $decl.isa('PAST::Op') and $decl.pasttype() eq 'null' {
-				#say("Skipping no-op code\n");
-			}
-			elsif $decl.isa('PAST::Block') {
-				$past.push($decl);      # function definition
-			}
-			else {
-				$init_load.push($decl);
-			}
-		}
-
-		#DUMP($past, "namespace_block");
-		#make $past;
-	}
-}
-
-method namespace_name($/) {
-	# my @parts := new_array();
-
-	# for $<part> {
-		# @parts.push(~$_);
-	# }
-
-	# my $past := PAST::Var.new(:node($/));
-
-	# if $<root> and $<part> and +@($<part>) {
-		# $past<is_rooted> := 1;
-		# $past<hll> := @parts.unshift();
-	# }
-	# else {
-		# $past<hll> := current_hll_block().name();
-	# }
-
-	# $past.namespace(@parts);
-	# DUMP($past, "namespace_name");
-	# make $past;
 }
 
 our %adverb_aliases;
@@ -234,7 +179,7 @@ sub decl_add_adverb($/, $past, $adverb) {
 	elsif	%append_adverb_to_pirflags{$name} {
 		$past<pirflags> := $past<pirflags> ~ ' :' ~ $name;
 	}
-	#DUMP($past, "current_declaration[w/ adverb]");
+	#DUMP($past);
 }
 
 
@@ -262,7 +207,7 @@ method adverb($/) {
 		}
 	}
 	
-	#DUMP($past, "adverb");
+	#DUMP($past);
 	make $past;
 }
 
@@ -273,7 +218,7 @@ method adverbs($/) {
 		$past.push($_.ast);
 	}
 
-	#DUMP($past, "adverbs");
+	#DUMP($past);
 	make $past;
 }
 
@@ -283,33 +228,13 @@ method short_ident($/) {
 		:name($name),
 		:node($/));
 
-	#DUMP($past, "short_ident");
+	#DUMP($past);
 	make $past;
 }
 
-method constant($/, $key)               { PASSTHRU($/, $key, 'constant'); }
+method constant($/, $key)               { PASSTHRU($/, $key); }
 
 ##### Implementation helpers
-
-sub join($_delim, @parts) {
-	my $result := '';
-	my $delim := '';
-
-	for @parts {
-		$result := $result ~ $delim ~ $_;
-		$delim := $_delim;
-	}
-
-	return $result;
-}
-
-sub die($msg) {
-	PIR q:to: 'XXX' ;
-		$P0 = find_lex '$msg'
-		$S0 = $P0
-		die $S0
-XXX
-}
 
 sub set_subroutine_adjective($node, $adj) {
 	#my $adj_name := $adj.name();
@@ -327,13 +252,13 @@ sub set_adjective($node, $adj) {
 
 sub close_decl_mode($mode) {
 	our @Decl_mode_stack;
-	#DUMP(@Decl_mode_stack, "Decl mode stack (pre-pop)");
+	#DUMP(@Decl_mode_stack)");
 	my $last := @Decl_mode_stack.shift();
 
 	if $last ne $mode {
-		DUMP($last, "last");
-		die("Decl mode mismatch on close: wanted "
-			~ $mode ~ ", but got " ~ $last);
+		DUMP($last);
+		DIE("Decl mode mismatch on close: wanted ", $mode,
+			", but got ", $last);
 	}
 
 	#say("Close declaration mode: '", $last, ", ",
@@ -371,11 +296,11 @@ sub open_decl_mode($mode) {
 	}
 
 	unless %valid_decl_mode{$mode} {
-		die("Invalid decl_mode: " ~ $mode);
+		DIE("Invalid decl_mode: ", $mode);
 	}
 
 	@Decl_mode_stack.unshift($mode);
-	#DUMP(@Decl_mode_stack, "Decl mode_stack (post-push)");
+	#DUMP(@Decl_mode_stack)");
 	#say("Opened declaration mode: ", $mode, ", ",
 	#	+@Decl_mode_stack, " now on stack");
 	return $mode;
@@ -431,7 +356,7 @@ sub replace_current_declaration($new_decl) {
 
 sub symbol_defined_locally($past) {
 	my $name := $past.name();
-	return current_lexical_scope().symbol($name);
+	return close::Compiler::Scopes::current().symbol($name);
 }
 
 #########
@@ -458,22 +383,7 @@ method Xlogical_op($/, $key) {
 		:pasttype($pasttype),
 	);
 	make $past;
-	#DUMP($past, "LOP");
-}
-
-sub clone_array(@ary) {
-	my @new := new_array();
-
-	for @ary {
-		@new.push($_);
-	}
-
-	return @new;
-}
-
-sub new_array() {
-	my @ary := Q:PIR { %r = new 'ResizablePMCArray' };
-	return (@ary);
+	#DUMP($past);
 }
 
 sub block2stmts($block) {
@@ -503,8 +413,8 @@ sub block2stmts($block) {
 sub merge_lexical_scopes($outer, $inner) {
     # Check for conflicting symbol names, fail if any exist.
 	say("Merging lexical scopes");
-	DUMP($outer, "outer");
-	DUMP($inner, "inner");
+	DUMP($outer);
+	DUMP($inner);
 
     for $inner<symtable> {
         if $outer.symbol($_) {
@@ -541,7 +451,7 @@ sub merge_lexical_scopes($outer, $inner) {
     }
 
     if !$found {
-        die("Tried to merge two non-nested scopes. WTF?");
+        DIE("Tried to merge two non-nested scopes. WTF?");
     }
 
     return $new_inner;
@@ -571,7 +481,7 @@ where they occur, but they need to be added to the block's symbol table.
 
 sub add_local_symbol($past) {
 	my $name := $past.name();
-	my $block := current_lexical_scope();
+	my $block := close::Compiler::Scopes::current();
 	$block.symbol($name, :decl($past));
 }
 
@@ -585,7 +495,8 @@ have different behaviors wrt namespace pollution, etc.
 =cut
 
 sub add_class_attribute($attr) {
-	my $class := find_lexical_block_with_attr('is_class');
+	#my $class := find_lexical_block_with_attr('is_class');
+	my $class := close::Compiler::Scopes::find_matching('is_class');
 
 	$class.symbol($attr.name(), :decl($attr));
 
@@ -608,14 +519,14 @@ sub add_class_decl($class) {
 		add_class_decl_p6object($class);
 	}
 	else {
-		die("Unrecognized phylum '" ~ $class<adverbs><phylum>
-			~ "' for class '" ~ $class.name() ~ "'");
+		DIE("Unrecognized phylum '", $class<adverbs><phylum>,
+			"' for class '", $class.name(), "'");
 	}
 }
 
 # P6object classes create a var with the same name. (extern pmc)
 sub add_class_decl_p6object($class) {
-	my @nsp := clone_array($class.namespace());
+	my @nsp := Array::clone($class.namespace());
 	@nsp.pop();
 
 	my $past := PAST::Var.new(
@@ -626,7 +537,7 @@ sub add_class_decl_p6object($class) {
 	$past<hll> := $class<hll>;
 	$past.isdecl(1);
 
-	#DUMP($past, "proto object");
+	#DUMP($past);
 	# Add symbol declaration to namespace.
 	my @path		:= namespace_path_of_var($past);
 	my $ns_block	:= get_namespace(@path);
@@ -655,7 +566,7 @@ sub make_init_class_sub($class) {
 		$init_class_sub := make_init_class_sub_p6object($class);
 	}
 	else {
-		die("Unrecognized phylum '" ~ $class<adverbs><phylum>
+		DIE("Unrecognized phylum '" ~ $class<adverbs><phylum>
 			~ "' for class '" ~ $class.name() ~ "'");
 	}
 
@@ -670,15 +581,15 @@ sub make_init_class_sub_close($class) {
 	$init_class_sub.node($ns_block);
 
 	my $hll := @path.shift();
-	my $class_name := join('::', @path);
+	my $class_name := Array::join('::', @path);
 	@path.unshift($hll);
 	my $parent_class := "";
 
 	if $class<adverbs><extends> {
 		my $parent := $class<adverbs><extends>[0];
-		my $nsp	:= clone_array($parent.namespace());
+		my $nsp	:= Array::clone($parent.namespace());
 		$nsp.push($parent.name());
-		my $class_name := join('::', $nsp);
+		my $class_name := Array::join('::', $nsp);
 		
 		if $parent<hll> ne $ns_block<hll> {
 			$class_name := $parent<hll> ~ ';' ~ $class_name;
@@ -736,15 +647,15 @@ sub make_init_class_sub_p6object($class) {
 	$init_class_sub.node($ns_block);
 
 	my $hll := @path.shift();
-	my $class_name := join('::', @path);
+	my $class_name := Array::join('::', @path);
 	@path.unshift($hll);
 	my $parent_class := "";
 
 	if $class<adverbs><extends> {
 		my $parent := $class<adverbs><extends>[0];
-		my $nsp	:= clone_array($parent.namespace());
+		my $nsp	:= Array::clone($parent.namespace());
 		$nsp.push($parent.name());
-		my $class_name := join('::', $nsp);
+		my $class_name := Array::join('::', $nsp);
 		
 		if $parent<hll> ne $ns_block<hll> {
 			$class_name := $parent<hll> ~ ';' ~ $class_name;
@@ -756,7 +667,7 @@ sub make_init_class_sub_p6object($class) {
 
 	my $attributes := "";
 
-	#DUMP($class, "class");
+	#DUMP($class);
 	if $class<symtable> {
 		my $delim := '';
 
@@ -888,7 +799,7 @@ sub compilation_unit_past()
 	say("Got ", +@ns_list, " namespaces");
 	for @ns_list {
 		#say("Codegen namespace: ", $_.name());
-		#DUMP($_.namespace(), "namespace");
+		#DUMP(($_.namespace(), "namespace"));
 		my @path	:= namespace_path_of_var($_);
 		# Do class first because it might create init_namespace code.
 		my $class	:= get_class_info_if_exists(@path);
@@ -905,7 +816,7 @@ sub compilation_unit_past()
 		if +@($init) {
 			#say("Adding initializer ", $init.name());
 			$_.unshift($init);
-			#DUMP($init, "init function");
+			#DUMP($init);
 		}
 
 		# Add all the blocks inside.
@@ -918,41 +829,6 @@ sub compilation_unit_past()
 	}
 
 	return $past;
-}
-
-#################################################################
-
-=head4 HLL
-
-=cut
-
-our $Current_hll;
-
-sub close_hll() {
-	#my $past := close_lexical_scope('hll');
-	#say("Closed HLL block: ", $past.name());
-	my $hll := $Current_hll;
-	$Current_hll := undef;
-	return $hll;
-}
-
-sub current_hll_block() {
-	#return find_lexical_block_with_attr("is_hll");
-	return $Current_hll;
-}
-
-sub open_hll($hll) {
-	#say("Setting HLL to ", $hll);
-
-	my $block 	:= PAST::Block.new(:blocktype('immediate'), :name($hll));
-	$block.hll($hll);
-	$block<is_hll> := 1;
-	$block<lstype> := 'hll';
-	$block.name($hll);
-
-	#push_lexical_scope($block);
-	$Current_hll := $block;
-	return $block;
 }
 
 #################################################################
@@ -978,41 +854,35 @@ declarations in curly braces:
 # Close the namespace that a class block inserted on stack
 sub close_class() {
 	my $past := close_namespace('class');
-	DUMP($past, 'close_class');
+	DUMP($past);
 	return $past;
 }
 
 # Close the namespace currently on the stack.
 sub close_namespace($decl_mode) {
 	close_decl_mode($decl_mode);
-	my $past := close_lexical_scope('namespace');
-	DUMP($past, "close_namespace");
+	my $past := close::Compiler::Scopes::pop('namespace');
+	DUMP($past);
 	return $past;
 }
 
-sub current_namespace_block() {
-	my $block := find_lexical_block_with_attr("is_namespace");
-	DUMP($block, 'current_namespace_block');
-	return $block;
-}
-
 sub open_namespace($past, $decl_mode) {
-DUMP($past, 'open_namespace');
+DUMP($past);
 	my @path	:= namespace_path_of_var($past);
 	my $block	:= get_namespace(@path);
 
 	$block<is_namespace> := 1;
 	$block<lstype> := 'namespace';
 
-	push_lexical_scope($block);
+	close::Compiler::Scopes::push($block);
 	open_decl_mode($decl_mode);
-	DUMP($block, 'open_namespace');
+	DUMP($block);
 	return $block;
 }
 
 sub open_class($class) {
 	my $block := open_namespace($class, 'class');
-	DUMP($block, 'open_class');
+	DUMP($block);
 	return $block;
 }
 

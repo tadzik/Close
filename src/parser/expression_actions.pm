@@ -2,7 +2,7 @@
 
 method arg_adverb($/) {
 	my $past := make_token($<token>);
-	DUMP($past, "tspec_storage_class");
+	DUMP($past);
 	make $past;
 }
 
@@ -20,7 +20,7 @@ method arg_expr($/) {
 	#	}
 	#}
 	
-	DUMP($past, 'arg_expr');
+	DUMP($past);
 	make $past;
 }
 
@@ -31,7 +31,7 @@ method arg_list($/) {
 		$past.push($_.ast);
 	}
 
-	DUMP($past, 'arg_list');
+	DUMP($past);
 	make $past;
 }
 
@@ -54,7 +54,7 @@ sub arg_expr_add_adverb($/, $past, $adverb) {
 		$/.panic("Unexpected adverb: '" ~ $adverb.name() ~ "' in arg-expression");
 	}
 	
-	#DUMP($past, "argument-expression, with adverbs");
+	#DUMP($past, "argument-expression);
 }
 
 method asm_expr($/, $key) {
@@ -70,7 +70,7 @@ method asm_expr($/, $key) {
     $past.pasttype('inline');
     $past.inline($<asm>.ast.value());
 
-	#DUMP($past, "inline asm");
+	#DUMP($past);
 	make $past;
 }
 
@@ -79,14 +79,14 @@ method asm_contents($/) {
 	make $past;
 }
 
-method expression($/, $key) { PASSTHRU($/, $key, 'expression'); }
+method expression($/, $key) { PASSTHRU($/, $key); }
 
 method postfix_expr($/) {
 	my $past := $<term>.ast;
 
 	# TODO: Am I doing anything with this? Yes, :flat.
 	for $<adjective> {
-		#DUMP($past, "postfix");
+		#DUMP($past);
 		say("Got adjective: ", $_.ast.name(), ", what to do?");
 	}
 
@@ -100,7 +100,7 @@ method postfix_expr($/) {
 		#postfixup($past);
 	}
 
-	#DUMP($past, "postfix_expr");
+	#DUMP($past);
 	make $past;
 }
 
@@ -113,7 +113,7 @@ sub postfixup($past) {
 	#say("Fixup: ", $past.WHAT, ": ", $past.name());
 
 	if $past.isa('PAST::Op') and $past.pasttype() eq 'call' {
-		#DUMP($past, "needs-fixup");
+		#DUMP($past);
 		my $func := $past[0];
 
 		if $func.isa('PAST::Var') {
@@ -127,7 +127,7 @@ sub postfixup($past) {
 			# Rewrite f() into (call 'f', args)
 			else {
 				unless $func<decl> {
-					die("No decl info stored for symbol '" ~ $func.name() ~ "'");
+					DIE("No decl info stored for symbol '", $func.name(), "'");
 				}
 
 				if is_local_function($func) {
@@ -137,7 +137,7 @@ sub postfixup($past) {
 				# TODO: Need to fix up aliases, etc. here. For now, leave it be.
 			}
 		}
-		DUMP($past, "postfixup");
+		DUMP($past);
 	}
 }
 
@@ -158,7 +158,7 @@ method postfix_xcrement($/) {
 			~   "    clone %r, %0\n"
 			~   $x_crement));
 	$past.lvalue(1);
-	#DUMP($past, "postfix:" ~ $<op>);
+	#DUMP($past);
 	make $past;
 }
 
@@ -169,7 +169,7 @@ method postfix_member($/) {
 	$past.isdecl(0);
 	$past.node($/);
 	$past.scope('attribute');
-	#DUMP($past, "postfix member");
+	#DUMP($past);
 	make $past;
 }
 
@@ -178,7 +178,7 @@ method postfix_member($/) {
 method postfix_call($/) {
 	my $past := $<arg_list>.ast;
 	$past.node($/);
-	#DUMP($past, "postfix call");
+	#DUMP($past);
 	make $past;
 }
 
@@ -190,7 +190,7 @@ method postfix_index($/) {
 		:node($/),
 		:scope('keyed'));
 	$past.push($<index>.ast);
-	#DUMP($past, "postfix index");
+	#DUMP($past);
 	make $past;
 }
 
@@ -276,7 +276,7 @@ our %assign_opcodes;
 
 method assign_expr($/, $key) {
 	if $key eq 'single' {
-		PASSTHRU($/, $key, 'assign_expr_rvalue');
+		PASSTHRU($/, $key);
 	}
 	else {
 		my $lhpast	:= $<lhs>.ast;
@@ -305,7 +305,7 @@ method assign_expr($/, $key) {
 
 		$past.push($rhpast);
 
-		#DUMP($past, ~$<op>);
+		#DUMP($past);
 		make $past;
 	}
 }
@@ -321,7 +321,7 @@ sub binary_expr_l2r($/) {
 		$past := $op;
 	}
 
-	#DUMP($past, "binary-expr");
+	#DUMP($past);
 	make $past;
 }
 
@@ -376,9 +376,9 @@ sub binary_op($/) {
 		$past.inline($inline);
 	}
 
-	#DUMP($past, "binary_op:" ~ $pirop);
+	#DUMP($past);
 	make $past;
 }
 
-method term($/, $key)     { PASSTHRU($/, $key, 'term'); }
+method term($/, $key)     { PASSTHRU($/, $key); }
 
