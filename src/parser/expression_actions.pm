@@ -84,7 +84,6 @@ method expression($/, $key) { PASSTHRU($/, $key); }
 method postfix_expr($/) {
 	my $past := $<term>.ast;
 
-	# TODO: Am I doing anything with this? Yes, :flat.
 	for $<adjective> {
 		#DUMP($past);
 		say("Got adjective: ", $_.ast.name(), ", what to do?");

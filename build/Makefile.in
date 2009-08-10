@@ -73,9 +73,12 @@ COMPILER_LIBS_PIR := \
 	library/close/Compiler/Dumper.pir		\
 	library/close/Compiler/Messages.pir		\
 	library/close/Compiler/Namespaces.pir		\
+	library/close/Compiler/Node.pir			\
+	library/close/Compiler/PrettyPrintVisitor.pir	\
 	library/close/Compiler/Scopes.pir			\
 	library/close/Compiler/String.pir			\
 	library/close/Compiler/SymbolLookupVisitor.pir	\
+	library/close/Compiler/Symbols.pir		\
 	library/close/Compiler/Symbols.pir		\
 	library/close/Compiler/Types.pir
 
@@ -225,14 +228,23 @@ library/close/Compiler/Namespaces.pir: library/close/Compiler/Namespaces.pm
 		> library/close/Compiler/Namespaces.pir
 	$(RM_F) library/close/Compiler/Namespaces.pira
 
-library/close/Compiler/String.pir: library/close/Compiler/String.pm
+library/close/Compiler/Node.pir: library/close/Compiler/Node.pm
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
-		--output=library/close/Compiler/String.pira \
-		library/close/Compiler/String.pm
-	$(STRIP_PIRA) library/close/Compiler/String.pira \
-		> library/close/Compiler/String.pir
-	$(RM_F) library/close/Compiler/String.pira
+		--output=library/close/Compiler/Node.pira \
+		library/close/Compiler/Node.pm
+	$(STRIP_PIRA) library/close/Compiler/Node.pira \
+		> library/close/Compiler/Node.pir
+	$(RM_F) library/close/Compiler/Node.pira
+
+library/close/Compiler/PrettyPrintVisitor.pir: library/close/Compiler/PrettyPrintVisitor.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/PrettyPrintVisitor.pira \
+		library/close/Compiler/PrettyPrintVisitor.pm
+	$(STRIP_PIRA) library/close/Compiler/PrettyPrintVisitor.pira \
+		> library/close/Compiler/PrettyPrintVisitor.pir
+	$(RM_F) library/close/Compiler/PrettyPrintVisitor.pira
 
 library/close/Compiler/Scopes.pir: library/close/Compiler/Scopes.pm
 	@echo "**** Compiling $< to PIR"
@@ -242,6 +254,15 @@ library/close/Compiler/Scopes.pir: library/close/Compiler/Scopes.pm
 	$(STRIP_PIRA) library/close/Compiler/Scopes.pira \
 		> library/close/Compiler/Scopes.pir
 	$(RM_F) library/close/Compiler/Scopes.pira
+
+library/close/Compiler/String.pir: library/close/Compiler/String.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/String.pira \
+		library/close/Compiler/String.pm
+	$(STRIP_PIRA) library/close/Compiler/String.pira \
+		> library/close/Compiler/String.pir
+	$(RM_F) library/close/Compiler/String.pira
 
 library/close/Compiler/SymbolLookupVisitor.pir: library/close/Compiler/SymbolLookupVisitor.pm
 	@echo "**** Compiling $< to PIR"

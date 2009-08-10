@@ -24,19 +24,11 @@ sub NOTE(*@parts) {
 	close::Dumper::NOTE(close::Dumper::info(), @parts);
 }
 
-our @Symbol_predicates := (
-	'is_alias', 
-	'is_duplicate',
-	'is_implicit',
-);
+################################################################
 
 sub new($name, $type, $block) {
 	my $symbol := PAST::Var.new(:name($name));
 
-	for @Symbol_predicates {
-		$symbol{$_} := 0;
-	}
-	
 	$symbol<pir_name>	:= $name;
 	$symbol<block>		:= $block;
 	#$symbol<searchpath>	:= clone_current_scope();

@@ -4,13 +4,12 @@ method TOP($/, $key) { PASSTHRU($/, $key); }
 
 method translation_unit($/, $key) {
 	if $key eq 'start' {
-	say("*** TRANSLATION UNIT STARTS");
 		my $config := close::Compiler::Config.new();
 		$config.read('close.cfg');
 		
 		NOTE("Begin translation unit!");
 		
-		my $pervasive := close::Compiler::Scopes::fetch_pervasive_scope();
+		my $pervasive := close::Compiler::Node::create('translation_unit');
 		close::Compiler::Scopes::push($pervasive);
 
 		my @root_nsp_path := Array::new('close');
@@ -20,36 +19,28 @@ method translation_unit($/, $key) {
 		close::Compiler::Scopes::print_symbol_table($pervasive);
 	}
 	else {
-		my $past := close::Compiler::Scopes::pop('namespace');
+		my $default_nsp := close::Compiler::Scopes::pop('namespace_block');
 
 		for $<extern_statement> {
-			$past.push($_.ast);
+			$default_nsp.push($_.ast);
 		}
 		
-		my $pervasive := close::Compiler::Scopes::pop('pervasive scope');
+		my $past := close::Compiler::Scopes::pop('translation_unit');
+		$past.push($default_nsp);
 		
 		close::Compiler::Scopes::dump_stack();
+
+		NOTE("Pretty-printing input");
+		my $prettified := close::Compiler::PrettyPrintVisitor::print($past);
+		
+		NOTE("Pretty print done\n", $prettified);
 		
 		# This should be a separate compiler phase. Later.
-		my $new_past := close::Compiler::SymbolLookupVisitor::update($past);
+#		my $new_past := close::Compiler::SymbolLookupVisitor::update($past);
 		
 		DUMP($past);
 		make $past;		
 	}
-}
-
-our %adverb_aliases;
-%adverb_aliases{'...'} := 'slurpy';
-%adverb_aliases{'?'} := 'optional';
-
-sub adverb_unalias_name($adverb) {
-	my $name := $adverb.name();
-	
-	if %adverb_aliases{$name} {
-		return (%adverb_aliases{$name});
-	}
-	
-	return $name;
 }
 
 our %adverb_arg_limits;
@@ -829,61 +820,6 @@ sub compilation_unit_past()
 	}
 
 	return $past;
-}
-
-#################################################################
-
-=head4 Namespaces
-
-Namespace blocks are implied by a C<hll> directive -- the implied namespace is
-the empty, hll-root namespace.
-
-The user may specify a namespace explicitly by the C<namespace> directive.
-At the outermost level, specifying C<namespace NAME;> creates a namespace block
-that continues until EOF, or the next C<hll> or C<namespace> directive.
-
-At any level, the user may create a namespace block by enclosing statements or
-declarations in curly braces:
-
-	namespace NAME {
-		# declarations or statements
-	}
-
-=cut
-
-# Close the namespace that a class block inserted on stack
-sub close_class() {
-	my $past := close_namespace('class');
-	DUMP($past);
-	return $past;
-}
-
-# Close the namespace currently on the stack.
-sub close_namespace($decl_mode) {
-	close_decl_mode($decl_mode);
-	my $past := close::Compiler::Scopes::pop('namespace');
-	DUMP($past);
-	return $past;
-}
-
-sub open_namespace($past, $decl_mode) {
-DUMP($past);
-	my @path	:= namespace_path_of_var($past);
-	my $block	:= get_namespace(@path);
-
-	$block<is_namespace> := 1;
-	$block<lstype> := 'namespace';
-
-	close::Compiler::Scopes::push($block);
-	open_decl_mode($decl_mode);
-	DUMP($block);
-	return $block;
-}
-
-sub open_class($class) {
-	my $block := open_namespace($class, 'class');
-	DUMP($block);
-	return $block;
 }
 
 #################################################################

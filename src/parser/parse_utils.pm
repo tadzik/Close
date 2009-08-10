@@ -50,7 +50,9 @@ sub NOTE(*@parts) {
 
 sub PASSTHRU($/, $key) {
 	my $past := $/{$key}.ast;
-	close::Dumper::DUMP(close::Dumper::info(), Array::new($past), undef);
+	my %named;
+	%named{$key} := $past;
+	close::Dumper::DUMP(close::Dumper::info(), undef, %named);
 	make $past;
 }
 
@@ -70,8 +72,7 @@ C<hll> set (or not) appropriately.
 
 =cut
 
-sub assemble_qualified_path($/) {
-	my $past	:= PAST::Var.new(:node($/));
+sub assemble_qualified_path($past, $/) {
 	my @parts	:= new_array();
 	
 	for $<path> {
@@ -117,9 +118,9 @@ value.
 
 sub clean_up_heredoc($past, @lines) {
 	my $closing	:= @lines.pop();
-	my $strip_indent := String::indent_size($closing);
+	my $leading_ws := String::substr($closing, 0, String::find_not_cclass('WHITESPACE', $closing));
+	my $strip_indent := String::display_width($leading_ws);
 	NOTE("Need to strip indentation of ", $strip_indent);
-	
 	
 	#say("fixing up heredoc: chomp indent of ", $indent);
 	my $text := '';
@@ -160,10 +161,14 @@ and 'String' as the return type.
 =cut
 
 sub make_token($capture) {
+	NOTE("Making token from: ", ~$capture);
+	
 	my $token := PAST::Val.new(
 		:node($capture), 
 		:returns('String'), 
 		:value(~$capture));
+		
+	DUMP($token);
 	return $token;
 }
 

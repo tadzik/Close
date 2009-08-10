@@ -152,42 +152,45 @@ sub find_not_cclass($class_name, $str, *%opts) {
 	return $result;
 }
 
-=sub indent_size($str) {
+=sub display_width($str) {
 
-Compute the indent size of the whitespace prefix of C<$str>, assuming that tabs
-are 8 characters wide, and all other whitespace is 1 character wide. Thus, a 
+Compute the display width of the C<$str>, assuming that tabs
+are 8 characters wide, and all other chars are 1 character wide. Thus, a 
 sequence like tab-space-space-tab will have a width of 16, since the two spaces
 do not equate to a full tab stop.
 
-Returns the computed size of the indentation. Returns zero if there are no 
-leading whitespace characters in C<$str>.
+Returns the computed width of C<$str>.
 
 =cut
 
-sub indent_size($str) {
-	my $size := 0;
+sub display_width($str) {
+	my $width := 0;
 	
 	if $str {
-		my $ws := substr($str, find_not_cclass('WHITESPACE', $str));
-		
 		my $i := 0;
-		my $len := length($ws);
+		my $len := length($str);
 		
 		while $i < $len {
 			if char_at($str, $i) eq "\t" {
-				$size := $size + 8 - $size % 8;
+				$width := $width + 8 - ($width % 8);
 			}
 			else {
-				$size ++;
+				$width++;
 			}
+			
+			$i++;
 		}
 	}
 
-	return $size;
+	return $width;
 }
 
-sub is_cclass($class_name, $str, $offset) {
+sub is_cclass($class_name, $str, $offset?) {
 	my $class := 0 + %Cclass_id{$class_name};
+	
+	unless $offset {
+		$offset := 0;
+	}
 
 	#NOTE("class = ", $class_name, "(", $class, "), offset = ", $offset, ", str = ", $str);
 	

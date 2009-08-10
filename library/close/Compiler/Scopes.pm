@@ -105,35 +105,6 @@ sub dump_stack() {
 	DUMP(@Scope_stack);
 }
 
-=sub fetch_pervasive_scope()
-
-Opens the "magic" pervasive-symbols lexical scope, which serves as the backstop
-for all other lexical scopes. Stores the resulting block in the $Pervasive_symbols 
-global, for immediate lookup by builtins, etc.
-
-=cut
-
-our $Pervasive_scope;
-
-sub fetch_pervasive_scope() {
-	unless $Pervasive_scope {
-		$Pervasive_scope := PAST::Block.new(
-			:blocktype('immediate'),
-			:name("Pervasive Symbols"),
-		);
-		$Pervasive_scope<lstype> := 'pervasive scope';
-		
-		close::Compiler::Types::add_builtins($Pervasive_scope);
-	
-		# FIXME: Move these to be typedefs in a standard namespace. (Then kill 'em.)
-		#my $bug := make_alias('num', $psym.symbol('float')<decl>, $psym);
-		#$bug := make_alias('str', $psym.symbol('string')<decl>, $psym);
-	}
-	
-	DUMP($Pervasive_scope);
-	return $Pervasive_scope;
-}
-
 sub fetch_current_hll() {
 	my $hll	:= 'close';	
 	my $block	:= find_matching('hll');
@@ -149,6 +120,7 @@ sub fetch_current_namespace() {
 	my $block := find_matching('is_namespace');
 
 	unless $block {
+		dump_stack();
 		DIE("INTERNAL ERROR: "
 			~ "Unable to locate current namespace block. "
 			~ " This should never happen.");
@@ -198,21 +170,14 @@ sub get_stack() {
 	return @Scope_stack;
 }
 
-sub new($lstype) {
-	NOTE("Creating new scope block with lstype='", $lstype, "'");
-	my $block := PAST::Block.new(:blocktype('immediate'));
-	$block<lstype> := $lstype;
-	DUMP($block);
-	return $block;
-}
-
-sub pop($lstype) {
+sub pop($type) {
 	my $old := get_stack().shift();
+	my $old_type := close::Compiler::Node::type($old);
 	
-	unless $lstype eq $old<lstype> {
+	unless $type eq $old_type {
 		DIE("Scope stack mismatch. Popped '"
-			~ $old<lstype> ~ "', but expected '"
-			~ $lstype);
+			~ $old_type ~ "', but expected '"
+			~ $type);
 	}
 	
 	DUMP($old);

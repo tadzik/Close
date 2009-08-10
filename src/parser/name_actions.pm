@@ -8,9 +8,11 @@ resulting PAST::Var IS NOT RESOLVED.
 =cut
 
 method declarator_name($/) {
-	my $past 	:= assemble_qualified_path($/);
-	NOTE("Creating declarator: ", $past.name());
-	$past<isdecl> := 1;
+	my $past	:= close::Compiler::Node::create('declarator_name', :node($/));
+	
+	# This stuff is too common to duplicate:
+	assemble_qualified_path($past, $/);
+	NOTE("Created declarator for: ", $past.name());
 	
 	# NOTE: Because the parser may decide to use a different parse of 
 	# this symbol (for example, a symbol declaration and a function
@@ -26,7 +28,10 @@ method declarator_name($/) {
 method namespace_name($/, $key) { PASSTHRU($/, $key); }
 
 method namespace_path($/) {
-	my $past := assemble_qualified_path($/);
+	my $past	:= close::Compiler::Node::create('namespace_path', :node($/));
+	
+	# This stuff is too common to duplicate:
+	assemble_qualified_path($past, $/);
 
 	# Namespace might be empty for ::, or for single-element paths.
 	unless $past.namespace() {
@@ -49,7 +54,10 @@ method new_alias_name($/) {
 }
 
 method qualified_identifier($/) {
-	my $past := assemble_qualified_path($/);
+	NOTE("Found qualified_identifier");
+	my $past	:= close::Compiler::Node::create('qualified_identifier', :node($/));
+	# This stuff is too common to duplicate:
+	assemble_qualified_path($past, $/);
 	#$past<searchpath> := clone_current_scope();
 	
 	DUMP($past);

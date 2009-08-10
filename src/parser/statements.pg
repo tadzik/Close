@@ -54,8 +54,6 @@ rule declaration_statement {
 	| <using_namespace_directive> ';'		{*} #= using_directive
 	| <using_declaration> ';'			{*} #= using_declaration
 	| <declaration> [ ';' | <?after '}' <.ws> > ]	{*} #= declaration
-#	| <symbol_declaration> ';'			{*} #= symbol_declaration
-#	| <function_definition>			{*} #= function_definition
 }
 
 
@@ -73,8 +71,9 @@ rule expression_statement {
 }
 
 rule compound_statement {
-	'{' ~ '}' <item=local_statement>*
-	{*}
+	'{'			{*} #= open
+		~ '}' <statements=local_statement>*
+				{*} #= close
 }
 
 rule conditional_statement {
@@ -82,6 +81,21 @@ rule conditional_statement {
 	'(' ~ ')' <expression>
 	$<then>=<local_statement>
 	[ 'else' $<else>=<local_statement> ]?
+	{*}
+}
+
+
+rule foreach_header {
+	# NB: decl before ident, to avoid typedefs messing up syntax: for (T t : x)
+	[ <loop_var=declaration> || <loop_var=simple_identifier> ]
+	':'
+	<list=expression>
+}
+
+rule foreach_statement {
+	<.FOREACH>
+	'(' ~ ')' <header=foreach_header>
+	<body=local_statement>
 	{*}
 }
 
@@ -113,21 +127,6 @@ token label {
 	<BAREWORD> ':' <!before ':'>
 	{*}
 }
-
-rule foreach_header {
-	# NB: decl before ident, to avoid typedefs messing up syntax: for (T t : x)
-	[ <loop_var=declaration> || <loop_var=simple_identifier> ]
-	':'
-	<list=expression>
-}
-
-rule foreach_statement {
-	<.FOREACH>
-	'(' ~ ')' <header=foreach_header>
-	<body=local_statement>
-	{*}
-}
-
 rule do_while_statement {
 	<.DO> <local_statement>
 	$<kw>=[ <WHILE> | <UNTIL> ]

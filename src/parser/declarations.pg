@@ -22,18 +22,6 @@ rule dclr_alias {
 	<.ALIAS> <alias=new_alias_name> {*}
 }
 
-=rule dclr_alias_init
-
-An dclr_alias_init is a C<dclr_declarator> optionally followed by an 
-C<dclr_initializer>.
-
-=cut
-
-rule dclr_alias_init {
-	<dclr_declarator> <dclr_alias>? <dclr_initializer>?
-	{*}
-}
-
 =rule dclr_array_or_hash
 
 Matches one of three possible syntaxes for declaring an array or hash. 
@@ -63,49 +51,14 @@ rule dclr_array_or_hash {
 =rule dclr_atom
 
 Matches either a C<declarator_name> (as in 'extern int Foo::x', the 'Foo::x'
-part) or another C<dclr_declarator> nested in parentheses.
+part) or another C<declarator> nested in parentheses.
 
 =cut
 
 rule dclr_atom {
 	| :dba('nested declarator')
-	    '(' ~ ')' <dclr_declarator>	{*}
+	    '(' ~ ')' <declarator>	{*}
 	| <declarator_name>	{*}
-}
-
-=rule dclr_declarator
-
-A dclr_declarator is that part of the declaration specific to a single name. The 
-dclr_declarator includes the symbol name, as well as any prefix indicating
-the symbol is a pointer, and any suffix indicating the symbol is a function,
-array, or hash.
-
-=cut
-
-rule dclr_declarator {
-	# * const	->	myvar		-> (int x, string y)
-	<dclr_pointer>* <dclr_atom> <dclr_postfix>*
-	{*}
-}
-
-=rule dclr_init_list
-
-A list of at least one C<dclr_alias_init>, separated by commas.
-
-=cut
-
-rule dclr_init_list {
-	<item=dclr_alias_init> [ ',' <item=dclr_alias_init> ]*
-}
-
-rule dclr_initializer {
-	'=' <expression>		{*}
-}
-
-rule dclr_param_list {
-	{*} #= open
-	[ <param_list=parameter_declaration> [ ',' | <?before ')'> ] ]*
-	{*} #= close
 }
 
 =rule dclr_pointer
@@ -122,27 +75,44 @@ rule dclr_pointer {
 =rule dclr_postfix
 
 Matches either an array or hash declaration (C<decl[%]>), or a function's 
-parameter declaration list (C<decl(int a, string b)>) after a dclr_declarator.
+parameter declaration list (C<decl(int a, string b)>) after a declarator.
 
 =cut
 
 rule dclr_postfix {
 	| :dba('function parameter list')
-	    '(' ~ ')' <dclr_param_list>		{*} #= dclr_param_list
+	    '(' ~ ')' <parameter_list>		{*} #= parameter_list
 	| :dba('hash or array declaration')
 	    '[' ~ ']' <dclr_array_or_hash>		{*} #= dclr_array_or_hash
 }
 
-=rule function_definition
+rule declaration {
+	<specifier>+				{*} #= specifiers
+	<symbol=declarator_part>
+	[ ','  <symbol=declarator_part> ]*	{*} #= declarators
+}
 
-Matches a function header with attached curly block.
+=rule declarator
+
+A declarator is that part of the declaration specific to a single name. The 
+declarator includes the symbol name, as well as any prefix indicating
+the symbol is a pointer, and any suffix indicating the symbol is a function,
+array, or hash.
 
 =cut
 
-rule function_definition {
-	<specifier>+
-	<dclr_declarator> <dclr_alias>?
-	<compound_statement>
+rule declarator {
+	# * const	->	myvar		-> (int x, string y)
+	<dclr_pointer>* <dclr_atom> <dclr_postfix>*
+	{*}
+}
+
+rule declarator_part {
+	<declarator>
+	<dclr_alias>?
+	[ '=' <initializer=expression>
+	| <body=compound_statement>
+	]?
 	{*}
 }
 
@@ -198,11 +168,18 @@ Matches a single parameter declaration, with optional trailing tokens.
 
 rule parameter_declaration {
 	<specifier>+
-	<parameter=dclr_declarator> 
-	[ $<adverbs>=<param_adverb> ]*
-	<initializer=dclr_initializer>?
+	<parameter=declarator> 
+	[ <adverbs=param_adverb> ]*
+	<default=expression>?
 	{*}
 }
+
+rule parameter_list {
+	{*} #= open
+	[ <param_list=parameter_declaration> [ ',' | <?before ')'> ] ]*
+	{*} #= close
+}
+
 
 =rule specifier
 
@@ -217,21 +194,6 @@ rule specifier {
 	| <tspec_function_attr>	{*} #= tspec_function_attr
 	| <tspec_storage_class>	{*} #= tspec_storage_class
 	| <tspec_type_specifier>	{*} #= tspec_type_specifier
-}
-
-=rule symbol_declaration
-
-Matches the standard C-like variable patterns: 
-
-    int foo;
-    int a = 1, b = 2;
-    extern void f();
-
-=cut
-
-rule symbol_declaration {
-	<specifier>+		{*} #= specifiers
-	<dclr_init_list>	{*} #= declarators
 }
 
 =rule tspec_builtin_type
@@ -286,21 +248,4 @@ rule using_namespace_directive {
 rule using_declaration {
 	<.USING> <qualified_identifier>
 	# FIXME: Add alias. (General alias rule needed.)
-}
-
-rule declarator_part {
-	<dclr_declarator>
-	<dclr_alias>?
-	[ '=' <dclr_initializer>
-	| <body=compound_statement>
-	]?
-	{*}
-}
-	
-rule declaration {
-	<specifier>+		
-	{*} #= specifiers
-	<symbol=declarator_part>
-	[ ',' <symbol=declarator_part> ]*	
-	{*} #= declarators
 }

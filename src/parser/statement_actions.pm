@@ -16,16 +16,29 @@ method expression_statement($/) {
 	make $past;
 }
 
-method compound_statement($/) {
-	my $past := PAST::Stmts.new(:node($/), :name("compound statement"));
-
-	for $<item> {
-		DUMP($_.ast);
-		$past.push($_.ast);
+method compound_statement($/, $key) {
+	if $key eq 'open' {
+		NOTE("Creating new block for compound_statement, pushing on scope stack");
+		my $past := close::Compiler::Node::create('compound_statement');
+		DUMP($past);
+		close::Compiler::Scopes::push($past);
 	}
-
-	DUMP($past);
-	make $past;
+	elsif $key eq 'close' {
+		my $past := close::Compiler::Scopes::pop('compound_statement');
+		NOTE("Popped compound_statement from scope stack");
+		
+		for $<statements> {
+			$past.push($_.ast);
+		}
+		
+		NOTE("Block has ", +@($past), " elements inside");
+		DUMP($past);
+		make $past;
+		NOTE("Done here");
+	} 
+	else {
+		DIE("Unexpected $key value: '", $key, "' in action method compound_statement");
+	}
 }
 
 method conditional_statement($/) {
@@ -156,6 +169,22 @@ method jump_statement($/, $key) {
 
 method foreach_statement($/) {
 	NOTE("started");
+	my $loop_var	:= $<header><loop_var>.ast;
+	my $list		:= $<header><list>.ast;
+	my $body		:= $<body>.ast;
+	DUMP(:list($list), :loop_var($loop_var), :body($body));
+
+	my $past := close::Compiler::Node::create('foreach_statement',
+		:loop_var($loop_var),
+		:list($list));
+	$past.push($body);
+		
+	DUMP($past);
+	make $past;
+}
+
+method foreach_statement2($/) {
+	NOTE("started");
 	my $iter	:= $<header><loop_var>.ast;
 	DUMP($iter);
 	my $list	:= $<header><list>.ast;
@@ -173,7 +202,8 @@ method foreach_statement($/) {
 		$iter_ref := PAST::Var.new(:name($iter.name()), :lvalue(1));
 	}
 	
-	my $past := PAST::Stmts.new(:name('foreach loop'), :node($/));
+	my $past := close::Compiler::Node::create('foreach', :node($/));
+	
 	my $iterator := PAST::Op.new(
 		:inline("    %r = iter %0"),
 		:name("new-iterator"),

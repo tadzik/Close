@@ -1,3 +1,5 @@
+# $Id$
+
 class close::Compiler::SymbolLookupVisitor;
 
 sub ASSERT($condition, *@message) {
@@ -21,6 +23,8 @@ sub DUMP(*@pos, *%what) {
 sub NOTE(*@parts) {
 	close::Dumper::NOTE(close::Dumper::info(), @parts);
 }
+
+################################################################
 
 our $Visitor_name := 'SymbolLookupVisitor';
 

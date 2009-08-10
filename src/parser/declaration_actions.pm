@@ -70,7 +70,7 @@ method dclr_atom($/) {
 	}
 }
 
-method dclr_declarator($/) {	
+method declarator($/) {	
 	my $past := $<dclr_atom>.ast;
 	NOTE("Processing declarator: ", $past.name());
 	DUMP($past);
@@ -124,63 +124,14 @@ method dclr_declarator($/) {
 =cut
 
 method dclr_alias_init($/) {
-	my $past := $<dclr_declarator>.ast;
+	my $past := $<declarator>.ast;
 	
-	if $<dclr_initializer> {
-		$past<dclr_initializer> := $<dclr_initializer>[0].ast;
+	if $<initializer> {
+		$past<initializer> := $<initializer>[0].ast;
 	}
 	
 	DUMP($past);
 	make $past;
-}
-
-=method dclr_initializer($/)
-
-Passes through the C<expression>.
-
-=cut
-
-method dclr_initializer($/) { PASSTHRU($/, 'expression'); }
-
-=method dclr_param_list
-
-Creates a function-returning declarator, which is set as the PAST result of 
-the rule. The declarator contains a PAST::Block to represent the function's 
-parameter scope.
-
-=cut
-
-method dclr_param_list($/, $key) {
-	if $key eq 'open' {
-		NOTE('Begin function parameter list');
-		my $past	:= close::Compiler::Types::function_returning();
-		$past.node(	$/);
-		my $block	:= $past<parameter_scope>;
-		
-		close::Compiler::Scopes::push($block);
-
-		NOTE("Pushed new scope on stack: ", $block.name());
-		DUMP($past);
-	}
-	elsif $key eq 'close' {
-		my $block	:= close::Compiler::Scopes::pop('function parameter');
-		my $past	:= $block<function_decl>;
-		
-		NOTE("Popped scope from stack: ", $block.name());
-		
-		for $<param_list> {
-			NOTE('Adding parameter to function: ', $_.ast.name());
-			$past.push($_.ast);
-			close::Compiler::Scopes::add_declarator($block, $_.ast);
-		}
-		
-		NOTE('End function parameter list: ', +@($past), ' parameters');
-		DUMP($past);
-		make $past;
-	}
-	else {
-		$/.panic('Unrecognized $key in action dclr_param_list: ' ~ $key);
-	}
 }
 
 =method dclr_pointer
@@ -217,11 +168,11 @@ method declaration($/, $key) {
 		# Create a temporary block on scope stack, so symbol names
 		# are visible to later declarations in this same structure.
 		# e.g., typedef int X, X* PX; // X must be visible after comma
-		my $block		:= close::Compiler::Scopes::new('declaration');
-		$block.name(	'temporary declaration');
-		my $past		:= PAST::VarList.new();
-		$block<varlist> 	:= $past;
-
+		my $block := close::Compiler::Node::create('decl_temp',
+			:name('temporary declaration scope')
+		);
+		
+		my $past := $block<varlist>;
 		# Modify $specifier to reflect all the specifiers we saw. 
 		# Attach errors to $past.
 		for $<specifier> {
@@ -234,13 +185,17 @@ method declaration($/, $key) {
 		DUMP($block);
 	}
 	elsif $key eq 'declarators' {
+		# FIXME: It may be logical to separate the VarList and the 
+		# Block, and only create the VarList to replace the Block in this
+		# part.
+		
 		NOTE("Processing declarators");
 		# Once the declaration is complete, the temporary block is 
 		# discarded. At that point, though, the PAST returned is a 
 		# varlist, and whoever requested the varlist should merge the 
 		# symbols in with their own symbol table. (E.g., a declaration
 		# statement, or a parameter list, or whatever.)
-		my $block	:= close::Compiler::Scopes::pop('declaration');
+		my $block	:= close::Compiler::Scopes::pop('decl_temp');
 		my $past	:= $block<varlist>;
 		my $spec	:= $past<specifier>;
 		
@@ -248,8 +203,8 @@ method declaration($/, $key) {
 		
 		# Convert individual declarators into type-chains
 		# Create Past Var entries for each declarator.
-		# Lookup init values for types where no dclr_initializer is provided.
-		# Set types for 'auto' decls with dclr_initializers.
+		# Lookup init values for types where no initializer is provided.
+		# Set types for 'auto' decls with initializers.
 			
 		# Merge the specifier in to the declarator. Attach errors, etc.
 		for $<symbol> {
@@ -269,30 +224,32 @@ method declaration($/, $key) {
 		make $past;
 	}
 	else {
-		$/.panic('Unrecognized $key in action symbol_declaration: ' ~ $key);
+		$/.panic('Unrecognized $key in action declaration: ' ~ $key);
 	}
 }
 
 method declarator_part($/) {
-	my $past := $<dclr_declarator>.ast;
+	my $past := $<declarator>.ast;
 	NOTE("Assembling declarator ", $past.name());
 	
 	if $<dclr_alias> {
 		$past<alias> := $<dclr_alias>.ast;
 	}
 	
-	if $<dclr_initializer> {
+	if $<initializer> {
 		NOTE("Adding initializer");
-		my $initializer := $<dclr_initializer>[0].ast;
+		my $initializer := $<initializer>[0].ast;
 		DUMP($initializer);
-		$past<dclr_initializer> := $initializer;
+		$past<initializer> := $initializer;
 	}
 	
 	if $<body> {
 		# Where is the block for this?
 		ASSERT($past<type><is_function>, "It's a function, unless it's a class or something.");
-		my $body := $<body>[0].ast;
-		$past<type><parameter_scope>.push($body);
+		
+		if $past<type><is_function> {
+			$past<type><function_definition> := $<body>[0].ast;
+		}
 	}
 	
 	NOTE("done");
@@ -323,10 +280,13 @@ method namespace_definition($/, $key) {
 	if $key eq 'open' {
 		# FIXME: This should be a function, maybe part of the namespace_path target.
  		my $path	:= $<namespace_path>.ast;
-		my $hll	:= $path<hll>;
 		my @namespace_path;
 		
-		unless $path<is_rooted> {
+		if $path<is_rooted> {
+			@namespace_path	:= $path.namespace();
+			@namespace_path.unshift($path<hll>);
+		}
+		else {
 			my $parent		:= close::Compiler::Scopes::fetch_current_namespace();
 			@namespace_path	:= Array::concat($parent<path>, $path.namespace());
 		}
@@ -336,7 +296,7 @@ method namespace_definition($/, $key) {
 		close::Compiler::Scopes::push($namespace);
 	}
 	else { # $key eq 'close'
-		my $past := close::Compiler::Scopes::pop('namespace');
+		my $past := close::Compiler::Scopes::pop('namespace_block');
 		
 		for $<extern_statement> {
 			$past.push($_.ast);
@@ -347,8 +307,32 @@ method namespace_definition($/, $key) {
 	}
 }
 
+
+our %Adverb_aliases;
+%Adverb_aliases{'...'} := 'slurpy';
+%Adverb_aliases{'?'} := 'optional';
+
+sub adverb_unalias_name($adverb) {
+	my $name := $adverb.value();
+	NOTE("Unaliasing adverb: '", $name, "'");
+	DUMP($adverb);
+	
+	if %Adverb_aliases{$name} {
+		$name := %Adverb_aliases{$name};
+	}
+	elsif String::char_at($name, 0) eq ':' {
+		$name := String::substr($name, 1);
+	}
+	
+	ASSERT(String::length($name) > 0, 'Adverb name must have some value.');
+	NOTE("Unaliased name is: '", $name, "'");
+	return $name;
+}
+
 method param_adverb($/) {
 	my $past := make_token($<token>);
+	$past.name(adverb_unalias_name($past));
+	
 	DUMP($past);
 	make $past;
 }
@@ -358,7 +342,9 @@ method param_adverb($/) {
 =cut
 
 method parameter_declaration($/) {
-	my $past := $<parameter>.ast;
+	my $past := close::Compiler::Node::create('parameter_declaration', 
+		:from($<parameter>.ast));
+	
 	my $specifier;
 
 	for $<specifier> {
@@ -369,92 +355,73 @@ method parameter_declaration($/) {
 	
 	for $<adverbs> {
 		my $adv := $_.ast;
-		$past<adverbs>{$adv.value()} := $adv;
+		$past<adverbs>{$adv.name()} := $adv;
 	}
 	
-	if $<initializer> {
-		$past<initializer> := $<initializer>.ast;
+	if $<default> {
+		$past<default> := $<default>.ast;
 	}
 	
 	# Done by declarator_name
 	# Declare object in current scope, which should be a parameter block.
-	#my $scope := close::Compiler::Scopes::current();
-	#ASSERT($scope<lstype> eq 'function parameter',
-	#	'Expected current scope to be function parameter');
-	#close::Compiler::Scopes::declare_object($scope, $past);
 	ASSERT(
 		close::Compiler::Scopes::get_object(
 			close::Compiler::Scopes::current(), $past.name()) =:= $past,
 		'Expected current scope would already have this parameter declared (by <declarator_name>)');
-		
+	
+	# Insert declaration into current scope.
+	my $scope := close::Compiler::Scopes::current();
+	DUMP($scope);
+	ASSERT(close::Compiler::Node::type($scope) eq 'parameter_scope',
+		'Parameters are expected to be declared within a parameter_scope block');
+	$scope.push($past);
+	
 	DUMP($past);
 	make $past;
 }
 
-method specifier($/, $key) { PASSTHRU($/, $key); }
+=method parameter_list
 
-method symbol_declaration($/, $key) {
-	if $key eq 'specifiers' {
-		NOTE("Processing specifiers");
-		# Create a temporary block on scope stack, so symbol names
-		# are visible to later declarations in this same structure.
-		# e.g., typedef int X, X* PX; // X must be visible after comma
-		my $block		:= close::Compiler::Scopes::new('varlist');
-		$block.name(	'symbol_declaration temp block');
-		my $past		:= PAST::VarList.new();
-		$block<varlist> 	:= $past;
+Creates a function-returning declarator, which is set as the PAST result of 
+the rule. The declarator contains a PAST::Block to represent the function's 
+parameter scope.
 
-		# Modify $specifier to reflect all the specifiers we saw. 
-		# Attach errors to $past.
-		for $<specifier> {
-			$past<specifier> := close::Compiler::Types::merge_specifiers($past, $past<specifier>, $_.ast);
-		}
+=cut
+
+method parameter_list($/, $key) {
+	if $key eq 'open' {
+		NOTE('Begin function parameter list');
+		my $past	:= close::Compiler::Types::function_returning();
+		$past.node(	$/);
+		my $block	:= $past<parameter_scope>;
 		
 		close::Compiler::Scopes::push($block);
-		
-		NOTE("Pushed temporary varlist scope on stack.");
-		DUMP($block);
+
+		NOTE("Pushed new scope on stack: ", $block.name());
+		DUMP($past);
 	}
-	elsif $key eq 'declarators' {
-		NOTE("Processing declarators");
-		# Once the declaration is complete, the temporary block is 
-		# discarded. At that point, though, the PAST returned is a 
-		# varlist, and whoever requested the varlist should merge the 
-		# symbols in with their own symbol table. (E.g., a declaration
-		# statement, or a parameter list, or whatever.)
-		my $block	:= close::Compiler::Scopes::pop('varlist');
-		my $past	:= $block<varlist>;
-		my $spec	:= $past<specifier>;
+	elsif $key eq 'close' {
+		my $block	:= close::Compiler::Scopes::pop('parameter_scope');
+		my $past	:= $block<function_decl>;
 		
-		NOTE("Popped ", $block<lstype>, " scope '", $block.name(), "'");
+		NOTE("Popped scope from stack: ", $block.name());
 		
-		# Convert individual declarators into type-chains
-		# Create Past Var entries for each declarator.
-		# Lookup init values for types where no dclr_initializer is provided.
-		# Set types for 'auto' decls with dclr_initializers.
-			
-		# Merge the specifier in to the declarator. Attach errors, etc.
-		for $<dclr_init_list><item> {
-			my $declarator := $_.ast;
-			
-			NOTE("Merging specifier with declarator '", $declarator.name(), "'");
-			$declarator := 
-				close::Compiler::Types::add_specifier_to_declarator($spec, $declarator);
-			$past.push($declarator);
+		for $<param_list> {
+			NOTE('Adding parameter to function: ', $_.ast.name());
+			$past.push($_.ast);
+			close::Compiler::Scopes::add_declarator($block, $_.ast);
 		}
-
-		if +@($block) {
-			$/.panic("Unexpected elements added to temporary VarList block");
-		}
-
-		NOTE("done");
+		
+		NOTE('End function parameter list: ', +@($past), ' parameters');
 		DUMP($past);
 		make $past;
 	}
 	else {
-		$/.panic('Unrecognized $key in action symbol_declaration: ' ~ $key);
+		$/.panic('Unrecognized $key in action dclr_param_list: ' ~ $key);
 	}
 }
+
+method specifier($/, $key) { PASSTHRU($/, $key); }
 
 =method tspec_builtin_type
 
@@ -465,7 +432,8 @@ Creates a type specifier with noun set to the type name.
 method tspec_builtin_type($/) {
 	my $past := close::Compiler::Types::new_specifier(
 		:is_builtin(1),
-		:noun(~$<token>));
+		:noun(~$<token>),
+		:name(~$<token>));
 	DUMP($past);
 	make $past;
 }

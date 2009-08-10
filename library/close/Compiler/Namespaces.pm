@@ -64,7 +64,7 @@ sub fetch_relative($origin, @target) {
 		my $child := close::Compiler::Scopes::get_namespace($block, $_);
 		
 		unless $child {
-			$child := new(@path);
+			$child := close::Compiler::Node::create('namespace_block', :path(@path));
 			close::Compiler::Scopes::set_namespace($block, $_, $child);
 		}
 		
@@ -126,21 +126,6 @@ sub format_path_of($past) {
 }
 
 our $Root := PAST::Block.new(:name('namespace root block'));
-
-sub new(@path) {
-	DUMP(@path);
-	my @namespace := Array::clone(@path);
-	
-	my $block			:= close::Compiler::Scopes::new('namespace');
-	$block.hll(			@namespace.shift());
-	$block<is_namespace>	:= 1;
-	$block.name(		'hll: ' ~ Array::join(' :: ', @path));
-	$block.namespace(		@namespace);
-	$block<path>		:= Array::clone(@path);
-
-	DUMP($block);
-	return $block;
-}
 
 sub path_of($past) {
 	DUMP($past);

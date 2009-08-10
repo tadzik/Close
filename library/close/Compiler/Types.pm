@@ -36,17 +36,19 @@ our %Builtin_register_types;
 
 sub add_builtins($block) {
 	for %Builtin_register_types {
-		my $type := new_specifier(
+		my $spec := close::Compiler::Node::create('type_specifier',
 			:name('builtin type ' ~ $_), 
 			:noun($_), 
 			:register_class(%Builtin_register_types{$_}), 
 			:value($_),
 		);
 		
-		my $builtin := close::Compiler::Symbols::new(~$_, $type, $block);
+		my $builtin := close::Compiler::Symbols::new(~$_, $spec, $block);
+		# I don't really want these as kids, just in the symbol table.
+		$block.pop();
 	}
 
-	DUMP(:block($block));
+	DUMP($block);
 }
 
 sub add_specifier_to_declarator($specifier, $declarator) {
@@ -58,8 +60,8 @@ sub add_specifier_to_declarator($specifier, $declarator) {
 }
 
 sub array_of($elements) {
-	my $decl := new_declarator(:is_array(1), :value('array of'));
-	
+	my $decl := close::Compiler::Node::create('decl_array_of');
+
 	if $elements {
 		$decl<num_elements> := $elements;
 		$decl.value('array of ' ~ $elements);
@@ -71,16 +73,7 @@ sub array_of($elements) {
 
 sub function_returning() {
 	NOTE("Creating a function-returning declarator");
-	
-	my $block := close::Compiler::Scopes::new('function parameter');
-	$block.name('function parameter');
-	
-	my $decl := new_declarator(
-		:is_function(1), 
-		:name('function parameter block'),
-		:value('function returning'));
-	$decl<parameter_scope> := $block;
-	$block<function_decl> := $decl;
+	my $decl := close::Compiler::Node::create('decl_function_returning');
 	
 	DUMP($decl);
 	return $decl;
@@ -251,14 +244,14 @@ sub new_declarator(*%attrs) {
 }
 
 sub new_specifier(*%attrs) {
-	my $spec := PAST::Val.new();
-	$spec<is_specifier> := 1;
+	NOTE("Creating new type specifier");
+	my $spec := close::Compiler::Node::create('type_specifier');
 	
 	for %attrs {
 		$spec{$_} := %attrs{$_};
 	}
 	
-	DUMP(:spec($spec));
+	DUMP($spec);
 	return $spec;
 }
 
