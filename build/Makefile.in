@@ -80,6 +80,7 @@ COMPILER_LIBS_PIR := \
 	library/close/Compiler/SymbolLookupVisitor.pir	\
 	library/close/Compiler/Symbols.pir		\
 	library/close/Compiler/Symbols.pir		\
+	library/close/Compiler/TypeResolutionVisitor.pir\
 	library/close/Compiler/Types.pir
 
 DOCS := README
@@ -281,6 +282,15 @@ library/close/Compiler/Symbols.pir: library/close/Compiler/Symbols.pm
 	$(STRIP_PIRA) library/close/Compiler/Symbols.pira \
 		> library/close/Compiler/Symbols.pir
 	$(RM_F) library/close/Compiler/Symbols.pira
+
+library/close/Compiler/TypeResolutionVisitor.pir: library/close/Compiler/TypeResolutionVisitor.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/TypeResolutionVisitor.pira \
+		library/close/Compiler/TypeResolutionVisitor.pm
+	$(STRIP_PIRA) library/close/Compiler/TypeResolutionVisitor.pira \
+		> library/close/Compiler/TypeResolutionVisitor.pir
+	$(RM_F) library/close/Compiler/TypeResolutionVisitor.pira
 
 library/close/Compiler/Types.pir: library/close/Compiler/Types.pm
 	@echo "**** Compiling $< to PIR"
