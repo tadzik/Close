@@ -44,6 +44,10 @@ sub _create_decl_array_of(%attributes) {
 	$past<is_declarator> := 1;
 	set_attributes($past, %attributes);
 
+	if $past<elements> {
+		$past.value('array of ' ~ $past<elements>);
+	}
+	
 	DUMP($past);
 	return $past;
 }
@@ -59,13 +63,22 @@ sub _create_decl_function_returning(%attributes) {
 	$past<is_function>		:= 1;
 	set_attributes($past, %attributes);
 	
-	my $block := close::Compiler::Node::create('parameter_scope',
-		:name('parameter scope')
-	);
+	my $block := close::Compiler::Node::create('parameter_scope');
 	$block<function_decl>	:= $past;
 	
 	$past<parameter_scope>	:= $block;
 	
+	DUMP($past);
+	return $past;
+}
+
+sub _create_decl_hash_of(%attributes) {
+	NOTE("Creating hash_of declarator");
+	my $past := PAST::Val.new(:value('hash of'));
+	$past<is_hash> := 1;
+	$past<is_declarator> := 1;
+	set_attributes($past, %attributes);
+
 	DUMP($past);
 	return $past;
 }
@@ -101,10 +114,85 @@ sub _create_decl_varlist(%attributes) {
 }
 
 sub _create_declarator_name(%attributes) {
-	NOTE("Creating declarator");
-	my $past := PAST::Var.new(:isdecl(1));
-	set_attributes($past, %attributes);
+	NOTE("Creating declarator_name");
+	%attributes<isdecl> := 1;
+	my $past := _create_symbol(%attributes);
 	
+	DUMP($past);
+	return $past;
+}
+
+
+our %binary_pastops;
+%binary_pastops{'&&'} := 'if';
+%binary_pastops{'and'} := 'if';
+%binary_pastops{'||'} := 'unless';
+%binary_pastops{'or'} := 'unless';
+%binary_pastops{'xor'} := 'xor';
+
+our %binary_pirops;
+%binary_pirops{'+'}  := 'add';
+%binary_pirops{'-'}  := 'sub';
+%binary_pirops{'*'}  := 'mul',
+%binary_pirops{'/'}  := 'div',
+%binary_pirops{'%'}  := 'mod',
+%binary_pirops{'<<'}  := 'shl',
+%binary_pirops{'>>'}  := 'shr',
+%binary_pirops{'&'}  := 'band',
+%binary_pirops{'band'}  := 'band',
+%binary_pirops{'|'}  := 'bor',
+%binary_pirops{'bor'}  := 'bor',
+%binary_pirops{'^'}  := 'bxor',
+%binary_pirops{'bxor'}  := 'bxor',
+
+our %binary_inline;
+%binary_inline{'=='} := "iseq";
+%binary_inline{'!='} := "isne";
+%binary_inline{'<'}  := "islt";
+%binary_inline{'<='}  := "isle";
+%binary_inline{'>'}  := "isgt";
+%binary_inline{'>='}  := "isge";
+
+sub _create_expr_asm(%attributes) {
+
+}
+
+sub _create_expr_binary(%attributes) {
+	NOTE("Creating expr_binary node");
+	my $oper	:= %attributes<operator>;
+	ASSERT($oper, 'Expr_binary must have an :operator()');
+	my $left	:= %attributes<left>;
+	ASSERT($left, 'Expr_binary must have a :left()');
+	my $right	:= %attributes<right>;
+	ASSERT($right, 'Expr_binary must have a :right()');
+	
+	my $past := PAST::Op.new(:name($oper));
+	set_attributes($past, %attributes);
+
+	if %binary_pastops{$oper} {
+		$past.pasttype(%binary_pastops{$oper});
+	}
+	elsif %binary_pirops{$oper} {
+		$past.pasttype('pirop');
+		$past.pirop(%binary_pirops{$oper});
+	}
+	elsif %binary_inline{$oper} {
+		$past.pasttype('inline');
+		my $inline := "\t$I0 = " ~ %binary_inline{$oper} ~ " %0, %1\n"
+			~ "\t%r = box $I0\n";
+		$past.inline($inline);
+	}
+
+	DUMP($past);
+	return $past;
+}
+
+sub _create_expr_call(%attributes) {
+	NOTE("Creating expr_call node");
+	
+	my $past := PAST::Op.new(:pasttype('call'));
+	set_attributes($past, %attributes);
+
 	DUMP($past);
 	return $past;
 }
@@ -113,6 +201,10 @@ sub _create_foreach_statement(%attributes) {
 	NOTE("Creating foreach_statement");
 	my $past := PAST::Stmts.new(:name('foreach statement'));
 	set_attributes($past, %attributes);
+	
+	$past<parameter_scope> := create('parameter_scope',
+		:name('foreach parameter scope'),
+		:foreach_statement($past));
 	
 	DUMP($past);
 	return $past;
@@ -127,6 +219,20 @@ sub _create_function_definition(%attributes) {
 	return $past;
 }
 
+sub _create_goto_statement(%attributes) {
+	my $label := %attributes<label>;
+	ASSERT($label, 'Goto statement must have a :label()');
+	NOTE("Creating goto_statement: ", $label);
+	my $past := PAST::Op.new(
+		:inline('    goto ' ~ $label),
+		:name('goto ' ~ $label), 
+		:pasttype('inline'),
+	);
+	set_attributes($past, %attributes);
+	DUMP($past);
+	return $past;
+}
+
 sub _create_inline(%attributes) {
 	my $past := PAST::Op.new(:pasttype('inline'));
 	
@@ -135,6 +241,21 @@ sub _create_inline(%attributes) {
 	}
 	
 	set_attributes($past, %attributes);
+	
+	DUMP($past);
+	return $past;
+}
+
+sub _create_label_name(%attributes) {
+	my $name := %attributes<name>;
+	ASSERT($name, 'Label_name must have a :name()');
+	NOTE("Creating label_name: ", $name);
+	
+	my $past := PAST::Val.new(
+		:returns('String'),
+		:value($name));
+	set_attributes($past, %attributes);
+
 	DUMP($past);
 	return $past;
 }
@@ -183,8 +304,8 @@ sub _create_parameter_declaration(%attributes) {
 	ASSERT(%attributes<from>, 'Parameter declaration must be created :from() a declarator.');
 	
 	my $past := %attributes<from>;
+	%attributes<from> := undef;
 	set_attributes($past, %attributes);
-	$past<from> := undef;
 	
 	DUMP($past);
 	return $past;
@@ -192,7 +313,9 @@ sub _create_parameter_declaration(%attributes) {
 
 sub _create_parameter_scope(%attributes) {
 	NOTE("Creating new parameter_scope");
-	my $past := PAST::Block.new(:blocktype('immediate'));
+	my $past := PAST::Block.new(
+		:blocktype('immediate'),
+		:name('parameter scope'));
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
@@ -208,6 +331,77 @@ sub _create_qualified_identifier(%attributes) {
 	return $past;
 }
 
+sub _create_return_statement(%attributes) {
+	NOTE("Creating return_statement");
+	
+	my $past := PAST::Op.new(
+		:name("return statement"),
+		:pasttype('pirop'),
+		:pirop('return'));
+	set_attributes($past, %attributes);
+
+	DUMP($past);
+	return $past;
+}
+
+sub _create_symbol(%attributes) {
+	NOTE("Creating new symbol");
+	my $past := PAST::Var.new();
+	set_attributes($past, %attributes);
+
+	unless $past<pir_name> {
+		$past<pir_name> := $past<name>;
+	}
+	
+	if $past<type> {
+		my $etype	:= $past<type>;
+		
+		while $etype<type> {
+			$etype	:= $etype<type>;
+		}
+
+		$past<etype> := $etype;
+	}
+	else {
+		$past<etype> := $past;
+	}
+
+	if $past<scope> {
+		close::Compiler::Scopes::declare_object($past<scope>, $past);
+	}
+	
+	DUMP($past);
+	return $past;
+}
+
+=sub _create_symbol_alias
+
+Creates a special kind of 'symbol' node.
+
+=cut
+
+sub _create_symbol_alias(%attributes) {
+	my $name := %attributes<name>;
+	ASSERT($name, 'Symbol_aliases must be created with a :name()');
+	NOTE("Creating alias entry: ", $name);
+
+	my $kind := %attributes<kind>;
+	ASSERT($kind, 'Symbol_aliases must specify a :kind(), either symbol, or namespace.');
+	
+	my $target := %attributes<target>;
+	ASSERT($target, 'Symbol_aliases must specify a :target()');
+	
+	# This is a specialized symbol. Don't change the node type.
+	%attributes<node_type>	:= 'symbol';
+	%attributes<is_alias>	:= 1;
+
+	NOTE("Symbol_aliases are a subtype of symbol");
+	my $past := _create_symbol(%attributes);
+	
+	DUMP($past);
+	return $past;
+}
+
 sub _create_type_specifier(%attributes) {
 	my $past := PAST::Val.new();
 	$past<is_specifier> := 1;
@@ -218,9 +412,9 @@ sub _create_type_specifier(%attributes) {
 }
 
 sub _create_translation_unit(%attributes) {
-	# FIXME: This code should probably be moved into here.
 	my $past := PAST::Block.new(
 		:blocktype('immediate'),
+		:hll(close::Compiler::Scopes::fetch_current_hll()),
 		:name('translation unit'),
 	);
 	set_attributes($past, %attributes);
@@ -276,6 +470,7 @@ sub get_factory($type) {
 
 sub set_attributes($past, %attributes) {
 	for %attributes {
+		# FIXME: Detect accessor methods with $past.can(...)
 		if $_ eq 'node' {
 			$past.node(%attributes{$_});
 		}

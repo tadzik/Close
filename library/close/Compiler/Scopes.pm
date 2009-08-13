@@ -37,7 +37,7 @@ declarator to the block's symbol table. Returns nothing.
 sub add_declarator($scope, $past) {
 	NOTE("Adding name '", $past.name(), "' to ", $scope<lstype>, " scope '", $scope.name(), "'");
 	my $name := $past.name();
-	my $already := get_object($scope, $name);
+	my $already := get_symbol($scope, $name);
 	
 	if $already {
 		if $already =:= $past {
@@ -50,7 +50,7 @@ sub add_declarator($scope, $past) {
 		}
 	}
 	else {
-		set_object($scope, $name, $past);
+		set_symbol($scope, $name, $past);
 	}
 }
 
@@ -58,21 +58,6 @@ sub add_declarator_to_current($past) {
 	my $scope := current();
 	NOTE("Adding name '", $past.name(), "' to ", $scope<lstype>, " scope '", $scope.name(), "'");
 	add_declarator($scope, $past);
-}
-
-sub add_varlist_symbols($past) {
-	unless $past.isa(PAST::VarList) {
-		DUMP($past);
-		DIE("Parameter $past must be a PAST::VarList");
-	}
-	
-	my $scope := current();
-	
-	for @($past) {
-		declare_object($scope, $_);
-	}
-	
-	DUMP($scope);
 }
 
 sub current() {
@@ -84,7 +69,7 @@ sub current() {
 sub declare_object($scope, $object) {
 	NOTE("Declaring object '", $object.name(), "' in ", $scope<lstype>, " scope '", $scope.name(), "'");
 	my $name	:= $object.name();
-	my $already	:= get_object($scope, $name);
+	my $already	:= get_symbol($scope, $name);
 	
 	if $already {
 		# FIXME: Should check for compatible types, like a redeclaration:
@@ -94,10 +79,9 @@ sub declare_object($scope, $object) {
 			'Repeated declaration of symbol \'' ~ $name ~ '\'');
 	}
 	else {
-		set_object($scope, $name, $object);
+		set_symbol($scope, $name, $object);
 	}
 
-	$scope.push($object);
 	DUMP($object);
 }
 
@@ -147,8 +131,8 @@ sub get_namespace($scope, $name) {
 	return $namespace;
 }
 
-sub get_object($scope, $name) {
-	my $object := $scope.symbol($name)<object>;
+sub get_symbol($scope, $name) {
+	my $object := $scope.symbol($name)<symbol>;
 	DUMP(:name($name), :result($object));
 	return $object;
 }
@@ -188,7 +172,7 @@ sub print_symbol_table($block) {
 	NOTE("printing...");
 	
 	for $block<symtable> {
-		close::Compiler::Symbols::print_symbol(get_object($block, $_));
+		close::Compiler::Symbols::print_symbol(get_symbol($block, $_));
 		DUMP($block);
 	}
 	
@@ -279,8 +263,8 @@ sub set_namespace($scope, $name, $namespace) {
 	$scope.symbol($name, :namespace($namespace));
 }
 
-sub set_object($scope, $name, $object) {
-	$scope.symbol($name, :object($object));
+sub set_symbol($scope, $name, $object) {
+	$scope.symbol($name, :symbol($object));
 }
 
 sub symbol_defined_anywhere($past) {

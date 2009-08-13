@@ -166,6 +166,7 @@ sub query_relative($origin, @target) {
 	
 	for @target {
 		@path.push($_);		
+		NOTE("Retrieving (sub) namespace: ", ~$_);
 		my $child := close::Compiler::Scopes::get_namespace($block, $_);
 		
 		unless $child {
@@ -176,6 +177,7 @@ sub query_relative($origin, @target) {
 		$block := $child;
 	}
 	
+	NOTE("Returning block: ", $block.name());
 	DUMP($block);
 	return $block;		
 }
@@ -200,6 +202,7 @@ sub query_relative_namespace_of($namespace, $past_var) {
 	my $result;
 	
 	if $past_var<is_rooted> {
+		NOTE("Querying relative namespace of rooted var.");
 		$result := query_namespace_of($past_var);
 	}
 	else {
@@ -210,7 +213,8 @@ sub query_relative_namespace_of($namespace, $past_var) {
 		$result := query_relative($namespace, @path);
 	}
 
-	DUMP($past_var, $result);
+	NOTE("Returning namespace: ", $result.name());
+	DUMP($result);
 	return $result;
 }
 

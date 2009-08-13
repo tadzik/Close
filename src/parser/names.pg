@@ -42,6 +42,23 @@ rule new_alias_name {
 	<alias=BAREWORD> {*}
 }
 
+=head3 Labels
+
+Labels are targets for local branches. They are used in C<goto_statement>s,
+and C<labeled_statement>s.
+
+=rule label_name
+
+A label is meaningful only within a subroutine. This means there is no reason to 
+permit (or encourage) the use of unusual label names.Every label must be a 
+C<BAREWORD>.
+
+=cut
+
+rule label_name {
+	<label=BAREWORD> {*}
+}
+
 =head3 High-level Language Names
 
 As specified by the Parrot documentation, HLL names are all lower case, and may
@@ -196,12 +213,11 @@ types I<must> be declared prior to being used as a type specifier in a declarati
 
 rule type_name {
 	<qualified_identifier> 
-	{*} #= check_typename
+	{*}
 	<?{{ 
 		$P0 = get_hll_global [ 'close' ; 'Grammar' ; 'Actions' ], '$Is_valid_type_name'
 		.return ($P0)
 	}}>
-	{*} #= valid_typename
 }
 
 #####

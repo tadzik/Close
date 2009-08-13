@@ -43,9 +43,9 @@ the value of expression at the time of initialization.
 =cut
 
 rule dclr_array_or_hash {
-	| $<hash>='%'		{*}
-	| <expression>		{*}
-	|				{*}
+	| $<hash>='%'		{*} #= decl_hash_of
+	| <size=expression>		{*} #= decl_array_of
+	|				{*} #= decl_array_of
 }
 
 =rule dclr_atom
@@ -57,8 +57,8 @@ part) or another C<declarator> nested in parentheses.
 
 rule dclr_atom {
 	| :dba('nested declarator')
-	    '(' ~ ')' <declarator>	{*}
-	| <declarator_name>	{*}
+	    '(' ~ ')' <declarator>	{*} #= declarator
+	| <declarator_name>	{*} #= declarator_name
 }
 
 =rule dclr_pointer
@@ -226,6 +226,10 @@ rule tspec_storage_class {
 	| <token=TYPEDEF>	{*}
 }
 
+rule tspec_type_name {
+	<type_name>	 	{*}
+}
+
 rule tspec_type_specifier {
 	| <tspec_builtin_type>	{*} #= tspec_builtin_type
 #	| <class_specifier>			{*} #= class_specifier
@@ -235,10 +239,6 @@ rule tspec_type_specifier {
 #	| <typename_specifier>		{*} #= typename_specifier
 	# type-name is the only pattern that does not have a keyword.
 	| <tspec_type_name>		{*} #= tspec_type_name
-}
-
-token tspec_type_name {
-	<type_name> {*}
 }
 
 rule using_namespace_directive {

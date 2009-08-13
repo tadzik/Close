@@ -1,5 +1,7 @@
 # $Id$
 
+method additive_expr($/) { binary_expr_l2r($/); }
+
 method arg_adverb($/) {
 	my $past := make_token($<token>);
 	DUMP($past);
@@ -25,7 +27,8 @@ method arg_expr($/) {
 }
 
 method arg_list($/) {
-	my $past := PAST::Op.new(:pasttype('call'), :node($/));
+	NOTE("Assembling arg_list");
+	my $past := close::Compiler::Node::create('expr_call', :node($/));
 
 	for $<arg> {
 		$past.push($_.ast);
@@ -58,19 +61,19 @@ sub arg_expr_add_adverb($/, $past, $adverb) {
 }
 
 method asm_expr($/, $key) {
-	my $past;
+	my $past := close::Compiler::Node::create('expr_asm', 
+		:asm($<asm>.ast.value()),
+	);
 
-    if $<arg_list> {
-        $past := $<arg_list>[0].ast;
-    }
-    else {
-        $past := PAST::Op.new(:node($/));
-    }
+	if $<arg_list> {
+		$past := $<arg_list>[0].ast;
+	}
+	else {
+		$past := close::Compiler::Node::create('expr_call', :node($/));
+	}
 
-    $past.pasttype('inline');
-    $past.inline($<asm>.ast.value());
-
-	#DUMP($past);
+	
+	DUMP($past);
 	make $past;
 }
 
@@ -79,7 +82,27 @@ method asm_contents($/) {
 	make $past;
 }
 
+# Assembly routine for a whole bunch of left-to-right associative binary ops.
+sub binary_expr_l2r($/) {
+	NOTE("Assembling binary left-associative expression");
+	my $past := $<term>.shift().ast;
+
+	for $<op> {
+		$past := close::Compiler::Node::create('expr_binary', 
+			:operator(~$_),
+			:left($past),
+			:right($<term>.shift().ast),
+			:node($<op>));
+	}
+
+	NOTE("done");
+	DUMP($past);
+	make $past;
+}
+
 method expression($/, $key) { PASSTHRU($/, $key); }
+
+method mult_expr($/) { binary_expr_l2r($/); }
 
 method postfix_expr($/) {
 	my $past := $<term>.ast;
@@ -229,12 +252,7 @@ method prefix_expr($/, $key)      {
 	make $past;
 }
 
-method mult_expr($/, $key) { binary_expr_l2r($/); }
-#method mult_op($/, $key) { binary_op($/, ~$/); }
-method additive_expr($/, $key) { binary_expr_l2r($/); }
-#method additive_op($/, $key) { binary_op($/, ~$/); }
 method bitwise_expr($/, $key) { binary_expr_l2r($/); }
-#method bitwise_op($/, $key) { binary_op($/, $key); }
 method compare_expr($/) { binary_expr_l2r($/); }
 method logical_expr($/) { binary_expr_l2r($/); }
 
@@ -256,6 +274,8 @@ method conditional_expr($/) {
 
 	make $past;
 }
+
+method term($/, $key)     { PASSTHRU($/, $key); }
 
 our %assign_opcodes;
 %assign_opcodes{'+='}	:= 'add';
@@ -308,76 +328,3 @@ method assign_expr($/, $key) {
 		make $past;
 	}
 }
-
-# Assembly routine for a whole bunch of left-to-right associative binary ops.
-sub binary_expr_l2r($/) {
-	my $past := $<term>.shift().ast;
-
-	for $<op> {
-		my $op := binary_op($_);
-		$op.push($past);
-		$op.push($<term>.shift().ast);
-		$past := $op;
-	}
-
-	#DUMP($past);
-	make $past;
-}
-
-our %binary_pastops;
-%binary_pastops{'&&'} := 'if';
-%binary_pastops{'and'} := 'if';
-%binary_pastops{'||'} := 'unless';
-%binary_pastops{'or'} := 'unless';
-%binary_pastops{'xor'} := 'xor';
-
-our %binary_pirops;
-%binary_pirops{'+'}  := 'add';
-%binary_pirops{'-'}  := 'sub';
-%binary_pirops{'*'}  := 'mul',
-%binary_pirops{'/'}  := 'div',
-%binary_pirops{'%'}  := 'mod',
-%binary_pirops{'<<'}  := 'shl',
-%binary_pirops{'>>'}  := 'shr',
-%binary_pirops{'&'}  := 'band',
-%binary_pirops{'band'}  := 'band',
-%binary_pirops{'|'}  := 'bor',
-%binary_pirops{'bor'}  := 'bor',
-%binary_pirops{'^'}  := 'bxor',
-%binary_pirops{'bxor'}  := 'bxor',
-
-our %binary_inline;
-%binary_inline{'=='} := "iseq";
-%binary_inline{'!='} := "isne";
-%binary_inline{'<'}  := "islt";
-%binary_inline{'<='}  := "isle";
-%binary_inline{'>'}  := "isgt";
-%binary_inline{'>='}  := "isge";
-
-# Create a "run this pir op" node for binary expressions.
-sub binary_op($/) {
-	my $opname   := ~$/;
-
-	my $past := PAST::Op.new(:name($opname), :node($/));
-
-	if %binary_pastops{$opname} {
-		$past.pasttype(%binary_pastops{$opname});
-	}
-	elsif %binary_pirops{$opname} {
-		$past.pasttype('pirop');
-		$past.pirop(%binary_pirops{$opname});
-	}
-	elsif %binary_inline{$opname} {
-		$past.pasttype('inline');
-		my $inline := "\t$I0 = " ~ %binary_inline{$opname} ~ " %0, %1\n"
-			~ "\t%r = new 'Integer'\n"
-			~ "\t%r = $I0\n";
-		$past.inline($inline);
-	}
-
-	#DUMP($past);
-	make $past;
-}
-
-method term($/, $key)     { PASSTHRU($/, $key); }
-

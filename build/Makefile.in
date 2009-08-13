@@ -72,6 +72,7 @@ COMPILER_LIBS_PIR := \
 	library/close/Compiler/Config.pir			\
 	library/close/Compiler/Dumper.pir		\
 	library/close/Compiler/Messages.pir		\
+	library/close/Compiler/MessageVisitor.pir	\
 	library/close/Compiler/Namespaces.pir		\
 	library/close/Compiler/Node.pir			\
 	library/close/Compiler/PrettyPrintVisitor.pir	\
@@ -219,6 +220,15 @@ library/close/Compiler/Messages.pir: library/close/Compiler/Messages.pm
 	$(STRIP_PIRA) library/close/Compiler/Messages.pira \
 		> library/close/Compiler/Messages.pir
 	$(RM_F) library/close/Compiler/Messages.pira
+
+library/close/Compiler/MessageVisitor.pir: library/close/Compiler/MessageVisitor.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/MessageVisitor.pira \
+		library/close/Compiler/MessageVisitor.pm
+	$(STRIP_PIRA) library/close/Compiler/MessageVisitor.pira \
+		> library/close/Compiler/MessageVisitor.pir
+	$(RM_F) library/close/Compiler/MessageVisitor.pira
 
 library/close/Compiler/Namespaces.pir: library/close/Compiler/Namespaces.pm
 	@echo "**** Compiling $< to PIR"

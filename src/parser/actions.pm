@@ -30,6 +30,12 @@ method translation_unit($/, $key) {
 		
 		close::Compiler::Scopes::dump_stack();
 
+		NOTE("Resolving types");
+		close::Compiler::TypeResolutionVisitor::resolve_types($past);
+
+		NOTE("Displaying messages");
+		close::Compiler::MessageVisitor::show_messages($past);
+		
 		NOTE("Pretty-printing input");
 		my $prettified := close::Compiler::PrettyPrintVisitor::print($past);
 		

@@ -27,25 +27,13 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub new($name, $type, $block) {
-	my $symbol := PAST::Var.new(:name($name));
+	my $symbol := close::Compiler::Node::create('symbol', 
+		:name($name),
+		:block($block),
+		:type($type),
+	);
 
-	$symbol<pir_name>	:= $name;
-	$symbol<block>		:= $block;
-	#$symbol<searchpath>	:= clone_current_scope();
-	
-	if $type {
-		my $etype		:= $type;
-		
-		while $etype<is_declarator> {
-			$etype		:= $etype<type>;
-		}
-		
-		$symbol<type>	:= $type;
-		$symbol<etype>	:= $etype;
-	}
-
-	close::Compiler::Scopes::declare_object($block, $symbol);
-	DUMP(:symbol($symbol));
+	DUMP($symbol);
 	return $symbol;
 }
 
@@ -65,7 +53,7 @@ DUMP($sym);
 			" ",
 			substr("is an alias for: " ~ "                  ", 0, 18),
 			" ",
-			substr($sym<alias_for><block>.name() ~ '::' 
+			substr($sym<alias_for><scope>.name() ~ '::' 
 				~ $sym<alias_for>.name() ~ "                              ", 0, 30));
 	}
 	else {
@@ -73,7 +61,7 @@ DUMP($sym);
 			" ",
 			substr($sym<pir_name> ~ "                  ", 0, 18),
 			" ",
-			$sym<block>.name(), 
+			$sym<scope>.name(), 
 			" ",
 			close::Compiler::Types::type_to_string($sym<type>));
 	}

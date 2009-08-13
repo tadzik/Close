@@ -8,8 +8,11 @@ because a cv_qualifier is a valid type specifier by itself.
 =cut
 
 method cv_qualifier($/) {
-	my $past := close::Compiler::Types::new_specifier(:name(~$<token>));
-	$past{'is_' ~ $<token>} := 1;
+	my $name := ~ $<token>;
+	NOTE("Creating new cv qualifier: ", $name);
+	my $past := close::Compiler::Node::create('type_specifier');
+	$past{'is_' ~ $name} := 1;
+
 	DUMP($past);
 	make $past;
 }
@@ -32,92 +35,18 @@ and attaches any attributes required (array #elements).
 
 =cut
 
-method dclr_array_or_hash($/) {
-	my $past;
+method dclr_array_or_hash($/, $key) {
+	my $past := close::Compiler::Node::create($key, :node($/));
 	
-	if $<hash> {
-		$past := new_dclr_hash();
+	if $<size> {
+		$past<elements> := $<size>.ast;
 	}
-	elsif $<expression> {
-		$past := immediate_token("FixedArray");
-		$past<num_elements> := $<expression>.ast;
-	}
-	else {
-		$past := immediate_token("Array");
-	}
-	$past.node($/);
-	
+
 	DUMP($past);
 	make $past;
 }
 
-# method declarator_name($/)
-# This method is defined in name_actions.pm
-
-=method dclr_atom
-
-Passes through the PAST of the C<declarator_name> or of the 
-nested C<declarator>.
-
-=cut
-
-method dclr_atom($/) {
-	if $<declarator_name> {
-		make $<declarator_name>.ast;
-	}
-	else {
-		make $<declarator>.ast;
-	}
-}
-
-method declarator($/) {	
-	my $past := $<dclr_atom>.ast;
-	NOTE("Processing declarator: ", $past.name());
-	DUMP($past);
-	
-	unless $past<etype> {
-		$past<etype> := $past;
-	}
-	
-	my $last_dclr := $past<etype>;
-	
-	# Merge postfix declarator mods (array, function, hash) in to 
-	# $past - the inner declarator or symbol name. Postfix declarators
-	# read left to right, so foo()[] is a function returning an array. 
-	# The declarator chain here should be 'foo'->function->array.
-	for $<dclr_postfix> {
-		NOTE("Adding postfix declarator: ", $_.ast.name());
-		$last_dclr<type> := $_.ast;
-		$last_dclr := $_.ast;
-	}
-	
-	$past<etype> := $last_dclr;
-	
-	# Merge prefix declarator mods (pointer) in to $past.
-	# Prefix declarators read from right to left, making 
-	# C< *v *c foo> a "const pointer to volatile pointer".
-	# The declarator chain should be foo -> *c -> *v.	
-	$last_dclr := $past<etype><type>;
-	
-	for $<dclr_pointer> {
-		NOTE("Adding pointer declarator: ", $_.ast.name());
-		# Reverse pointers by "inserting" them in at back of list.
-		$_.ast<type> := $past<etype><type>;
-		$past<etype><type> := $_.ast;
-		
-		if !$last_dclr {
-			$last_dclr := $_.ast;
-		}
-	}
-
-	if $last_dclr {
-		$past<etype> := $last_dclr;
-	}
-	
-	NOTE("Declarator fixed up (specifiers not added yet)");
-	DUMP($past);
-	make $past;
-}
+method dclr_atom($/, $key) { PASSTHRU($/, $key); }
 	
 =method dclr_alias_init($/)
 
@@ -162,6 +91,49 @@ Passes through the array, hash, or function declarator.
 
 method dclr_postfix($/, $key) { PASSTHRU($/, $key); }
 
+method declarator($/) {	
+	my $past := $<dclr_atom>.ast;
+	
+	NOTE("Processing declarator: ", $past.name());
+	DUMP($past);
+	
+	my $last_dclr := $past<etype>;
+
+	for $<dclr_postfix> {
+		NOTE("Adding postfix declarator: ", $_.ast.name());
+		$last_dclr<type> := $_.ast;
+		$last_dclr := $_.ast;
+	}
+	
+	$past<etype> := $last_dclr;
+
+	# Reverse the chain of pointer declarators:
+	# int *const *volatile X;  becomes
+	# X -> *volatile -> *const -> int
+	my $pointer_chain;
+	$last_dclr := undef;
+	
+	for $<dclr_pointer> {
+		$_.ast<type> := $pointer_chain;
+		$pointer_chain := $_.ast;
+		
+		unless $last_dclr {
+			$last_dclr := $pointer_chain;
+		}
+	}
+	
+	# Append pointer chain to declarators
+	# X -> array of -> pointer to...
+	if $last_dclr {
+		$past<etype><type> := $pointer_chain;
+		$past<etype> := $last_dclr;
+	}
+	
+	NOTE("Declarator fixed up (specifiers not added yet)");
+	DUMP($past);
+	make $past;
+}
+
 method declaration($/, $key) {
 	if $key eq 'specifiers' {
 		NOTE("Processing specifiers");
@@ -171,13 +143,6 @@ method declaration($/, $key) {
 		my $block := close::Compiler::Node::create('decl_temp',
 			:name('temporary declaration scope')
 		);
-		
-		my $past := $block<varlist>;
-		# Modify $specifier to reflect all the specifiers we saw. 
-		# Attach errors to $past.
-		for $<specifier> {
-			$past<specifier> := close::Compiler::Types::merge_specifiers($past, $past<specifier>, $_.ast);
-		}
 		
 		close::Compiler::Scopes::push($block);
 		
@@ -189,34 +154,35 @@ method declaration($/, $key) {
 		# Block, and only create the VarList to replace the Block in this
 		# part.
 		
-		NOTE("Processing declarators");
+		my $block	:= close::Compiler::Scopes::pop('decl_temp');
+
+		ASSERT(+@($block) == 0,
+			'No statements should be added to temporary decl_temp scope block.');
+
+		my $past	:= $block<varlist>;
+		
 		# Once the declaration is complete, the temporary block is 
 		# discarded. At that point, though, the PAST returned is a 
 		# varlist, and whoever requested the varlist should merge the 
 		# symbols in with their own symbol table. (E.g., a declaration
 		# statement, or a parameter list, or whatever.)
-		my $block	:= close::Compiler::Scopes::pop('decl_temp');
-		my $past	:= $block<varlist>;
-		my $spec	:= $past<specifier>;
+
+		# Attach errors to $past.
+		for $<specifier> {
+			$past<specifier> := close::Compiler::Types::merge_specifiers($past, $past<specifier>, $_.ast);
+		}
 		
-		NOTE("Popped ", $block<lstype>, " scope '", $block.name(), "'");
-		
-		# Convert individual declarators into type-chains
-		# Create Past Var entries for each declarator.
-		# Lookup init values for types where no initializer is provided.
-		# Set types for 'auto' decls with initializers.
-			
+		NOTE("Processing declarators");
 		# Merge the specifier in to the declarator. Attach errors, etc.
 		for $<symbol> {
 			my $declarator := $_.ast;
+			
 			NOTE("Merging specifier with declarator '", $declarator.name(), "'");
 			$declarator := 
-				close::Compiler::Types::add_specifier_to_declarator($spec, $declarator);
+				close::Compiler::Types::add_specifier_to_declarator($past<specifier>, $declarator);
+				
 			$past.push($declarator);
-		}
-
-		if +@($block) {
-			$/.panic("Unexpected elements added to temporary VarList block");
+			close::Compiler::Scopes::add_declarator_to_current($declarator);
 		}
 
 		NOTE("done");
@@ -362,10 +328,9 @@ method parameter_declaration($/) {
 		$past<default> := $<default>.ast;
 	}
 	
-	# Done by declarator_name
 	# Declare object in current scope, which should be a parameter block.
 	ASSERT(
-		close::Compiler::Scopes::get_object(
+		close::Compiler::Scopes::get_symbol(
 			close::Compiler::Scopes::current(), $past.name()) =:= $past,
 		'Expected current scope would already have this parameter declared (by <declarator_name>)');
 	
@@ -391,8 +356,8 @@ parameter scope.
 method parameter_list($/, $key) {
 	if $key eq 'open' {
 		NOTE('Begin function parameter list');
-		my $past	:= close::Compiler::Types::function_returning();
-		$past.node(	$/);
+		my $past	:= close::Compiler::Node::create('decl_function_returning',
+			:node($/));
 		my $block	:= $past<parameter_scope>;
 		
 		close::Compiler::Scopes::push($block);
@@ -430,23 +395,39 @@ Creates a type specifier with noun set to the type name.
 =cut
 
 method tspec_builtin_type($/) {
-	my $past := close::Compiler::Types::new_specifier(
-		:is_builtin(1),
-		:noun(~$<token>),
-		:name(~$<token>));
+	my $name := ~ $<token>;
+	NOTE("Creating new type specifier for builtin type: ", $name);
+	
+	my $type_name := close::Compiler::Node::create('qualified_identifier', 
+		:name($name),
+		:node($/),
+	);
+
+	my $builtin := close::Compiler::Types::query_typename($type_name);
+	
+	ASSERT($builtin,
+		'query_typename should always be able to find a builtin type');
+		
+	$type_name<apparent_type>  := $builtin;
+	my $past := close::Compiler::Node::create('type_specifier',
+		:noun($type_name));
+	
 	DUMP($past);
 	make $past;
 }
 
 =method tspec_function_attr
 
-Creates a token around the keyword.
+Creates a type specifier around the keyword.
 
 =cut
 
 method tspec_function_attr($/) {
-	my $past := close::Compiler::Types::new_specifier();
-	$past{'is_' ~ $<token>} := 1;
+	my $name := ~ $<token>;
+	NOTE("Creating new function attribute specifier: ", $name);
+	my $past := close::Compiler::Node::create('type_specifier');
+	$past{'is_' ~ $name} := 1;
+
 	DUMP($past);
 	make $past;
 }
@@ -458,7 +439,11 @@ Creates a token around the keyword.
 =cut
 
 method tspec_storage_class($/) {
-	my $past := close::Compiler::Types::new_specifier(:storage_class(~$<token>));
+	my $name := ~ $<token>;
+	NOTE("Creating new storage class specifier: ", $name);
+	my $past := close::Compiler::Node::create('type_specifier',
+		:storage_class($name));
+		
 	DUMP($past);
 	make $past;
 }
@@ -466,7 +451,16 @@ method tspec_storage_class($/) {
 method tspec_type_specifier($/, $key) { PASSTHRU($/, $key); }
 
 method tspec_type_name($/) {
-	my $past := close::Compiler::Types::new_specifier(:type_name($<type_name>.ast));
+	my $type_name := $<type_name>.ast;
+	my $name	:= $type_name.name();
+	NOTE("Creating new specifier for type_name: ", $name);
+
+	ASSERT($type_name<apparent_type>,
+		'Type_name lookup sets apparent type to current resolution of name');
+		
+	my $past := close::Compiler::Node::create('type_specifier',
+		:noun($type_name));
+
 	DUMP($past);
 	make $past;
 }

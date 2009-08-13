@@ -124,7 +124,7 @@ method visit_vardecl($node) {
 		$node.scope('package');
 	}
 	else {
-		#my $block := $node<block>;
+		#my $block := $node<scope>;
 		my $block := close::Compiler::Scopes::current();
 		DUMP($block);
 		

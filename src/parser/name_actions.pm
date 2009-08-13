@@ -8,7 +8,7 @@ resulting PAST::Var IS NOT RESOLVED.
 =cut
 
 method declarator_name($/) {
-	my $past	:= close::Compiler::Node::create('declarator_name', :node($/));
+	my $past := close::Compiler::Node::create('declarator_name', :node($/));
 	
 	# This stuff is too common to duplicate:
 	assemble_qualified_path($past, $/);
@@ -21,6 +21,16 @@ method declarator_name($/) {
 	# and other stuff that will invoke this rule.
 	close::Compiler::Scopes::add_declarator_to_current($past);
 	# TODO: Maybe add a warning if it's already defined? "Repeated decl of name..."
+	DUMP($past);
+	make $past;
+}
+
+method label_name($/) {
+	NOTE("Creating new label_name: ", ~ $<label>);
+	my $past := close::Compiler::Node::create('label_name', 
+		:name(~ $<label>), 
+		:node($/));
+	
 	DUMP($past);
 	make $past;
 }
@@ -55,10 +65,8 @@ method new_alias_name($/) {
 
 method qualified_identifier($/) {
 	NOTE("Found qualified_identifier");
-	my $past	:= close::Compiler::Node::create('qualified_identifier', :node($/));
-	# This stuff is too common to duplicate:
+	my $past := close::Compiler::Node::create('qualified_identifier', :node($/));
 	assemble_qualified_path($past, $/);
-	#$past<searchpath> := clone_current_scope();
 	
 	DUMP($past);
 	make $past;
@@ -73,16 +81,18 @@ method simple_identifier($/) {
 
 our $Is_valid_type_name := 0;
 
-method type_name($/, $key) {
+method type_name($/) {
 	my $past := $<qualified_identifier>.ast;
+	NOTE("Checking for typename '", $past<display_name>, "'");
 	
-	if $key eq 'check_typename' {
-		$Is_valid_type_name := close::Compiler::Types::is_typename($past);
-		NOTE("Checked for typename '", $past.name(), "', valid = ", $Is_valid_type_name);
-		return 0;
+	$Is_valid_type_name := 0;
+	my $nsp := close::Compiler::Types::query_typename($past);
+	
+	if $nsp {
+		$Is_valid_type_name := 1;
+		$past<apparent_type> := close::Compiler::Scopes::get_symbol($nsp, $past.name());
 	}
-	else {
-		DUMP($past);
-		make $past;
-	}
+		
+	DUMP($past);
+	make $past;
 }

@@ -21,6 +21,18 @@ rule extern_statement {
 	| <local_statement>		{*} #= local_statement
 }
 
+
+rule label_declaration {
+	<label=label_name> <.SINGLE_COLON>
+	{*}
+}
+
+rule labeled_statement {
+	<labels=label_declaration>+
+	<statement=local_statement>
+	{*}
+}
+
 =rule local_statement
 
 A I<local_statement> is a statement that may appear in a local scope -- that is,
@@ -30,18 +42,18 @@ such as loops, goto, if/then/else, expressions, etc.
 =cut
 
 rule local_statement {
-	[ <labeled_statement>	{*} #= labeled_statement
 	| <null_statement>		{*} #= null_statement
 	| <compound_statement>	{*} #= compound_statement
 	| <conditional_statement>	{*} #= conditional_statement
 	| <do_while_statement>	{*} #= do_while_statement
 	| <while_do_statement>	{*} #= while_do_statement
 	| <foreach_statement>	{*} #= foreach_statement
+	| <goto_statement>		{*} #= goto_statement
+	| <return_statement>	{*} #= return_statement
 	| <jump_statement>	{*} #= jump_statement
+	| <labeled_statement>	{*} #= labeled_statement
 	| <declaration_statement>	{*} #= declaration_statement
 	| <expression_statement>	{*} #= expression_statement
-	]
-	|| [ <!before '}' | $ > <.panic: "Statement expected"> ]
 }
 
 rule null_statement {
@@ -87,25 +99,32 @@ rule conditional_statement {
 
 rule foreach_header {
 	# NB: decl before ident, to avoid typedefs messing up syntax: for (T t : x)
-	[ <loop_var=declaration> || <loop_var=simple_identifier> ]
-	':'
+	[ <parameter_declaration> 
+	|| <simple_identifier> 
+	]
+	<.SINGLE_COLON>
 	<list=expression>
 }
 
 rule foreach_statement {
-	<.FOREACH>
+	<.FOREACH>		{*} #= open
 	'(' ~ ')' <header=foreach_header>
-	<body=local_statement>
+	<body=local_statement>	{*} #= close
+}
+
+rule goto_statement {
+	<.GOTO> ~ ';' 
+	<label=BAREWORD> 
+	{*}
+}
+
+rule return_statement {
+	<.RETURN> ~ ';'
+	<value=expression>?  
 	{*}
 }
 
 rule jump_statement {
-	| 'goto' <label=BAREWORD>
-		[ ';' || <panic: "Missing ';' at end of goto statement" > ]
-		{*}	#= goto
-	| 'return' <retval=expression>? 
-		[ ';' || <panic: "Missing ';' at end of return statement" > ]
-		{*} #= return
 	| 'tailcall' <retval=postfix_expr> 
 		[ ';' || <panic: "Missing ';' at end of tailcall statement" > ]
 		{*} #= tailcall
@@ -113,20 +132,6 @@ rule jump_statement {
 	# | break [ <loop> ]? ';'             {*} #= break
 }
 
-rule labeled_statement {
-	| [ <label> ]+
-		[ <local_statement>		{*} #= label
-		|| <panic: "A statement label must be followed by a statement" >
-		]
-
-	# | 'case' <label=expression> ':' <local_statement> {*} #= case
-	# | 'default' ':' <local_statement>       {*} #= default
-}
-
-token label {
-	<BAREWORD> ':' <!before ':'>
-	{*}
-}
 rule do_while_statement {
 	<.DO> <local_statement>
 	$<kw>=[ <WHILE> | <UNTIL> ]

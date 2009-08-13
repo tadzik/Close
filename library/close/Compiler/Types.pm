@@ -24,31 +24,65 @@ sub NOTE(*@parts) {
 	close::Dumper::NOTE(close::Dumper::info(), @parts);
 }
 
+sub NODE_TYPE($node) {
+	close::Compiler::Node::type($node);
+}
+
 ################################################################
 
-our %Builtin_register_types;
-%Builtin_register_types<auto>	:= 'X';
-%Builtin_register_types<float>	:= 'N';
-%Builtin_register_types<int>	:= 'I';
-%Builtin_register_types<pmc>	:= 'P';
-%Builtin_register_types<string>	:= 'S';
-%Builtin_register_types<void>	:= 'v';
+our $Builtins := "
+# Declaration of builtin types
+typedef _builtin	auto	:register_class('X');
+typedef _builtin	float	:register_class('N');
+typedef _builtin	int	:register_class('I');
+typedef _builtin	pmc	:register_class('P');
+typedef _builtin	string	:register_class('S');
+typedef _builtin	void	:register_class('v');
+";
 
-sub add_builtins($block) {
-	for %Builtin_register_types {
-		my $spec := close::Compiler::Node::create('type_specifier',
-			:name('builtin type ' ~ $_), 
-			:noun($_), 
-			:register_class(%Builtin_register_types{$_}), 
-			:value($_),
+sub add_builtins($scope) {
+	NOTE("Adding builtin types");
+	DUMP($Builtins);
+	my $index := String::index($Builtins, "typedef", :offset(0));
+	
+	while $index != -1 {
+		$index	:= $index + String::length("typedef _builtin\t");
+		my $pos	:= $index;
+		my $end	:= String::find_cclass('WHITESPACE', $Builtins, :offset($index));
+		my $name	:= String::substr($Builtins, $index, $end - $index);
+		
+		NOTE("Adding builtin type: '", $name, "'");
+
+		my $symbol	:= close::Compiler::Node::create('declarator_name',
+			:is_typedef(1),
+			:name($name),
+			:pos($pos),
+			:scope($scope),
+			:source($Builtins)
 		);
 		
-		my $builtin := close::Compiler::Symbols::new(~$_, $spec, $block);
-		# I don't really want these as kids, just in the symbol table.
-		$block.pop();
-	}
+		$index	:= String::index($Builtins, ":register_class('", :offset($index))
+			+ String::length(":register_class('");
+		my $register_class := String::substr($Builtins, $index, 1);
 
-	DUMP($block);
+		NOTE("Type ", $name, " has register class '", $register_class, "'");
+		
+		my $spec	:= close::Compiler::Node::create('type_specifier',
+			:is_builtin(1),
+			:name($name),
+			:pir_name('specifier for builtin type: ' ~ $name), 
+			:register_class($register_class),
+			:noun($symbol),
+		);
+		
+		add_specifier_to_declarator($spec, $symbol);
+		
+		$index := String::index($Builtins, "typedef", :offset($index));
+		DUMP($symbol);
+	}
+	
+	NOTE("Dumping item info:");
+	DUMP($scope);
 }
 
 sub add_specifier_to_declarator($specifier, $declarator) {
@@ -58,27 +92,6 @@ sub add_specifier_to_declarator($specifier, $declarator) {
 	DUMP($declarator);
 	return $declarator;
 }
-
-sub array_of($elements) {
-	my $decl := close::Compiler::Node::create('decl_array_of');
-
-	if $elements {
-		$decl<num_elements> := $elements;
-		$decl.value('array of ' ~ $elements);
-	}
-	
-	DUMP($decl);
-	return $decl;
-}
-
-sub function_returning() {
-	NOTE("Creating a function-returning declarator");
-	my $decl := close::Compiler::Node::create('decl_function_returning');
-	
-	DUMP($decl);
-	return $decl;
-}
-
 
 sub get_specifier($node) {
 	my $spec := $node<type>;
@@ -106,6 +119,7 @@ sub hash() {
 }
 
 my @Type_attributes := (
+	'is_builtin',
 	'is_typedef',
 	'is_class',
 	'is_struct',
@@ -114,43 +128,56 @@ my @Type_attributes := (
 );
 
 sub is_type($object) {
+	NOTE("Checking if ", NODE_TYPE($object), " is a type");
 	DUMP($object);
 	ASSERT($object.isa(PAST::Var), 'Object must be a PAST::Var');
 		
+	my $result := 0;
+	
 	for @Type_attributes {
-		if $object{$_} {
-			return 1;
-		}
+		NOTE("Checking type-attribute: ", $_, " (", $object{$_}, ")");
+		$result := $result || $object{$_};
 	}
 	
-	return 0;
+	NOTE("Returning: ", $result);
+	return $result;
 }
 
-=sub Boolean is_typename($past)
+=sub Boolean query_typename($past)
 
 Checks the current lexical stack for a type definition matching C<$past>. If 
 C<$past> is a rooted identifier, looks for a class with that name. Else looks for
 any kind of typedef -- a class, a typedef record, etc.
 
-Returns 1 if a matching type name is found, 0 otherwise.
+Returns the symbol (declarator) identifying the first matching type found.
 
 =cut
 
-sub is_typename($past) {
+sub query_typename($past) {
+	ASSERT($past.isa(PAST::Var) && NODE_TYPE($past) eq 'qualified_identifier',
+		'query_typename must be called with a qualified_identifier');
 	NOTE("Checking if '", $past.name(), "' is a defined type");
 	DUMP($past);
 	
 	my @results := lookup_type_name($past);
-	
+	NOTE("Found ", +@results, " matching types");
 	DUMP(@results);
 	
+	my $result := undef;
+	
 	if +@results {
-		NOTE("Returning true");
-		return 1;
+		my $result_nsp := @results[0];
+		ASSERT($result_nsp.isa(PAST::Block),
+			'Type lookup results are scope blocks.');
+		
+		$result := close::Compiler::Scopes::get_symbol($result_nsp, $past.name());
+		ASSERT($result.isa(PAST::Var) && NODE_TYPE($result) eq 'declarator_name',
+			'Found type should point to a declarator of some kind.');
+		NOTE("Returning matching type from scope '", $result_nsp.name(), "'");
 	}
 	
-	NOTE("Returning false");
-	return 0;
+	DUMP($result);
+	return $result;
 }
 
 =sub lookup_type_name($past)
@@ -173,21 +200,25 @@ sub lookup_type_name($past) {
 	# but the %namespaces flag prevents duplicate namespace entries.
 	
 	for close::Compiler::Scopes::get_search_list() {
-		NOTE("Looking in '", $_<lstype>, "' namespace ", $_.name());
-		my $nsp	:= close::Compiler::Namespaces::query_relative_namespace_of($_, $past);
+		NOTE("Looking in '", $_<node_type>, "' namespace ", $_.name());
+		my $nsp := close::Compiler::Namespaces::query_relative_namespace_of($_, $past);
 				
 		if $nsp {
-			my $object	:= close::Compiler::Scopes::get_object($nsp, $name);
-		
+			NOTE("Found relative namespace: ", $nsp.name());
+			
+			my $object	:= close::Compiler::Scopes::get_symbol($nsp, $name);
+			DUMP($object);
+			
 			if $object && is_type($object) {
 				unless %namespaces{$nsp} {
-					@results.push($object);
+					@results.push($nsp);
 					%namespaces{$nsp} := 1;
 				}
 			}
 		}
 	}
 	
+	NOTE("Returning ", +@results, " results");
 	DUMP(@results);
 	return @results;
 }
@@ -204,10 +235,16 @@ our $Merge_specifier_fields := (
 );
 
 sub merge_specifiers($error_sink, $merge_into, $merge_from) {
+	ASSERT(close::Compiler::Node::type($merge_from) eq 'type_specifier',
+		'Merge_from argument must be a type specifier.');
+		
 	unless $merge_into {
-		return ($merge_from);
+		return $merge_from;
 	}
 	
+	ASSERT(close::Compiler::Node::type($merge_into) eq 'type_specifier',
+		'Merge_into argument must be a type specifier, if given.');
+		
 	for $Merge_specifier_fields {
 		if $merge_from{$_} {
 			if $merge_into{$_} {
@@ -243,24 +280,11 @@ sub new_declarator(*%attrs) {
 	return $decl;
 }
 
-sub new_specifier(*%attrs) {
-	NOTE("Creating new type specifier");
-	my $spec := close::Compiler::Node::create('type_specifier');
-	
-	for %attrs {
-		$spec{$_} := %attrs{$_};
-	}
-	
-	DUMP($spec);
-	return $spec;
-}
-
 sub pointer() {
 	my $decl := new_declarator(:is_pointer(1), :value('pointer to'));
 	DUMP(:decl($decl));
 	return $decl;
 }
-
 
 sub same_type($type1, $type2) {
 	while $type1 && $type2 {

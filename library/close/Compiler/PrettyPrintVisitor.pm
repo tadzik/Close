@@ -287,24 +287,13 @@ method visit_decl_varlist($node) {
 	return $result;
 }
 
-method visit_declarator($node) {
-	NOTE("Visiting declarator: ", $node.name());
-	DUMP($node);
-	
-	my $result := '';
-	close::Compiler::Symbols::print_symbol($node);
-	
-	DUMP($result);
-	return $result;
-}
-
-method visit_declarator_name($node) {
-	NOTE("Visiting declarator name: ", $node.name());
+method visit_symbol($node) {
+	NOTE("Visiting symbol: ", $node.name());
 	DUMP($node);
 	
 	my $result := $node.name();
 	
-	ASSERT($node<type>, 'Declarator should always have a type attached.');
+	ASSERT($node<type>, 'Symbol should always have a type attached.');
 	@Declarator.push($result);
 	$result := self.visit($node<type>);
 
@@ -341,11 +330,10 @@ method visit_foreach_statement($node) {
 	
 	my $loop_var	:= self.visit($node<loop_var>);
 	my $list		:= self.visit($node<list>);
-	my $result		:= indent_lines('foreach ( ' ~ $loop_var ~ ' : ' ~ $list ~ ')');
-	
+	my $result		:= indent_lines('foreach (' ~ $loop_var ~ ' : ' ~ $list ~ ')');
 	my $body		:= $node[0];
 	
-	if close::Compiler::Node::type($node[0]) ne 'compound_statement' {
+	if close::Compiler::Node::type($body) ne 'compound_statement' {
 		indent_full();
 		$result 	:= $result ~ indent_lines($body);
 		unindent();

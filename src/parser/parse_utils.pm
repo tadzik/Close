@@ -78,7 +78,9 @@ sub assemble_qualified_path($past, $/) {
 	for $<path> {
 		@parts.push($_.ast.value());
 	}
-		
+
+	my $display_name := Array::join('::', @parts);
+	
 	# 'if' here is to handle namespaces, too. A root-only namespace
 	# ('::') has no name.
 	if +@parts {
@@ -87,13 +89,15 @@ sub assemble_qualified_path($past, $/) {
 	
 	if $<root> {
 		$past<is_rooted> := 1;
+		$display_name := '::' ~ $display_name;
 		
 		if $<hll_name> {
 			$past<hll> := ~ $<hll_name>;
+			$display_name := 'hll:' ~ $<hll_name> ~ $display_name;
 		}
 		
 		# Rooted + empty @parts -> '::x'
-		$past<namespace> := @parts;
+		$past.namespace(@parts);
 	}
 	else {
 		$past<is_rooted> := 0;
@@ -104,6 +108,8 @@ sub assemble_qualified_path($past, $/) {
 		}
 	}
 
+	$past<display_name> := $display_name;
+	
 	DUMP($past);
 	return ($past);
 }

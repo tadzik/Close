@@ -1,12 +1,13 @@
+# $Id$
+
 rule additive_expr {
-    <term=mult_expr>
-    [ <op=additive_op>
-        <term=mult_expr>
-    ]*                                  {*} #= mult_expr
+    <term=mult_expr> [ <op=additive_op> <term=mult_expr> ]* 
+    {*}
 }
 
 token additive_op {
-    [ '+'| '-' ]
+	| <.SINGLE_PLUS>
+	| <.SINGLE_MINUS>
 }
 
 rule arg_adverb {
@@ -15,7 +16,7 @@ rule arg_adverb {
 }
 
 rule arg_expr {
-	[ <argname=short_ident>  <.colon_space> ]? 
+	[ <argname=short_ident>  <.COLON_SPACE> ]? 
 	<expression> 
 	[ <arg_adverb> ]*
 	{*}
@@ -27,7 +28,7 @@ rule arg_list {
 }
 
 rule asm_expr {
-	'asm'
+	<.ASM> [ '(' ~ ')' <postfix_call> ]
 	# FIXME: This should be "<postfix_call>"
 	[ '('
 		<arg_list>
@@ -35,13 +36,13 @@ rule asm_expr {
 		|| <panic: "Missing ')' in argument list" >
 		]
 	]?
-        <asm=asm_contents>
+	<asm=asm_contents>
 	{*} #= asm
 }
 
 token asm_contents {
-    '{{' .*? '}}'
-    {*}
+	'{{' ~ '}}'	<string_literal: '}}' >
+	{*}
 }
 
 rule assign_expr {
@@ -112,10 +113,8 @@ token logical_op {
 }
 
 rule mult_expr {
-    <term=prefix_expr>
-    [ <op=mult_op>
-        <term=mult_expr>
-    ]*                                  {*} #= prefix_expr
+	<term=prefix_expr> [ <op=mult_op> <term=mult_expr> ]*
+	{*}
 }
 
 token mult_op {
@@ -150,10 +149,6 @@ token postfix_xcrement {
 	$<op>=[ '++' | '--' ]	{*}
 }
 
-token colon_space {
-	':' <.WS_ALL>
-}
-
 rule prefix_expr {
 	| <prefix_op> <prefix_expr>	{*} #= prefix_expr
 	| <built_in>				{*} #= built_in
@@ -170,4 +165,3 @@ rule term {
 	| <constant>			{*} #= constant
 	| <qualified_identifier>	{*} #= qualified_identifier
 }
-

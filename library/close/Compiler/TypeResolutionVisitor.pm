@@ -68,7 +68,8 @@ visit_cues_definition	class/struct/enum/union definition (adds type name to loca
 				extends may contain a type name
 				attributes (declarators)
 				others?
-visit_function_definition	function definition (creates new local scope)
+visit_decl_function_returning 
+				function definition (creates new local scope)
 				parameter list contains specifiers
 				declarator contains specifier
 visit_namespace_block	namespace definition block (creates new local scope)
@@ -78,73 +79,40 @@ visit_symbol			typedef declarations (adds type name to local scope)
 				variable declaration contains specifier
 visit_type_specifier		actually names a type. (Our whole reason for being here.)
 
+The rest of the node types just need to pass along the visit calls to all their 
+children, no matter how stored. Most of these nodes can be handled in 
+UNKNOWN.
+
+
 =cut
 
+# Well, this hasn't happened yet.
 method _visit_cues_definition($node) {
 	# visit attribute declarations (where? children?)
 	# visit children
 	# visit parent class, if any.
 }
 
-method _visit_expr_typecast($node) {
-	# FIXME: Wrong, because this ignores other parts of the expr, and ignores specifiers inside declarators (function_returning)
-	self.visit(close::Compiler::Types::get_specifier($node<type>));
-	return $node;
-}
-
-method _visit_function_definition($node) {
-	# Contains code. Just run the children through.
-}
-
-method _visit_function_returning($node) {
-	# Visit the param list, also any node<type> child nodes.
-}
-
-method _visit_namespace_block($node) {
-	NODE("Visiting namespace block: ", $node.name());
-	DUMP($node);
-
-	close::Compiler::Scopes::push($node);
-	# Process entries in symtable. 'extern', 'alias', and 'using' declarations
-	# may put entries in symtable that are not declarations in 
-	# children. They'll still need to be resolved.
-	# e.g., extern int OtherNamespace::foo;
-	
-	for $node<symtable> {
-		self.visit(close::Compiler::Scopes::get_object($node, $_));
-	}
-	
-	self.replace_children($node, self.visit_children($node));
-	close::Compiler::Scopes::pop($node);
-	return $node;
-}
-
-method _visit_symbol($node) {
-	NODE("Visiting symbol: ", $node.name());
-	ASSERT($node<type>, 'Every symbol needs a type');
-	
-	self.visit($node<type>);
-
-	if +@($node) {
-		NOTE("Visiting child nodes");
-		my @results := self.visit_children($node);
-		
-		NOTE("Replacing children with results of visit(s)");
-		self.replace_children($node, @results);
-	}
-	
-	NOTE("done");
-	DUMP($node);
-	return $node;
-}
+# A type specifier might say ":noun(foo::bar)," but I want to nail that down,
+# to "hll:close::std::foo::bar" (or whatever). This involves looking up the
+# relative path of the qualified-id, and then replacing the noun in the
+# specifier with the "real" target symbol.
 
 method _visit_type_specifier($node) {
-	my $original := $node<noun>;
-	my $type_name := ~ $original.node();
+	DUMP($node);
+	ASSERT(NODE_TYPE($node) eq 'type_specifier',
+		'Only type_specifiers get this treatment');
+	
+	my $type_name := $node.name();
+		
+	unless $type_name {
+		$type_name := $node<noun>.name();
+		NOTE("Fetching type_name from node of original qualified_identifier");
+	}
 	
 	NOTE("Resolving type specifier: ", $type_name);
 	
-	my @cands := lookup_type_name($node<noun>);
+	my @cands := close::Compiler::Types::lookup_type_name($node<noun>);
 
 	ASSERT(+@cands > 0,
 		'For a type-specifier to parse, there must have been at least one type_name that matched');
@@ -175,36 +143,73 @@ method _visit_type_specifier($node) {
 		);
 	}
 
-	$node<noun> := close::Compiler::Scopes::get_object($result_namespace,
+	my $original := $node<noun><apparent_type>;
+	
+	unless $original {
+		$original := $node<noun>;
+		NOTE("No original type stored for ", $original.name());
+	}
+	
+	$node<noun> := close::Compiler::Scopes::get_symbol($result_namespace, 
 		$original.name());
 
-	if !( $original =:= $node<noun>) {
+	if !( $original =:= $node<noun> ) {
 		# This is NOT an error. If the grammar wasn't ambiguous, 
 		# there would never have been an original.
 		NOTE("Attaching a type-name-changed-resolution warning");
+		DUMP(:original($original), :new($node<noun>));
+		
 		ADD_WARNING($node, 
 			"Type specifier '", $type_name, 
-			"' was originally resolved in namespace '",
-			$original<scope>.name(),
-			"' but now resolves to '",
-			$node<noun><scope>.name(),
-			"'.");
+			"' appears to have changed resolution namespaces."
+		);
 	}
 	
+	NOTE("done");
 	DUMP($node);
 	return $node;
 }
+
+our @Child_attribute_names := (
+	'alias_for',
+	'type',
+	'scope',			# Symbols link to their enclosing scope. Should be a no-op
+	'parameter_scope',
+	'initializer',
+	'function_definition',
+);
 
 method _visit_UNKNOWN($node) {
 	NOTE("No special handling for '", NODE_TYPE($node), "' node:", $node.name());
 	DUMP($node);
 
+	if $node.isa(PAST::Block) {
+		# Should I keep a list of push-able block types?
+		NOTE("Pushing this Block onto the scope stack");
+		close::Compiler::Scopes::push($node);
+		
+		NOTE("Visiting symtable entries");
+		for $node<symtable> {
+			my $child := close::Compiler::Scopes::get_symbol($node, $_);
+			self.visit($child);
+		}
+	}
+	
+	for @Child_attribute_names {
+		if $node{$_} {
+			NOTE("Visiting <", $_, "> attribute");
+			self.visit($node{$_});
+		}
+	}
+	
 	NOTE("Visiting child nodes");
-	my @results := self.visit_children($node);
+	self.visit_children($node);
 	
-	NOTE("Replacing children with results of visit(s)");
-	self.replace_children($node, @results);
+	if $node.isa(PAST::Block) {
+		close::Compiler::Scopes::pop(NODE_TYPE($node));
+	}
 	
+	NOTE("Done");
 	DUMP($node);
 	return $node;
 }
@@ -233,8 +238,6 @@ sub get_visit_method($type) {
 			$P0 = find_lex '$type'
 			$S1 = $P0
 			$S0 = concat $S0, $S1
-			print "get method: "
-			say $S0
 			%r = get_global $S0
 		};
 
@@ -260,20 +263,6 @@ sub get_visit_method($type) {
 	NOTE("Returning method '", $sub, "' to visit node of type '", $type, "'");
 	DUMP($sub);
 	return $sub;
-}
-
-method replace_children($node, @new_kids) {
-	NOTE("Replacing children of '", NODE_TYPE($node), "' node: ", $node.name());
-	
-	while +@($node) {
-		$node.shift();
-	}
-	
-	for @new_kids {
-		$node.push($_);
-	}
-	
-	DUMP($node);
 }
 
 sub resolve_types($past) {
@@ -303,13 +292,15 @@ method visit($node) {
 			return $visited;
 		}
 		
+		self.already_visited($node, $node);
+		
 		my &method	:= get_visit_method($type);
 		$result	:= &method(self, $node);
 		
+		self.already_visited($node, $result);
 		NOTE("Done with ", $type, " node\n", $result);
 	}
 
-	self.already_visited($node, $result);
 	return $result;
 }
 
