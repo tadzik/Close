@@ -6,6 +6,50 @@ $Rev$
 
 =cut
 
+rule compound_statement {
+	'{'			{*} #= open
+		~ '}' <statements=local_statement>*
+				{*} #= close
+}
+
+rule conditional_statement {
+	$<kw>=[ 'if' | 'unless' ]
+	'(' ~ ')' <expression>
+	$<then>=<local_statement>
+	[ 'else' $<else>=<local_statement> ]?
+	{*}
+}
+
+rule declaration_statement {
+	| <namespace_alias_declaration> ';'	{*} #= namespace_alias_declaration
+	| <using_namespace_directive> ';'		{*} #= using_directive
+	| <using_declaration> ';'			{*} #= using_declaration
+	| <declaration> [ ';' | <?after '}' <.ws> > ]	{*} #= declaration
+}
+
+rule do_while_statement {
+	<.DO> <local_statement>
+	$<kw>=[ <WHILE> | <UNTIL> ]
+	[ '(' || <panic: "do...while/until statements must have '(' ')' around test expression" > ]
+	<expression>
+	[ ')' || <panic: "missing ')' at end of test expression" > ]
+	[ ';' || <panic: "Missing ';' at end of do...while/until statement" > ]
+	{*}
+}
+
+=head4 Expression Statement
+
+Expression statement represent most of your programs. Any expression, defined above, followed by a
+semi-colon[;] is an expression statement.
+
+=cut
+
+rule expression_statement {
+	<expression>
+	[ ';' || <panic: "Missing ';' at end of expression statement" > ]
+	{*}
+}
+
 =rule extern_statement
 
 An C<extern_statement> is a statement that may appear outside a function. 
@@ -21,6 +65,34 @@ rule extern_statement {
 	| <local_statement>		{*} #= local_statement
 }
 
+# foreach (int x in array) say("# ", x);
+# string x; foreach (x in hash) say(x, " => ", hash[x]);
+
+rule foreach_header {
+	# NB: Try declaration first, to avoid typedef/expression problem.
+	[ <loop_var=parameter_declaration> || <loop_var=simple_identifier> ]
+	<.IN>
+	<list=expression>
+}
+
+rule foreach_statement {
+	<.FOREACH>		{*} #= open
+	'(' ~ ')' <header=foreach_header>
+	<body=local_statement>	{*} #= close
+}
+
+rule goto_statement {
+	<.GOTO> ~ ';' <label=BAREWORD> 
+	{*}
+}
+
+rule jump_statement {
+	| 'tailcall' <retval=postfix_expr> 
+		[ ';' || <panic: "Missing ';' at end of tailcall statement" > ]
+		{*} #= tailcall
+	# | continue [ <loop> ]? ';'         {*} #= continue
+	# | break [ <loop> ]? ';'             {*} #= break
+}
 
 rule label_declaration {
 	<label=label_name> <.SINGLE_COLON>
@@ -61,84 +133,9 @@ rule null_statement {
 	{*}
 }
 
-rule declaration_statement {
-	| <namespace_alias_declaration> ';'	{*} #= namespace_alias_declaration
-	| <using_namespace_directive> ';'		{*} #= using_directive
-	| <using_declaration> ';'			{*} #= using_declaration
-	| <declaration> [ ';' | <?after '}' <.ws> > ]	{*} #= declaration
-}
-
-
-=head4 Expression Statement
-
-Expression statement represent most of your programs. Any expression, defined above, followed by a
-semi-colon[;] is an expression statement.
-
-=cut
-
-rule expression_statement {
-	<expression>
-	[ ';' || <panic: "Missing ';' at end of expression statement" > ]
-	{*}
-}
-
-rule compound_statement {
-	'{'			{*} #= open
-		~ '}' <statements=local_statement>*
-				{*} #= close
-}
-
-rule conditional_statement {
-	$<kw>=[ 'if' | 'unless' ]
-	'(' ~ ')' <expression>
-	$<then>=<local_statement>
-	[ 'else' $<else>=<local_statement> ]?
-	{*}
-}
-
-
-rule foreach_header {
-	# NB: decl before ident, to avoid typedefs messing up syntax: for (T t : x)
-	[ <parameter_declaration> 
-	|| <simple_identifier> 
-	]
-	<.SINGLE_COLON>
-	<list=expression>
-}
-
-rule foreach_statement {
-	<.FOREACH>		{*} #= open
-	'(' ~ ')' <header=foreach_header>
-	<body=local_statement>	{*} #= close
-}
-
-rule goto_statement {
-	<.GOTO> ~ ';' 
-	<label=BAREWORD> 
-	{*}
-}
-
 rule return_statement {
 	<.RETURN> ~ ';'
 	<value=expression>?  
-	{*}
-}
-
-rule jump_statement {
-	| 'tailcall' <retval=postfix_expr> 
-		[ ';' || <panic: "Missing ';' at end of tailcall statement" > ]
-		{*} #= tailcall
-	# | continue [ <loop> ]? ';'         {*} #= continue
-	# | break [ <loop> ]? ';'             {*} #= break
-}
-
-rule do_while_statement {
-	<.DO> <local_statement>
-	$<kw>=[ <WHILE> | <UNTIL> ]
-	[ '(' || <panic: "do...while/until statements must have '(' ')' around test expression" > ]
-	<expression>
-	[ ')' || <panic: "missing ')' at end of test expression" > ]
-	[ ';' || <panic: "Missing ';' at end of do...while/until statement" > ]
 	{*}
 }
 
@@ -150,4 +147,3 @@ rule while_do_statement {
 	<local_statement>
 	{*}
 }
-

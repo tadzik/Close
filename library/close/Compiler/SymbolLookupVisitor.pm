@@ -159,7 +159,7 @@ method visit_varlist($node) {
 	}
 	else {
 		if $spec<type_name> {
-			$spec<type> := lookup_qualified_identifier($node, $spec<type_name>);
+			$spec<type> := close::Compiler::Lookups::lookup_qualified_identifier($node, $spec<type_name>);
 		}
 	}
 	
@@ -171,7 +171,7 @@ method visit_varlist($node) {
 # FIXME: This is wrong. Should find decl, then take scope from decl.
 method visit_varref($node) {
 	NOTE("Visited variable reference: ", $node.name());
-	my @results := close::Grammar::Actions::lookup_qualified_identifier($node);
+	my @results := close::Compiler::Lookups::lookup_qualified_identifier($node);
 	if +@results {
 		my $result := @results.shift();
 		

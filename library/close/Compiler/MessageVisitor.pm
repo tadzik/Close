@@ -24,10 +24,6 @@ sub NOTE(*@parts) {
 	close::Dumper::NOTE(close::Dumper::info(), @parts);
 }
 
-sub NODE_TYPE($node) {
-	close::Compiler::Node::type($node);
-}
-
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
@@ -39,6 +35,12 @@ sub ADD_WARNING($node, *@msg) {
 	close::Compiler::Messages::add_warning($node,
 		Array::join('', @msg));
 }
+
+sub NODE_TYPE($node) {
+	close::Compiler::Node::type($node);
+}
+
+################################################################
 
 =head3 Message Visitor
 

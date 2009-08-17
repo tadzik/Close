@@ -265,6 +265,7 @@ token RESERVED {
 	| 'goto'			# Control flow
 	| 'hll'			# Directive
 	| 'if'			# if statement
+	| 'in'			# foreach statement (x in list)
 	| 'inline'		# Declaration
 	| 'int'			# Builtin type
 	| 'lexical'		# Storage class
@@ -314,6 +315,7 @@ token FOREACH		{ 'foreach'		>> }
 token GOTO			{ 'goto'		>> }
 token HLL			{ 'hll'			>> }
 token IF			{ 'if'			>> }
+token IN			{ 'in'			>> }
 token INLINE		{ 'inline' 		>> }
 token INT			{ 'int'			>> }
 token LEXICAL		{ 'lexical' 		>> }

@@ -31,7 +31,7 @@ sub append(@dest, @append) {
 		@dest.push($_);
 	}
 	
-	return @append;
+	return @dest;
 }
 
 sub _get_function($name) {

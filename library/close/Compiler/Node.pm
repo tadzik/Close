@@ -26,6 +26,27 @@ sub NOTE(*@parts) {
 
 ################################################################
 
+sub NODE_TYPE($node) {
+	return close::Compiler::Node::type($node);
+}
+
+################################################################
+
+sub _create_bareword(%attributes) {
+	NOTE("Creating bareword");
+
+	unless %attributes<returns> {
+		%attributes<returns> := 'String';
+	}
+	
+	my $past := PAST::Val.new();
+	set_attributes($past, %attributes);
+	
+	DUMP($past);
+	return $past;
+	
+}
+
 sub _create_compound_statement(%attributes) {
 	NOTE("Creating compound block");
 	DUMP(%attributes);
@@ -55,19 +76,13 @@ sub _create_decl_array_of(%attributes) {
 sub _create_decl_function_returning(%attributes) {
 	NOTE("Creating a function_returning declarator");
 	
-	my $past := PAST::Val.new(
+	my $past := PAST::Block.new(
 		:name('function returning'), 
-		:value('function returning'),
 	);
 	$past<is_declarator>	:= 1;
 	$past<is_function>		:= 1;
 	set_attributes($past, %attributes);
-	
-	my $block := close::Compiler::Node::create('parameter_scope');
-	$block<function_decl>	:= $past;
-	
-	$past<parameter_scope>	:= $block;
-	
+		
 	DUMP($past);
 	return $past;
 }
@@ -197,14 +212,24 @@ sub _create_expr_call(%attributes) {
 	return $past;
 }
 
-sub _create_foreach_statement(%attributes) {
-	NOTE("Creating foreach_statement");
-	my $past := PAST::Stmts.new(:name('foreach statement'));
+sub _create_float_literal(%attributes) {
+	NOTE("Creating float_literal");
+
+	unless %attributes<returns> {
+		%attributes<returns> := 'Num';
+	}
+	
+	my $past := PAST::Val.new();
 	set_attributes($past, %attributes);
 	
-	$past<parameter_scope> := create('parameter_scope',
-		:name('foreach parameter scope'),
-		:foreach_statement($past));
+	DUMP($past);
+	return $past;
+}
+
+sub _create_foreach_statement(%attributes) {
+	NOTE("Creating foreach_statement");
+	my $past := PAST::Block.new(:name('foreach statement'));
+	set_attributes($past, %attributes);
 	
 	DUMP($past);
 	return $past;
@@ -240,6 +265,20 @@ sub _create_inline(%attributes) {
 		%attributes<inline> := '    ' ~ %attributes<inline>;
 	}
 	
+	set_attributes($past, %attributes);
+	
+	DUMP($past);
+	return $past;
+}
+
+sub _create_integer_literal(%attributes) {
+	NOTE("Creating integer_literal");
+
+	unless %attributes<returns> {
+		%attributes<returns> := 'Integer';
+	}
+	
+	my $past := PAST::Val.new();
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
@@ -329,6 +368,21 @@ sub _create_qualified_identifier(%attributes) {
 	
 	DUMP($past);
 	return $past;
+}
+
+sub _create_quoted_literal(%attributes) {
+	NOTE("Creating quoted_literal");
+
+	unless %attributes<returns> {
+		%attributes<returns> := 'String';
+	}
+	
+	my $past := PAST::Val.new();
+	set_attributes($past, %attributes);
+	
+	DUMP($past);
+	return $past;
+	
 }
 
 sub _create_return_statement(%attributes) {
@@ -438,6 +492,36 @@ sub create($type, *%attributes) {
 	return $past;
 }
 
+sub format_path_of($node) {
+	my @path;
+	my $result := '';
+	
+	if $node.isa(PAST::Var) || $node.isa(PAST::Block) {
+		# If node has a 'namespace' method
+		@path := Array::clone($node.namespace());
+	}
+	elsif $node<namespace> {
+		@path := Array::clone($node<namespace>);
+	}
+	else {
+		@path := Array::empty();
+	}
+	
+	if $node<hll> {
+		@path.unshift($node<hll>);
+		$result := 'hll: ';
+	}
+	elsif $node<is_rooted> {
+		@path.unshift('');
+	}
+	
+	$result := $result ~ Array::join(' :: ', @path);
+	
+	NOTE("done");
+	DUMP($result);
+	return $result;
+}
+
 sub get_factory($type) {
 	our %Dispatch;
 
@@ -466,6 +550,39 @@ sub get_factory($type) {
 	
 	DUMP($sub);
 	return $sub;
+}
+
+sub path_of($node) {
+	NOTE("Computing path of '", NODE_TYPE($node), "' node: ", $node.name());
+	DUMP($node);
+	
+	my @path;
+
+	if $node<path> {
+		@path := Array::clone($node<path>);
+	}
+	else {
+		if $node.isa(PAST::Var) || $node.isa(PAST::Block) {
+			# If node has a 'namespace' method
+			@path := Array::clone($node.namespace());
+		}
+		elsif $node<namespace> {
+			@path := Array::clone($node<namespace>);
+		}
+		else {
+			@path := Array::empty();
+		}
+		
+		if $node<hll> {
+			@path.unshift($node<hll>);
+		}
+		
+		$node<path> := Array::clone(@path);
+	}
+
+	NOTE("done");
+	DUMP(@path);
+	return @path;
 }
 
 sub set_attributes($past, %attributes) {

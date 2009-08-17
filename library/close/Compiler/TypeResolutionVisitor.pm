@@ -24,10 +24,6 @@ sub NOTE(*@parts) {
 	close::Dumper::NOTE(close::Dumper::info(), @parts);
 }
 
-sub NODE_TYPE($node) {
-	close::Compiler::Node::type($node);
-}
-
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
@@ -40,65 +36,188 @@ sub ADD_WARNING($node, *@msg) {
 		Array::join('', @msg));
 }
 
-=head3 Type Resolution Visitor
+sub NODE_TYPE($node) {
+	return close::Compiler::Node::type($node);
+}
 
-For type fixups, the only things I'm interested in are specifiers. Declarators 
-have no type info, except for function-returning declarators, which may have 
-parameters that have types (that have specifiers). So only specifiers.
+################################################################
 
-For a specifier, I need to resolve the various type expressions into a lookup. 
-Absolute lookups and builtins are easy.
+our $SUPER;
 
-Relative lookups require that the stack of open namespaces and using namespace 
-foo and using typedefname and function, class, namespace, and block level 
-typedefs all be present. So all block-setting nodes have to be intercepted so 
-as to correctly maintain the lexical stack.
+method get_method_prefix() {
+	return '_type_resolve_';
+}
 
-The various temp-decl spaces are only needed if the symbols are not moved into 
-the right place by the parser. That would be a parser bug, and should be 
-fixed. When the parser finalizes a declaration, it should make sure the names 
-are in the right scope.
+# This is used for visited-by caching. Use the class name.
+our $Visitor_name := 'TypeResolutionVisitor';
 
-=head4 Node types 
+method name() {
+	return $Visitor_name;
+}
 
-These are node types that I think are interesting, either because they are part
-of maintaining the lexical stack, or because they reference types:
+=method visit($node)
 
-visit_cues_definition	class/struct/enum/union definition (adds type name to local scope, creates new local scope, injects typename)
-				extends may contain a type name
-				attributes (declarators)
-				others?
-visit_decl_function_returning 
-				function definition (creates new local scope)
-				parameter list contains specifiers
-				declarator contains specifier
-visit_namespace_block	namespace definition block (creates new local scope)
-visit_expr_typecast		type casts in expressions mention types explicitly.
-visit_symbol			typedef declarations (adds type name to local scope)
-				forward declaration (tagged: class foo;) (should add foo to local scope as alias for unknown /unresolved type)
-				variable declaration contains specifier
-visit_type_specifier		actually names a type. (Our whole reason for being here.)
-
-The rest of the node types just need to pass along the visit calls to all their 
-children, no matter how stored. Most of these nodes can be handled in 
-UNKNOWN.
-
+Delegates to SUPER.visit. This method should be copied unchanged into the new code.
 
 =cut
 
-# Well, this hasn't happened yet.
-method _visit_cues_definition($node) {
-	# visit attribute declarations (where? children?)
-	# visit children
-	# visit parent class, if any.
+method visit($node) {
+	my @results;
+	
+	if $node {
+		NOTE("Visiting ", NODE_TYPE($node), " node: ", $node.name());
+		DUMP($node);
+		
+		@results := $SUPER.visit(self, $node);
+	}
+	else {
+		@results := Array::empty();
+	}
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
 }
 
-# A type specifier might say ":noun(foo::bar)," but I want to nail that down,
-# to "hll:close::std::foo::bar" (or whatever). This involves looking up the
-# relative path of the qualified-id, and then replacing the noun in the
-# specifier with the "real" target symbol.
+=method visit_children($node)
 
-method _visit_type_specifier($node) {
+Delegates to SUPER.visit_children. This method should be copied unchanged into 
+the new code.
+
+=cut
+
+method visit_children($node) {
+	NOTE("Visiting ", +@($node), " children of ", NODE_TYPE($node), " node: ", $node.name());
+	DUMP($node);
+
+	my @results := $SUPER.visit_children(self, $node);
+	
+	DUMP(@results);
+	return @results;
+}
+
+################################################################
+
+our @Child_attribute_names := (
+	'alias_for',
+	'type',
+	'scope',			# Symbols link to their enclosing scope. Should be a no-op
+	'parameter_scope',
+	'initializer',
+	'function_definition',
+);
+
+method _type_resolve_UNKNOWN($node) {	
+	NOTE("No custom handler exists for node type: '", NODE_TYPE($node), 
+		"'. Passing through to children.");
+	DUMP($node);
+
+	if $node.isa(PAST::Block) {
+		# Should I keep a list of push-able block types?
+		NOTE("Pushing this block onto the scope stack");
+		close::Compiler::Scopes::push($node);
+	
+		NOTE("Visiting symtable entries");
+		for $node<symtable> {
+			my $symbol := close::Compiler::Scopes::get_symbol($node, $_);
+			self.visit($symbol);
+		}
+	}
+
+	for @Child_attribute_names {
+		if $node{$_} {
+			NOTE("Visiting <", $_, "> attribute");
+			self.visit(node{$_});
+		}
+	}
+	
+	NOTE("Visiting children");
+	self.visit_children($node);
+	
+	if $node.isa(PAST::Block) {
+		NOTE("Popping this block off the scope stack");
+		close::Compiler::Scopes::pop(NODE_TYPE($node));
+	}
+
+	# We need to return an array of something.
+	my @results := Array::new($node);
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+=method _type_resolve_type_specifier($node)
+
+Visits a type-specifier node, and resolves the <noun> part. Prior to this point, 
+the type specifier has been left as a reference to the original token(s) that
+declared it. Thus, if a type was specified as "A::B", that qualified-identifier
+was left in the <noun> slot. During the original lookup (in the <type_name>
+rule), the <apparent_type> tag was set. That tag points to the type that was
+found during initial lookup. In code like this:
+
+    typedef int T;
+    namespace N {
+        T   myvar;
+        
+        typedef string T;
+    }
+    
+the original resolution -- found during the top-to-bottom scan of the source --
+would point to the outer symbol (::T -- int). This pass, on the other hand, would resolve
+T to the local scope (N::T -- string). In this case, a warning is attached indicating
+that the resolution namespace has changed for T.
+
+B<Note:> the fact that T must be looked up early, in order to disambiguate a
+declaration from a statement, is due to the ambiguity of the Close grammar.
+The final resolution is considered to be the 'correct' one.
+
+In some cases, a type name may resolve to different candidates. In particular,
+using an unqualified name will match every type currently in scope with that
+name. The rules used for type resolution are as follows:
+
+=item 0. If there are no (0) candidates, abort. The parser was able to resolve at
+least one type for this name, so something has gone horribly wrong.
+
+=item 1. If there is exactly one candidate matching the type name, use that.
+
+=item 2. If there is more than one candidate for the type name, then:
+
+=item 2a. If one of the candidates is in the current scope, use that.
+
+=item 2b. Otherwise, the type is ambiguous. Record an error, but use the first
+candidate returned, to continue processing.
+
+B<Note:> there is no "disambiguation" at all, except that a name in the current
+scope may be referred to with no explict scoping. 
+
+    typedef int T;
+    typedef int U;
+    typedef int V;
+    
+    namespace N1 {
+    
+        typedef float T;
+        typedef float U;
+        
+        namespace N2 {
+        
+            typedef string T;
+	
+	T	t;
+	U	u;
+	V	v;
+        }
+    }
+
+In this example, type T will be resolved to ::N1::N2::T, because it is in the
+current scope. (Rule 2a.) Type U wll be resolved to ::N1::U, but an error will
+be attached because U is an ambiguous name. (Rule 2b.) And type V will resolve
+with no problems to ::V (Rule 1.)
+
+=cut
+
+method _type_resolve_type_specifier($node) {
 	DUMP($node);
 	ASSERT(NODE_TYPE($node) eq 'type_specifier',
 		'Only type_specifiers get this treatment');
@@ -116,14 +235,6 @@ method _visit_type_specifier($node) {
 
 	ASSERT(+@cands > 0,
 		'For a type-specifier to parse, there must have been at least one type_name that matched');
-
-	# The rules:
-	# 0. If there are 0 candidates, abort - the parser found one, we should too.
-	# 1. If there is exactly one candidate, we're done.
-	# 2. If more than one candidate:
-	# 2a.	If one of the candidates is in the local namespace, it wins.
-	# 2b.	Otherwise, the type is ambiguous. Record an error, and
-	#	select the first candidate.
 
 	my $result_namespace := @cands[0];
 	
@@ -161,161 +272,43 @@ method _visit_type_specifier($node) {
 		
 		ADD_WARNING($node, 
 			"Type specifier '", $type_name, 
-			"' appears to have changed resolution namespaces."
+			"' appears to have changed resolution namespaces.\n",
+			"Original type: ", $original<display_name>, "\n",
+			"Final type: ", $node<noun><display_name>, "\n",
 		);
 	}
 	
+	# We need to return an array of something.
+	my @results := Array::new($node);
+	
 	NOTE("done");
-	DUMP($node);
-	return $node;
+	DUMP(@results);
+	return @results;
 }
 
-our @Child_attribute_names := (
-	'alias_for',
-	'type',
-	'scope',			# Symbols link to their enclosing scope. Should be a no-op
-	'parameter_scope',
-	'initializer',
-	'function_definition',
-);
+################################################################
 
-method _visit_UNKNOWN($node) {
-	NOTE("No special handling for '", NODE_TYPE($node), "' node:", $node.name());
-	DUMP($node);
+=sub resolve_types($past)
 
-	if $node.isa(PAST::Block) {
-		# Should I keep a list of push-able block types?
-		NOTE("Pushing this Block onto the scope stack");
-		close::Compiler::Scopes::push($node);
-		
-		NOTE("Visiting symtable entries");
-		for $node<symtable> {
-			my $child := close::Compiler::Scopes::get_symbol($node, $_);
-			self.visit($child);
-		}
-	}
-	
-	for @Child_attribute_names {
-		if $node{$_} {
-			NOTE("Visiting <", $_, "> attribute");
-			self.visit($node{$_});
-		}
-	}
-	
-	NOTE("Visiting child nodes");
-	self.visit_children($node);
-	
-	if $node.isa(PAST::Block) {
-		close::Compiler::Scopes::pop(NODE_TYPE($node));
-	}
-	
-	NOTE("Done");
-	DUMP($node);
-	return $node;
-}
+Traverses the PAST tree, resolving all of the type names.
 
-our $Visitor_name := 'TypeResolutionVisitor';
-
-method already_visited($node, $store?) {
-	if $store {
-		$node<visited_by>{$Visitor_name} := $store;
-	}
-	
-	return $node<visited_by>{$Visitor_name};
-}
-
-sub get_visit_method($type) {
-	our %visit_method;
-
-	NOTE("Finding visit_method for type '", $type, "'");
-	my $sub :=%visit_method{$type};
-	
-	unless $sub {
-		NOTE("Looking up visit method for '", $type, "'");
-		
-		$sub := Q:PIR {
-			$S0 = '_visit_'
-			$P0 = find_lex '$type'
-			$S1 = $P0
-			$S0 = concat $S0, $S1
-			%r = get_global $S0
-		};
-
-		NOTE("Got sub: ", $sub);
-		DUMP($sub);
-		
-		if $type ne 'UNKNOWN' {
-			unless $sub {
-				$sub := get_visit_method('UNKNOWN');
-			}
-			
-			unless $sub {
-				DIE("No visit method available, ",
-				"including UNKNOWN,  ",
-				"for Node class: ", $type);
-			}
-		}
-		
-		%visit_method{$type} := $sub;
-		DUMP(%visit_method);
-	}
-	
-	NOTE("Returning method '", $sub, "' to visit node of type '", $type, "'");
-	DUMP($sub);
-	return $sub;
-}
+=cut
 
 sub resolve_types($past) {
 	NOTE("Resolving types in PAST tree");
 	DUMP($past);
 	
+	$SUPER := close::Compiler::Visitor.new();
+	NOTE("Created SUPER-visitor");
+	DUMP($SUPER);
+	
 	my $visitor	:= close::Compiler::TypeResolutionVisitor.new();
-	my $result	:= $visitor.visit($past);
+	NOTE("Created visitor");
+	DUMP($visitor);
+
+	my @result	:= $visitor.visit($past);
 	
-	DUMP($result);
-	return $result;
-}
-
-method visit($node) {
-	my $result := $node;
-	
-	if $node {
-		my $type	:= close::Compiler::Node::type($node);
-		NOTE("Visiting '", $type, "' node: ", $node.name());
-		DUMP($node);
-		
-		# Don't visit twice.
-		my $visited := self.already_visited($node);
-		
-		if $visited {
-			NOTE("Already visited");
-			return $visited;
-		}
-		
-		self.already_visited($node, $node);
-		
-		my &method	:= get_visit_method($type);
-		$result	:= &method(self, $node);
-		
-		self.already_visited($node, $result);
-		NOTE("Done with ", $type, " node\n", $result);
-	}
-
-	return $result;
-}
-
-method visit_children($node) {
-	my $count := +@($node);
-	NOTE("Visiting ", $count, " children");
-	DUMP($node);	
-		
-	my @results := Array::empty();	
-	
-	for @($node) {
-		@results.push(self.visit($_));
-	}
-
-	NOTE("Done with children");
-	DUMP(@results);
-	return @results;
+	NOTE("done");
+	DUMP(@result);
+	return @result;
 }

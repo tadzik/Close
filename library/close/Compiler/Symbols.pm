@@ -26,7 +26,7 @@ sub NOTE(*@parts) {
 
 ################################################################
 
-sub new($name, $type, $block) {
+sub newOLD($name, $type, $block) {
 	my $symbol := close::Compiler::Node::create('symbol', 
 		:name($name),
 		:block($block),

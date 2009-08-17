@@ -30,20 +30,24 @@ method translation_unit($/, $key) {
 		
 		close::Compiler::Scopes::dump_stack();
 
+		if get_config('Compiler', 'PrettyPrint') {
+			NOTE("Pretty-printing input");
+				
+			my $prettified := close::Compiler::PrettyPrintVisitor::print($past);
+			
+			NOTE("Pretty print done\n", $prettified);
+		}
+
 		NOTE("Resolving types");
 		close::Compiler::TypeResolutionVisitor::resolve_types($past);
+		
+		NOTE("Resolving symbols");
+		close::Compiler::SymbolResolutionVisitor::resolve_symbols($past);
 
 		NOTE("Displaying messages");
 		close::Compiler::MessageVisitor::show_messages($past);
-		
-		NOTE("Pretty-printing input");
-		my $prettified := close::Compiler::PrettyPrintVisitor::print($past);
-		
-		NOTE("Pretty print done\n", $prettified);
-		
-		# This should be a separate compiler phase. Later.
-#		my $new_past := close::Compiler::SymbolLookupVisitor::update($past);
-		
+
+		NOTE("done");
 		DUMP($past);
 		make $past;		
 	}

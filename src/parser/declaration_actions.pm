@@ -305,6 +305,15 @@ method param_adverb($/) {
 
 =method parameter_declaration
 
+Matches the declaration of a I<single> declarator, with a limited set of 
+specifiers. When completed, pushes the declared symbol on to the current
+lexical scope. (Note that C<declarator_name> will add the name to the 
+scope's symtable by default.) Returns a C<parameter_declaration> node, which is
+constructed from the C<declarator> node returned by the C<declarator_name> rule.
+
+Supports the adverbs appropriate to parameters, including C<named>, C<slurpy>,
+and C<optional>.
+
 =cut
 
 method parameter_declaration($/) {
@@ -336,9 +345,6 @@ method parameter_declaration($/) {
 	
 	# Insert declaration into current scope.
 	my $scope := close::Compiler::Scopes::current();
-	DUMP($scope);
-	ASSERT(close::Compiler::Node::type($scope) eq 'parameter_scope',
-		'Parameters are expected to be declared within a parameter_scope block');
 	$scope.push($past);
 	
 	DUMP($past);
@@ -356,27 +362,20 @@ parameter scope.
 method parameter_list($/, $key) {
 	if $key eq 'open' {
 		NOTE('Begin function parameter list');
-		my $past	:= close::Compiler::Node::create('decl_function_returning',
-			:node($/));
-		my $block	:= $past<parameter_scope>;
 		
-		close::Compiler::Scopes::push($block);
+		my $past := close::Compiler::Node::create('decl_function_returning',
+			:node($/));
+		
+		close::Compiler::Scopes::push($past);
 
-		NOTE("Pushed new scope on stack: ", $block.name());
+		NOTE("Pushed new scope on stack: ", $past.name());
 		DUMP($past);
 	}
 	elsif $key eq 'close' {
-		my $block	:= close::Compiler::Scopes::pop('parameter_scope');
-		my $past	:= $block<function_decl>;
+		my $past := close::Compiler::Scopes::pop('decl_function_returning');
 		
-		NOTE("Popped scope from stack: ", $block.name());
-		
-		for $<param_list> {
-			NOTE('Adding parameter to function: ', $_.ast.name());
-			$past.push($_.ast);
-			close::Compiler::Scopes::add_declarator($block, $_.ast);
-		}
-		
+		NOTE("Popped scope from stack: ", $past.name());
+			
 		NOTE('End function parameter list: ', +@($past), ' parameters');
 		DUMP($past);
 		make $past;

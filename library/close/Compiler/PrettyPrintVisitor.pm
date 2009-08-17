@@ -26,79 +26,585 @@ sub NOTE(*@parts) {
 
 ################################################################
 
+sub ADD_ERROR($node, *@msg) {
+	close::Compiler::Messages::add_error($node,
+		Array::join('', @msg));
+}
+
+sub ADD_WARNING($node, *@msg) {
+	close::Compiler::Messages::add_warning($node,
+		Array::join('', @msg));
+}
+
+sub NODE_TYPE($node) {
+	return close::Compiler::Node::type($node);
+}
+
+################################################################
+
+our $SUPER;
+
+method get_method_prefix() {
+	return '_prettyprint_';
+}
+
 our $Visitor_name := 'PrettyPrintVisitor';
 
-sub get_visit_method($type) {
-	our %Dispatch;
+method name() {
+	return $Visitor_name;
+}
 
-	NOTE("Finding visit_method for type '", $type, "'");
-	my $sub :=%Dispatch{$type};
+method visit($node) {
+	my @results;
 	
-	unless $sub {
-		NOTE("Looking up visit method for '", $type, "'");
+	if $node {
+		NOTE("Visiting ", NODE_TYPE($node), " node: ", $node.name());
+		DUMP($node);
 		
-		$sub := Q:PIR {
-			$S0 = 'visit_'
-			$P0 = find_lex '$type'
-			$S1 = $P0
-			$S0 = concat $S0, $S1
-			print "get method: "
-			say $S0
-			%r = get_global $S0
-		};
-
-		NOTE("Got sub: ", $sub);
-		DUMP($sub);
-		
-		if $type ne 'UNKNOWN' {
-			unless $sub {
-				$sub := get_visit_method('UNKNOWN');
-			}
-			
-			unless $sub {
-				DIE("No visit method available, ",
-				"including UNKNOWN,  ",
-				"for Node class: ", $type);
-			}
-		}
-		
-		%Dispatch{$type} := $sub;
-		DUMP(%Dispatch);
+		@results := $SUPER.visit(self, $node);
+	}
+	else {
+		@results := Array::empty();
 	}
 	
-	NOTE("Returning method '", $sub, "' to visit node of type '", $type, "'");
-	DUMP($sub);
-	return $sub;
+	NOTE("done");
+	DUMP(@results);
+	return @results;
 }
 
-our @Indent_parts := Array::empty();
-our $Indent;
+method visit_children($node) {
+	NOTE("Visiting ", +@($node), " children of ", NODE_TYPE($node), " node: ", $node.name());
+	DUMP($node);
 
-sub indent_full() {
-	@Indent_parts.push("\t");
-	$Indent := Array::join('', @Indent_parts);
-}
-
-sub indent_half() {
-	@Indent_parts.push("    ");
-	$Indent := Array::join('', @Indent_parts);
-}
-
-sub unindent() {
-	@Indent_parts.pop();
-	$Indent := Array::join('', @Indent_parts);
-}
+	my @results := $SUPER.visit_children(self, $node);
 	
-sub indent_lines(*@lines) {
-	my $result := '';
+	DUMP(@results);
+	return @results;
+}
+
+################################################################
+
+our @Child_attribute_names := (
+	'alias_for',
+	'type',
+	'scope',			# Symbols link to their enclosing scope. Should be a no-op
+	'parameter_scope',
+	'initializer',
+	'function_definition',
+);
+
+method _prettyprint_UNKNOWN($node) {	
+	NOTE("Unrecognized node type: '", NODE_TYPE($node), 
+		"'. Passing through to children.");
+	DUMP($node);
+
+	my $indent := '    '; # 4 spaces
+	
+	if $node.isa(PAST::Block) {
+		# Should I keep a list of push-able block types?
+		NOTE("Pushing this block onto the scope stack");
+		close::Compiler::Scopes::push($node);
+	
+		$indent := "\t"; 
+		# FIXME: I don't think we want to prettyprint anything in the symbol table.
+		# Let them come from the declarations inside the block.
+		#NOTE("Visiting symtable entries");
+		#for $node<symtable> {
+		#	my $child := close::Compiler::Scopes::get_symbol($node, $_);
+		#	self.visit($child);
+		#}
+	}
+
+	#for @Child_attribute_names {
+	#	if $node{$_} {
+	#		NOTE("Visiting <", $_, "> attribute");
+	#		self.visit($node{$_});
+	#	}
+	#}
+	
+	NOTE("Visiting children");
+	
+	my @results := self.wrap_children($node,
+		Array::new(
+			"/* Unknown '" ~ NODE_TYPE($node) ~ "' node: '" ~ $node.name() ~ "' */",
+			""
+		),
+		$indent,
+		Array::new("", "/* --- done --- */"),
+	);
+	
+	if $node.isa(PAST::Block) {
+		NOTE("Popping this block off the scope stack");
+		close::Compiler::Scopes::pop(NODE_TYPE($node));
+	}
+	
+	NOTE("Done with unknown node");
+	return @results;
+}
+
+method _prettyprint_bareword($node) {
+	NOTE("Visiting bareword: ", $node.name());
+	DUMP($node);
+	
+	ASSERT(0, 'There should be no bareword nodes in the tree.');
+	
+	my @results := Array::new( $node.name() );
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+method _prettyprint_compound_statement($node) {
+	NOTE("Visiting compound_statement");
+	DUMP($node);
+
+	my @kids := Array::empty();
+	
+	for @($node) {
+		Array::append(@kids, self.visit($_));
+		
+		if String::substr(NODE_TYPE($_), 0, 4) eq 'expr' {
+			my $last := @kids[+@kids - 1];
+			$last := $last ~ ';';
+			@kids[+@kids - 1] := $last;
+		}
+	}
+	
+	my @results := Array::new('{');
+	Array::append(@results, indent_lines("\t", @kids));
+	@results.push("}");
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+our @Declarator := Array::empty();
+
+method _prettyprint_decl_array_of($node) {
+	NOTE("Visiting array_of declarator");
+	DUMP($node);
+	
+	ASSERT($node<type>,
+		'Declarator must link to a specifier of some kind');
+	
+	my @elements	:= Array::new('[', $node<elements>, ']');
+	my $declarator	:= @Declarator.pop() ~ Array::join(' ', @elements);
+	@Declarator.push(	$declarator);
+	my @results		:= self.visit($node<type>);
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+method _prettyprint_decl_function_returning($node) {
+	NOTE("Visiting function_returning declarator");
+	DUMP($node);
+
+	ASSERT($node<type>, 
+		'Declarator must link to a specifier of some kind');	
+	
+	NOTE("Function has ", +@($node), " parameters");	
+	
+	my @kids		:= self.visit_children($node);
+	my $params		:= "(" ~ Array::join(", ", @kids) ~ ")";	
+	my $declarator	:= @Declarator.pop() ~ $params;	
+	
+	@Declarator.push(	$declarator);	
+	my @results		:= self.visit($node<type>);
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+our @Pointer_qualifiers := ( 'const', 'volatile' );
+
+method _prettyprint_decl_pointer_to($node) {
+	NOTE("Visiting pointer_to declarator");
+	DUMP($node);
+
+	ASSERT($node<type>,
+		'Declarator must link to a specifier of some kind');
+	
+	my @qualifiers	:= Array::empty();
+	
+	for @Pointer_qualifiers {
+		if $node{'is_' ~ $_} {
+			@qualifiers.push($_);
+		}
+	}
+	
+	my $declarator := '*';
+	
+	if +@qualifiers {
+		@qualifiers.unshift($declarator);
+		@qualifiers.push('');
+		$declarator := Array::join(' ', @qualifiers);
+	}
+
+	$declarator := $declarator ~ @Declarator.pop();
+
+	my $ptr_to := $node<type>;
+	
+	if $ptr_to<is_array> || $ptr_to<is_function> || $ptr_to<is_hash> {
+		$declarator := '(' ~ $declarator ~ ')';
+	}
+	
+	@Declarator.push($declarator);
+	my @results := self.visit($ptr_to);
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+method _prettyprint_decl_varlist($node) {
+	NOTE("Visiting decl_varlist node.");
+	DUMP($node);
+
+	my @results := self.visit_children($node);
+
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+method _prettyprint_declarator_name($node) {
+	NOTE("Visiting declarator_name: ", $node<display_name>);
+	DUMP($node);
+
+	ASSERT($node<type>,
+		'All declarators must come with an attached type');
+		
+	my $depth := +@Declarator;
+	
+	@Declarator.push($node<display_name>);
+	my @results := self.visit($node<type>);
+
+	ASSERT(+@Declarator == $depth,
+		'Declarator stack must stay in balance');
+
+	if $node<type><function_definition> {
+		my @body := self.visit($node<type><function_definition>);
+		Array::append(@results, @body);
+	}
+	else {
+		my $term := ';';
+		
+		if $node<initializer> {
+			my @initializer := self.visit($node<initializer>);
+			
+			$term := ' = ' ~ Array::join("\n", @initializer) ~ $term;
+		}
+	
+		@results[0] := @results[0] ~ $term;
+	}
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+method _prettyprint_expr_call($node) {
+	NOTE("Visiting expr_call");
+	DUMP($node);
+	
+	my @args := Array::clone(@($node));
+	my $callee;
+	
+	if $node.name() {
+		$callee := $node.name();
+	}
+	else {
+		$callee := @args.shift();
+		
+		my @callee := self.visit($callee);
+		ASSERT(+@callee == 1,
+			'Function call, or method call, or whatever, should resolve to a single line');
+		
+		$callee := @callee.shift();
+	}
+			
+	my @kids := Array::empty();
+		
+	for @args {
+		Array::append(@kids, self.visit($_));
+	}
+	
+	my @results := Array::new(
+		$callee ~ '(' ~ Array::join(', ', @kids) ~ ')',
+	);
+
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+method _prettyprint_expression($node) {
+	NOTE("Visiting expression");
+	DUMP($node);
+	
+	my @results := '... expression ...';
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+method _prettyprint_float_literal($node) {
+	NOTE("Visiting float_literal: ", $node.name());
+	
+	my @results := Array::new( $node.name() );
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+	
+}
+
+method _prettyprint_foreach_statement($node) {
+	NOTE("Visiting foreach_statement");
+	DUMP($node);
+	
+	my @loop_var	:= self.visit($node<loop_var>);
+	ASSERT(+@loop_var == 1,
+		'Even the most complex declarator should have only one line, here.');
+	my @list		:= self.visit($node<list>);
+
+	my @result		:= Array::new(
+		"foreach (" 
+		~ Array::join("\n", @loop_var)
+		~ " in "
+		~ Array::join("\n", @list)
+		~ ")",
+	);
+	
+	my $body		:= $node[0];
+	
+	if $body =:= $node<loop_var> {
+		$body := $node[1];
+	}
+
+	Array::append(@result, self.visit($body));
+	
+	NOTE("done");
+	DUMP(@result);
+	return @result;
+}
+
+method _prettyprint_integer_literal($node) {
+	NOTE("Visiting integer_literal: ", $node.name());
+	
+	my @results := Array::new( $node.name() );
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+method _prettyprint_namespace_block($node) {
+	my $name := $node.name();
+	NOTE("Visiting namespace_block: ", $name);
+	DUMP($node);
+
+	my @results := self.wrap_children($node,
+		Array::new(
+			"namespace " ~ $name,
+			"{",
+		),
+		"\t",
+		Array::new("}"),
+	);
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+method _prettyprint_parameter_declaration($node) {
+	NOTE("Visiting parameter_declaration: ", $node.name());
+	DUMP($node);
+	
+	ASSERT($node<type>,
+		'Declarator must link to a specifier of some kind');
+	
+	my $depth := +@Declarator;	# See ASSERT, below
+	
+	@Declarator.push($node.name());
+	my @results := self.visit($node<type>);
+
+	ASSERT($depth == +@Declarator, 'Declarator stack is kept in balance');
+
+	my @adverbs := Array::new('');
+	
+	for ('optional', 'slurpy', 'named') {
+		if $node<adverbs>{$_} {
+			@adverbs.push($node<adverbs>{$_}.value());
+		}
+	}
+
+	ASSERT(+@results == 1,
+		'Parameter declaration fits in one line');
+		
+	@results[0] := @results[0] ~ Array::join(' ', @adverbs);
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+method _prettyprint_qualified_identifier($node) {
+	NOTE("Visiting qualified_identifier: ", $node<display_name>);
+	DUMP($node);
+
+	my @results := Array::new( $node<display_name> );
+
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+method _prettyprint_quoted_literal($node) {
+	NOTE("Visiting quoted_literal: ", $node.name());
+	
+	my @results := Array::new( $node.name() );
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+	
+}
+
+method _prettyprint_translation_unit($node) {
+	NOTE("Visiting translation unit");
+	DUMP($node);
+	
+	close::Compiler::Scopes::push($node);
+	
+	my $file_name := $node<file_name>;
+	unless $file_name {
+		$file_name := 'unknown';
+	}
+	NOTE("File name is: ", $file_name);
+
+	my @results := self.wrap_children($node,
+		Array::new(
+			"# $Id" ~ ": $",
+			"",
+			"=config function :like<item1> :formatted<C>",
+			"",
+			"=head1 " ~ $file_name,
+			"",
+			"This file generated by PrettyPrintVisitor.pm",
+			"",
+			"=head2 DESCRIPTION",
+			"",
+			"=cut",
+			"",
+		),
+		"",	# No indentation for these lines
+		Array::new(
+			"",
+			"=head1 AUTHOR",
+			"",
+			"Austin Hastings",
+			"",
+		),
+	);
+		
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+our @Type_specifiers := ('const', 'volatile');
+
+method _prettyprint_type_specifier($node) {
+	NOTE("Visiting type_specifier node");
+	DUMP($node);
+	
+	my $noun :=$node<noun><display_name>;
+	
+	unless $noun {
+		$noun := $node<noun>.name();
+	}
+	
+	my @specifiers := Array::new( $noun, );
+	
+	for @Type_specifiers {
+		if $node{'is_' ~ $_} {
+			@specifiers.unshift($_);	# const, volatile
+		}
+	}
+
+	if $node<storage_class> {
+		@specifiers.unshift($node<storage_class>);	# extern
+	}
+
+	my @results := Array::new(
+		Array::join(' ', @specifiers) ~ " " ~ @Declarator.pop(),
+	);
+	
+	NOTE("done");		
+	DUMP(@results);
+	return @results;
+}
+
+
+method _visit_symbol($node) {
+	NOTE("Visiting symbol: ", $node.name());
+	DUMP($node);
+	
+	my @results := $node.name();
+	
+	ASSERT($node<type>, 'Symbol should always have a type attached.');
+	@Declarator.push(@results);
+	@results := self.visit($node<type>);
+
+	# WTF is this?
+	if $node<type><function_definition> {
+		NOTE("Attaching function definition");
+		@results := @results ~ "\n"
+			~ self.visit($node<type><function_definition>);
+	}
+	elsif $node<initializer> {
+		NOTE("Attaching initializer");
+		@results := @results ~ ' = ' ~ self.visit($node<initializer>);
+	}
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+method _visit_parameter_scope($node) {
+	NOTE("Visiting parameter_scope");
+	DUMP($node);
+	
+	my @results := indent_lines2("{ // parameter scope");
+	indent_full();
+	@results := @results ~ self.visit_children($node, "\n");
+	unindent();
+	@results := @results ~ indent_lines2("}");
+	
+	return @results;
+}
+
+################################################################
+	
+sub indent_lines($indent, @lines) {
+	my @results := Array::empty();
 	
 	for @lines {
-		$result := $result ~ $Indent ~ $_ ~ "\n";
+		@results.push($indent ~ $_);
 	}
 	
-	return $result;
+	return @results;
 }
-
+		
 =sub print($past)
 
 The top-level entry point. Pretty-prints the nodes below $past.
@@ -108,420 +614,38 @@ The top-level entry point. Pretty-prints the nodes below $past.
 sub print($past) {
 	NOTE("Pretty-printing");
 	DUMP($past);
+
+	$SUPER	:= close::Compiler::Visitor.new();
+	NOTE("Created SUPER-visitor");
+	DUMP($SUPER);
 	
 	my $visitor	:= close::Compiler::PrettyPrintVisitor.new();
 	NOTE("Created visitor");
 	DUMP($visitor);
 	
-	my $result	:= $visitor.visit($past);
-
-	DUMP($result);
-	return $result;
-}
-
-method visit($node) {
-	my $result := '';
+	my @results	:= $visitor.visit($past);
 	
-	if $node {
-		my $type	:= close::Compiler::Node::type($node);
-		NOTE("Visiting '", $type, "' node: ", $node.name());
-		DUMP($node);
-		
-		# Don't visit twice.
-		if $node<visited_by>{$Visitor_name} {
-			NOTE("Already visited");
-			return $node<visited_by>{$Visitor_name};
-		}
-
-		my &method	:= get_visit_method($type);
-		$result	:= &method(self, $node);
-		
-		NOTE("Done with ", $type, " node\n", $result);
-	}
+	DUMP(@results);
 	
-	$node<visited_by>{$Visitor_name} := $result;
-	return $result;
-}
-
-method visit_children($node, $delim?) {
-	my $count := +@($node);
-	NOTE("Visiting ", $count, " children");
-	DUMP($node);
-	
-	unless $delim {
-		$delim := '';
-	}
-	
-	DUMP(:delimiter($delim));
-	
-	my @results := Array::empty();
-	
-	for @($node) {
-		@results.push(self.visit($_));
-	}
-
-	my $result := Array::join($delim, @results);
-	NOTE("Done with children");
-	return $result;
-}
-
-method visit_compound_statement($node) {
-	NOTE("Visiting compound_statement");
-	DUMP($node);
-	
-	my $result := indent_lines('{');
-	indent_full();
-	$result := $result ~ self.visit_children($node, "\n");
-	unindent();
-	$result := $result ~ indent_lines('}');
-	
-	NOTE("done");
-	DUMP($result);
-	return $result;
-}
-
-method visit_decl_temp($node) {
-	NOTE("Visiting decl_temp node.");
-	DIE('This should not appear in finished tree');
-	
-	my $result := self.visit_children($node);
-	
-	NOTE("Done with decl_temp.");
-	return $result;
-}
-
-our @Declarator := Array::empty();
-
-method visit_decl_array_of($node) {
-	NOTE("Visiting array_of declarator");
-	DUMP($node);
-	DUMP(@Declarator);
-	
-	my $elements := $node<elements>;
-	
-	if $elements {
-		$elements := '[ ' ~ $elements ~ ' ]';
-	}
-	else {
-		$elements := '[ ]';
-	}
-
-	my $result := @Declarator.pop()
-		~ $elements;
-	
-	if $node<type> {
-		@Declarator.push($result);
-		$result := self.visit($node<type>);
-	}
-	
-	DUMP($result);
-	return $result;
-}
-
-method visit_decl_function_returning($node) {
-	NOTE("Visiting function_returning declarator");
-	DUMP($node);
-
-	NOTE("Function has ", +@($node<parameter_scope>), " parameters");
-	my $parameters := '('
-		~ self.visit_children($node<parameter_scope>, ", ")
-		~ ')';
-		
-	my $result := @Declarator.pop()
-		~ $parameters;
-
-	ASSERT($node<type>, 'Declarator must link to a specifier of some kind');
-	@Declarator.push($result);
-	$result := self.visit($node<type>);
-	
-	DUMP($result);
-	return $result;
-}
-
-method visit_decl_pointer_to($node) {
-	NOTE("Visiting pointer_to declarator");
-	DUMP($node);
-	DUMP(@Declarator);
-
-	my $pointer_to := '* ';
-	
-	if $node<is_const> {
-		$pointer_to := $pointer_to ~ 'const ';
-	}
-	
-	if $node<is_volatile> {
-		$pointer_to := $pointer_to ~ 'volatile ';
-	}
-	
-	my $result := $pointer_to ~ @Declarator.pop();
-	
-	if $node<type> {
-		my $to_type := $node<type>;
-		
-		if $to_type<is_array>
-			|| $to_type<is_function>
-			|| $to_type<is_hash> {
-			$result := '(' ~ $result ~ ')';
-		}
-	
-		@Declarator.push($result);
-		$result := self.visit($to_type);
-	}
-	
-	DUMP($result);
-	return $result;
-}
-
-method visit_decl_varlist($node) {
-	NOTE("Visiting decl_varlist node.");
-	DUMP($node);
-
-
-	my $result := '';
-	
-	for @($node) {
-		$result := $result ~ indent_lines(self.visit($_) ~ ";");
-	}
-	
-	NOTE("Done with decl_varlist.");
-	return $result;
-}
-
-method visit_symbol($node) {
-	NOTE("Visiting symbol: ", $node.name());
-	DUMP($node);
-	
-	my $result := $node.name();
-	
-	ASSERT($node<type>, 'Symbol should always have a type attached.');
-	@Declarator.push($result);
-	$result := self.visit($node<type>);
-
-	# WTF is this?
-	if $node<type><function_definition> {
-		NOTE("Attaching function definition");
-		$result := $result ~ "\n"
-			~ self.visit($node<type><function_definition>);
-	}
-	elsif $node<initializer> {
-		NOTE("Attaching initializer");
-		$result := $result ~ ' = ' ~ self.visit($node<initializer>);
-	}
-	
-	NOTE("done");
-	DUMP($result);
-	return $result;
-}
-
-method visit_expression($node) {
-	NOTE("Visiting expression");
-	DUMP($node);
-	
-	my $result := '... expression ...';
-	
-	NOTE("done");
-	DUMP($result);
-	return $result;
-}
-
-method visit_foreach_statement($node) {
-	NOTE("Visiting foreach_statement");
-	DUMP($node);
-	
-	my $loop_var	:= self.visit($node<loop_var>);
-	my $list		:= self.visit($node<list>);
-	my $result		:= indent_lines('foreach (' ~ $loop_var ~ ' : ' ~ $list ~ ')');
-	my $body		:= $node[0];
-	
-	if close::Compiler::Node::type($body) ne 'compound_statement' {
-		indent_full();
-		$result 	:= $result ~ indent_lines($body);
-		unindent();
-	}
-	else {
-		$result	:= $result ~ indent_lines($body);
-	}
-		
-	NOTE("done");
-	DUMP($result);
-	return $result;
-}
-
-method visit_function_call($node) {
-	NOTE("Visiting function_call");
-	DUMP($node);
-	
-	my @args := Array::clone($node);
-	
-	if $node.name() {
-		@args.unshift($node.name());
-	}
-	
-	my $func := @args.shift();
-	
-	my $result := self.visit($func)
-		~ '('
-		~ self.visit_children(@args)
-		~ ')';
+	my $result	:= Array::join("\n", @results);
 
 	NOTE("done");
 	DUMP($result);
 	return $result;
 }
 
-method visit_namespace_block($node) {
-	my $name := $node.name();
-	NOTE("Visiting namespace_block: ", $name);
-	DUMP($node);
+method wrap_children($node, @before, $indent, @after) {
+	NOTE("Wrapping children of ", NODE_TYPE($node), " node: ", $node.name());
+	DUMP(:before(@before), :indent($indent), :after(@after));
 	
-	my $result := '' ~ indent_lines(
-	"namespace " ~ $name,
-	"{" );
+	my @results := Array::clone(@before);
 	
-		indent_full();
-		my $result := $result ~ self.visit_children($node);
-		unindent();
+	my @kids := self.visit_children($node);
 	
-	$result := $result ~ indent_lines(
-	"}" );
+	Array::append(@results, indent_lines($indent, @kids));
+	Array::append(@results, @after);
 	
-	return $result;
-}
-
-method visit_parameter_declaration($node) {
-	NOTE("Visiting parameter_declaration: ", $node.name());
-	DUMP($node);
-	
-	my $depth := +@Declarator;	# See ASSERT, below
-	
-	my $result := $node.name();
-	
-	if $node<type> {
-		@Declarator.push($result);
-		$result := self.visit($node<type>);
-	}
-
-	for ('optional', 'slurpy', 'named') {
-		if $node<adverbs>{$_} {
-			$result := $result ~ ' ' ~ $node<adverbs>{$_}.value();
-		}
-	}
-	
-	ASSERT($depth == +@Declarator, 'Declarator stack is kept in balance');
-	DUMP($result);
-	return $result;
-}
-
-method visit_parameter_scope($node) {
-	NOTE("Visiting parameter_scope");
-	DUMP($node);
-	
-	my $result := indent_lines("{ // parameter scope");
-	indent_full();
-	$result := $result ~ self.visit_children($node, "\n");
-	unindent();
-	$result := $result ~ indent_lines("}");
-	
-	return $result;
-}
-
-method visit_qualified_identifier($node) {
-	NOTE("Visiting qualified_identifier: ", $node.name());
-	DUMP($node);
-
-	my @parts := Array::clone($node.namespace());
-	@parts.push($node.name());
-	
-	if $node<is_rooted> {
-		@parts.unshift($node<hll>);	# Works if null, too: ::foo
-	}
-	
-	my $result := Array::join('::', @parts);
-	
-	if $node<hll> {
-		$result := 'hll:' ~ $result;
-	}
-	
-	DUMP($result);
-	return $result;
-}
-
-method visit_translation_unit($node) {
-	NOTE("Visiting translation unit");
-	DUMP($node);
-	close::Compiler::Scopes::push($node);
-	
-	$Indent := '';
-	
-	my $file_name := $node<file_name>;
-	unless $file_name {
-		$file_name := 'unknown';
-	}
-	NOTE("File name is: ", $file_name);
-	
-	my $result := indent_lines(
-		"# $Id$",
-		"",
-		"=config function :like<item1> :formatted<C>",
-		"",
-		"=head1 " ~ $file_name,
-		"",
-		"This file generated by PrettyPrintVisitor.pm",
-		"",
-		"=head2 DESCRIPTION",
-		"",
-		"=cut",
-		"")
-		~ self.visit_children($node)
-		~ indent_lines(
-		"",
-		"=head1 AUTHOR",
-		"",
-		"Austin Hastings",
-		"");
-		
-	DUMP($result);
-	return $result;
-}
-
-method visit_type_specifier($node) {
-	NOTE("Visiting type_specifier node");
-	DUMP($node);
-	
-	my $specifiers := $node<noun>;
-	
-	if $node<is_volatile> {
-		$specifiers := 'volatile ' ~ $specifiers;
-	}
-	
-	if $node<is_const> {
-		$specifiers := 'const ' ~ $specifiers;
-	}
-
-	if $node<storage_class> {
-		$specifiers := $node<storage_class> ~ ' ' ~ $specifiers;
-	}
-	
-	my $result := $specifiers ~ ' ' ~ @Declarator.pop();
-	
-	DUMP($result);
-	return $result;
-}
-	
-method visit_UNKNOWN($node) {	
-	NOTE("Unrecognized node type: '", 
-		close::Compiler::Node::type($node),
-		"'. Passing through to children.");
-	DUMP($node);
-
-	my $result := indent_lines("/* Unknown '" ~ close::Compiler::Node::type($node) ~ "' node: '"
-		~ $node.name() ~ "' */",
-		"");
-	indent_full();
-	$result := $result ~ self.visit_children($node, "\n");
-	unindent();
-	$result := $result ~ indent_lines("", "/* --- done --- */");
-	
-	NOTE("Done with unknown node:\n", $result);
-	return $result;
+	NOTE("done");
+	DUMP(@results);
+	return @results;
 }

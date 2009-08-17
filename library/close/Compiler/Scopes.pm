@@ -91,7 +91,7 @@ sub dump_stack() {
 
 sub fetch_current_hll() {
 	my $hll	:= 'close';	
-	my $block	:= find_matching('hll');
+	my $block	:= query_inmost_scope_with_attr('hll');
 	
 	if $block {
 		$hll	:= $block.hll();
@@ -101,7 +101,7 @@ sub fetch_current_hll() {
 }
 
 sub fetch_current_namespace() {
-	my $block := find_matching('is_namespace');
+	my $block := query_inmost_scope_with_attr('is_namespace');
 
 	unless $block {
 		dump_stack();
@@ -114,9 +114,11 @@ sub fetch_current_namespace() {
 	return $block;
 }
 
-sub find_matching($attr) {
+# FIXME: Don't know how to deal with ?value
+sub query_inmost_scope_with_attr($attr, $value?) {
 	for get_search_list() {
 		if $_{$attr} {
+			NOTE("Found matching ", $_<node_type>);
 			DUMP($_);
 			return $_;
 		}
@@ -136,6 +138,14 @@ sub get_symbol($scope, $name) {
 	DUMP(:name($name), :result($object));
 	return $object;
 }
+
+=sub get_search_list
+
+Returns a copy of the lexical stack - so it can be destroyed - arranged in the 
+correct order for searching. The first element of the returned array is the 
+top of the lexical stack, the last element is the bottom of the stack, etc.
+
+=cut
 
 sub get_search_list() {
 	my @list := Array::clone(get_stack());
@@ -196,103 +206,10 @@ sub push_namespace(@path) {
 	push($nsp);
 }
 
-=sub void resolve_qualified_identifier($root, @identifier)
-
-Returns a list of candidates that match the components in the given qualified
-C<@identifier> relative to C<$root>. 
-
-There are three possible ways to decode 'B' in a scenario like C<B::C>. The 
-first is that B might be a namespace. The second is that B might be an aggregate
-type -- a class, struct, union, or enum. And the third is that B might be an 
-alias for another type.
-
-If B is a namespace, then our options are still open for C -- it could be anything.
-
-If B is an aggregate, then C gets resolved as a member, a method, or a member
-type (e.g., C<typedef int C> within the class). In any case, B must have a 
-symtable entry for C.
-
-If B is an alias for another type or namespace, see above.
-
-=cut
-
-sub resolve_qualified_identifier($root, @identifier) {
-	my @candq := new_array();
-	@candq.push($root);
-	
-	for @identifier {
-		my $id_part := $_;
-		say("Part: ", $id_part);
-		my $num_cands := +@candq;
-		say("# candidates at this level: ", $num_cands);
-		
-		while $num_cands-- {
-			my $scope	:= @candq.shift();
-			say("Scope: ", $scope.name());
-			if ! $scope.isa(PAST::Block) {
-				say("Dead end at ", $scope.name());
-			}
-			else {
-				my $sym	:= $scope.symbol($id_part);
-		
-				# Handle functions, variables, types.
-				if $sym && $sym<decl> {
-					if $sym<decl><is_alias> {
-						say("Found alias");
-						@candq.push($sym<decl><alias_for>);
-					}
-					else {
-						say("Found plain symbol");
-						@candq.push($sym<decl>);
-					}
-				}
-				
-				# Handle namespaces
-				if $sym && $sym<namespace> {
-					@candq.push($sym<namespace>);
-				}
-			}
-		}
-	}
-
-	DUMP(@candq);
-	return @candq;
-}
-
 sub set_namespace($scope, $name, $namespace) {
 	$scope.symbol($name, :namespace($namespace));
 }
 
 sub set_symbol($scope, $name, $object) {
 	$scope.symbol($name, :symbol($object));
-}
-
-sub symbol_defined_anywhere($past) {
-	if $past.scope() ne 'package' {
-		my $name := $past.name();
-		my $def;
-
-		for get_stack() {
-			$def := $_.symbol($name);
-
-			if $def {
-				if $def<decl>.HOW.can($def<decl>, "scope") {
-					#say("--- FOUND: ", $def<decl>.scope());
-				}
-				elsif $def<decl>.isa("PAST::Block") {
-					#say("--- FOUND: Block");
-				}
-				else {
-					#say("--- FOUND in unrecognized object:");
-					#DUMP($def<decl>, "Declaration");
-					DIE("Unexpected data item");
-				}
-
-				return $def;
-			}
-		}
-	}
-
-	# Not any kind of local variable, parameter, etc. Try global.
-	return get_global_symbol_info($past);
 }

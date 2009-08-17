@@ -159,6 +159,37 @@ method builtin_issame($/) {
 }
 
 
+
+sub symbol_defined_anywhere($past) {
+	if $past.scope() ne 'package' {
+		my $name := $past.name();
+		my $def;
+
+		for get_stack() {
+			$def := $_.symbol($name);
+
+			if $def {
+				if $def<decl>.HOW.can($def<decl>, "scope") {
+					#say("--- FOUND: ", $def<decl>.scope());
+				}
+				elsif $def<decl>.isa("PAST::Block") {
+					#say("--- FOUND: Block");
+				}
+				else {
+					#say("--- FOUND in unrecognized object:");
+					#DUMP($def<decl>, "Declaration");
+					DIE("Unexpected data item");
+				}
+
+				return $def;
+			}
+		}
+	}
+
+	# Not any kind of local variable, parameter, etc. Try global.
+	return get_global_symbol_info($past);
+}
+
 # NB: This operator gives precedence to variable names over class names.
 # If you create a variable called 'Iterator', you won't be able to create a new
 # Iterator (class) object in that scope. Sucks for you.

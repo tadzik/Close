@@ -36,9 +36,19 @@ HLL name. Returns the found or created PAST block.
 
 sub fetch(@target) {
 	DUMP(@target);
-	my $block := fetch_relative($Root, @target);
+	my $block := fetch_relative(fetch_namespace_root(), @target);
 	DUMP($block);
 	return $block;
+}
+
+sub fetch_namespace_root() {
+	our $root;
+	
+	unless $root {
+		$root := PAST::Block.new(:name('namespace root block'));
+	}
+	
+	return $root;
 }
 
 sub fetch_namespace_of($past_var) {
@@ -125,8 +135,6 @@ sub format_path_of($past) {
 	return $result;
 }
 
-our $Root := PAST::Block.new(:name('namespace root block'));
-
 sub path_of($past) {
 	DUMP($past);
 	
@@ -142,7 +150,7 @@ sub path_of($past) {
 
 sub query(@target) {
 	DUMP(@target);
-	my $block := query_relative($Root, @target);
+	my $block := query_relative(fetch_namespace_root(), @target);
 	DUMP($block);
 	return $block;
 }
@@ -184,14 +192,14 @@ sub query_relative($origin, @target) {
 
 =sub query_relative_namespace_of($namespace, $past_var)
 
-queryes a namespace, creating blocks as needed, that is either:
+Queries a namespace, that is either:
 
 =item * the rooted namespace of C<$past_var>, if it is rooted; or
 
 =item * the resulting namespace of C<$past_var>, if it is not rooted,
 when added to the end of C<$namespace>.
 
-Note that these namespaces are I<always> created.
+Returns undef if not such namespace path exists.
 
 =cut
 

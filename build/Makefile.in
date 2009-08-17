@@ -71,6 +71,7 @@ COMPILER_LIBS_PIR := \
 	library/close/Compiler/Array.pir			\
 	library/close/Compiler/Config.pir			\
 	library/close/Compiler/Dumper.pir		\
+	library/close/Compiler/Lookups.pir		\
 	library/close/Compiler/Messages.pir		\
 	library/close/Compiler/MessageVisitor.pir	\
 	library/close/Compiler/Namespaces.pir		\
@@ -79,10 +80,12 @@ COMPILER_LIBS_PIR := \
 	library/close/Compiler/Scopes.pir			\
 	library/close/Compiler/String.pir			\
 	library/close/Compiler/SymbolLookupVisitor.pir	\
-	library/close/Compiler/Symbols.pir		\
+	library/close/Compiler/SymbolResolutionVisitor.pir	\
 	library/close/Compiler/Symbols.pir		\
 	library/close/Compiler/TypeResolutionVisitor.pir\
-	library/close/Compiler/Types.pir
+	library/close/Compiler/Types.pir			\
+	library/close/Compiler/Types.pir			\
+	library/close/Compiler/Visitor.pir
 
 DOCS := README
 
@@ -212,6 +215,15 @@ library/close/Compiler/Dumper.pir: library/close/Compiler/Dumper.pm
 		> library/close/Compiler/Dumper.pir
 	$(RM_F) library/close/Compiler/Dumper.pira
 
+library/close/Compiler/Lookups.pir: library/close/Compiler/Lookups.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/Lookups.pira \
+		library/close/Compiler/Lookups.pm
+	$(STRIP_PIRA) library/close/Compiler/Lookups.pira \
+		> library/close/Compiler/Lookups.pir
+	$(RM_F) library/close/Compiler/Lookups.pira
+
 library/close/Compiler/Messages.pir: library/close/Compiler/Messages.pm
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
@@ -283,6 +295,15 @@ library/close/Compiler/SymbolLookupVisitor.pir: library/close/Compiler/SymbolLoo
 	$(STRIP_PIRA) library/close/Compiler/SymbolLookupVisitor.pira \
 		> library/close/Compiler/SymbolLookupVisitor.pir
 	$(RM_F) library/close/Compiler/SymbolLookupVisitor.pira
+	
+library/close/Compiler/SymbolResolutionVisitor.pir: library/close/Compiler/SymbolResolutionVisitor.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/SymbolResolutionVisitor.pira \
+		library/close/Compiler/SymbolResolutionVisitor.pm
+	$(STRIP_PIRA) library/close/Compiler/SymbolResolutionVisitor.pira \
+		> library/close/Compiler/SymbolResolutionVisitor.pir
+	$(RM_F) library/close/Compiler/SymbolResolutionVisitor.pira
 
 library/close/Compiler/Symbols.pir: library/close/Compiler/Symbols.pm
 	@echo "**** Compiling $< to PIR"
@@ -310,6 +331,15 @@ library/close/Compiler/Types.pir: library/close/Compiler/Types.pm
 	$(STRIP_PIRA) library/close/Compiler/Types.pira \
 		> library/close/Compiler/Types.pir
 	$(RM_F) library/close/Compiler/Types.pira
+
+library/close/Compiler/Visitor.pir: library/close/Compiler/Visitor.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/Visitor.pira \
+		library/close/Compiler/Visitor.pm
+	$(STRIP_PIRA) library/close/Compiler/Visitor.pira \
+		> library/close/Compiler/Visitor.pir
+	$(RM_F) library/close/Compiler/Visitor.pira
 
 $(CLOSE_GROUP): $(PMC_DEPS)
 #	$(MAKE) $(PMC_DIR)

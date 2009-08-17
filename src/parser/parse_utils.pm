@@ -73,7 +73,7 @@ C<hll> set (or not) appropriately.
 =cut
 
 sub assemble_qualified_path($past, $/) {
-	my @parts	:= new_array();
+	my @parts	:= Array::empty();
 	
 	for $<path> {
 		@parts.push($_.ast.value());
@@ -145,17 +145,19 @@ sub clean_up_heredoc($past, @lines) {
 	DUMP($past);
 }
 
-=sub PAST::Val immediate_token($string)
+our $Config;
 
-Makes a token -- that is, a PAST::Val node -- from an immediate string. Sets
-no C<:node()> attribute, but 'String' is the return type and the given C<$string>
-is the value. Returns the new token.
+sub get_config(*@keys) {
+	NOTE("Get config setting: ", Array::join('::', @keys));
 
-=cut
-
-sub immediate_token($string) {
-	my $token := PAST::Val.new(:returns('String'),  :value($string));
-	return $token;
+	unless $Config {
+		$Config := close::Compiler::Config.new();
+	}
+	
+	my $result := $Config.value(@keys);
+	
+	DUMP($result);
+	return $result;
 }
 
 =sub PAST::Val make_token($capture)
@@ -176,100 +178,6 @@ sub make_token($capture) {
 		
 	DUMP($token);
 	return $token;
-}
-
-our %Unique_name;
-
-sub make_unique_name($category) {
-	unless %Unique_name{$category} {
-		%Unique_name{$category} := 0;
-	}
-	
-	my $name := $category ~ '_0000' ~ %Unique_name{$category}++;
-	$name := substr($name, 0, -4);
-	return $name;
-}
-
-=sub PAST::Block make_aggregate($kind, $tag)
-
-Creates and returns a new PAST::Block to store the aggregate symbol table.
-The C<$kind> of aggregate (class, struct, union, enum) is encoded in the 
-generated C<$tag>, if no value is provided for C<$tag> explicitly.
-
-=cut
-
-sub make_aggregate($kind, $tag) {
-	unless $tag {
-		$tag := make_unique_name($kind);
-	}
-	
-	my $agg := PAST::Block.new(
-		:blocktype('immediate'),
-		:name($kind ~ ' ' ~ $tag));	# 'struct foo' or 'enum bar'
-	$agg<kind> := $kind;
-	$agg<tag> := $tag;
-	
-	return ($agg);
-}
-
-sub new_array() {
-	my @ary := Q:PIR { %r = new 'ResizablePMCArray' };
-	return (@ary);
-}
-
-sub get_path_of_id($id) {
-	my @path := Array::clone($id.namespace());
-	@path.push($id.name());
-	
-	if $id<hll> {
-		@path.unshift($id<hll>);
-	}
-	
-	DUMP(@path);
-	return @path;
-}
-
-=sub PAST::Node[] lookup_qualified_identifier($ident)
-
-Given a qualified identifier -- a name that may or may not be prefixed with type
-or namespace names -- looks up the possible matches for the identifier using the
-current lexical scope stack. If the identifier is rooted, the only the rooted
-path is used to search for candidates.
-
-Returns an array of candidates. Note that because namespaces and symbols do
-not share a namespace, any path, no matter how explicit, can potentially resolve
-to both a namespace and a symbol. (Perl6 uses this to create a proto-object with
-the same name as the namespace.)
-
-=cut
-
-sub lookup_qualified_identifier($ident) {
-	my @candidates;
-	my @ident := get_path_of_id($ident);
-	
-	if $ident<is_rooted> {
-		# Potential problem if no symbol information exists for name when it gets used.
-		my @hll_root := new_array();
-		@hll_root.push(@ident[0]);
-		my $nsp := close::Compiler::Namespaces::fetch(@hll_root);
-		@candidates := close::Compiler::Scopes::resolve_qualified_identifier($nsp, @ident);
-	}
-	else {
-		#for @Outer_scopes {
-		for $ident<searchpath> {
-			say("Searching in ", $_.name());
-			my @idpath := Array::clone(@ident);
-			@candidates := close::Compiler::Scopes::resolve_qualified_identifier($_, @idpath);
-			
-			if +@candidates {
-				DUMP(@candidates);
-				return @candidates;
-			}
-		}
-	}
-
-	DUMP(@candidates);
-	return @candidates;
 }
 
 ##################################################################
@@ -306,18 +214,6 @@ namespaces. This is the continuation of the symbol table tree. Thus,
 =back
 
 =cut
-
-sub add_global_symbol($sym) {
-	my @path := namespace_path_of_var($sym);
-	my $block := close::Compiler::Namespaces::fetch(@path);
-
-	#say("Found block: ", $block.name());
-
-	my $name	:= $sym.name();
-	my $info	:= $block.symbol($name);
-
-	$block.symbol($name, :decl($sym));
-}
 
 sub _find_block_of_path(@_path) {
 	our $Symbol_table;
@@ -367,7 +263,7 @@ sub _fetch_namespaces_below($block, @results) {
 sub get_all_namespaces() {
 	our $Symbol_table;
 
-	my @results := new_array();
+	my @results := Array::empty();
 
 	if $Symbol_table {
 		_fetch_namespaces_below($Symbol_table, @results);
@@ -543,7 +439,7 @@ sub adverb_args_storage($adverb) {
 		return $adverb[0].value();
 	}
 	else {	# $num_args > 1
-		my $args := new_array();
+		my $args := Array::empty();
 		
 		for $adverb {
 			$args.push($_.value());
@@ -722,7 +618,7 @@ sub open_decl_mode($mode) {
 	our @Decl_mode_stack;
 
 	unless @Decl_mode_stack {
-		@Decl_mode_stack := new_array();
+		@Decl_mode_stack := Array::empty();
 	}
 
 	unless %valid_decl_mode{$mode} {
@@ -734,157 +630,6 @@ sub open_decl_mode($mode) {
 	#say("Opened declaration mode: ", $mode, ", ",
 	#	+@Decl_mode_stack, " now on stack");
 	return $mode;
-}
-
-##################################################################
-
-=head4 Declaration tracking
-
-There is a stack used to track the symbol currently being declared. This is needed for
-nested declarations -- functions within classes, complex parameters inside a 
-function parameter list.
-
-=cut 
-
-sub close_declaration() {
-	our @Declaration_stack;
-	my $last := @Declaration_stack.shift();
-	#say("Close declaration of '", $last.name(), "', ",
-	#    +@Declaration_stack, " now on stack");
-	return $last;
-}
-
-sub current_declaration() {
-	our @Declaration_stack;
-	return @Declaration_stack[0];
-}
-
-sub open_declaration($/) {
-	our @Declaration_stack;
-
-	unless @Declaration_stack {
-		@Declaration_stack := new_array();
-	}
-
-	my $decl := PAST::Var.new(
-		:isdecl(1),
-		:node($/));
-	$decl<pirflags> := '';
-
-	@Declaration_stack.unshift($decl);
-	#say("Open declaration of '", ~$/, "', ",
-	#    +@Declaration_stack, " now on stack");
-	return $decl;
-}
-
-sub replace_current_declaration($new_decl) {
-	our @Declaration_stack;
-	@Declaration_stack[0] := $new_decl;
-	#say("Replaced current declaration with '", $new_decl.name(), "'");
-	return $new_decl;
-}
-
-sub symbol_defined_locally($past) {
-	my $name := $past.name();
-	return close::Compiler::Scopes::current().symbol($name);
-}
-
-#########
-
-##### Legacy code - deprecated.
-
-method Xlogical_op($/, $key) {
-	my $op := ~$/;
-	my $pasttype;
-
-	if $op eq '&&' {
-		$pasttype := 'unless';
-	}
-	elsif $op eq '||' {
-		$pasttype := 'if';
-	}
-	else {
-		$/.panic("Unexpected value: '" ~ $op ~ "' for logical operator.");
-	}
-
-	my $past := PAST::Op.new(
-		:name($op),
-		:node($/),
-		:pasttype($pasttype),
-	);
-	make $past;
-	#DUMP($past);
-}
-
-sub block2stmts($block) {
-	my $past := PAST::Stmts.new(
-		:name($block.name()),
-		:node($block));
-
-	# copy attributes
-
-	# copy children
-	for @($block) {
-		unless ($_.isa('PAST::Op') and $_.pasttype() eq 'null') {
-			$past.push($_);
-		}
-	}
-
-	say("Block2stmts: ", $past.name(), ", with ", +@($past), " items left");
-
-	unless +@($past) {
-		$past := PAST::Op.new(:pasttype('null'));
-		say("Nulled out block");
-	}
-
-	return $past;
-}
-
-sub merge_lexical_scopes($outer, $inner) {
-    # Check for conflicting symbol names, fail if any exist.
-	say("Merging lexical scopes");
-	DUMP($outer);
-	DUMP($inner);
-
-    for $inner<symtable> {
-        if $outer.symbol($_) {
-            return $inner;
-        }
-    }
-
-    # Merge the symbol tables.
-    for $inner<symtable> {
-        $outer<symtable>{$_} := $inner.symbol($_);
-    }
-
-    # Merge the blocks
-    my $new_inner := PAST::Stmts.new();
-    $new_inner.name($inner.name());
-    #$new_inner.namespace($inner.namespace());
-    #$new_inner.node($inner.node());
-    $new_inner<rtype> := $inner<rtype>;
-
-    for @($inner) {
-        $new_inner.push($_);
-    }
-
-    my $found := 0;
-    my $index := 0;
-
-    for @($outer) {
-        if $_.isa('PAST::Block') and $_ =:= $inner {
-            $found := 1;
-            $outer[$index] := $new_inner;
-        }
-
-        $index ++;
-    }
-
-    if !$found {
-        DIE("Tried to merge two non-nested scopes. WTF?");
-    }
-
-    return $new_inner;
 }
 
 ##################################################################
@@ -926,7 +671,7 @@ have different behaviors wrt namespace pollution, etc.
 
 sub add_class_attribute($attr) {
 	#my $class := find_lexical_block_with_attr('is_class');
-	my $class := close::Compiler::Scopes::find_matching('is_class');
+	my $class := close::Compiler::Scopes::query_inmost_scope_with_attr('is_class');
 
 	$class.symbol($attr.name(), :decl($attr));
 
@@ -1259,19 +1004,4 @@ sub compilation_unit_past()
 	}
 
 	return $past;
-}
-
-#################################################################
-
-=head4 Temporary variables
-
-Some operations need temporary variables to store internal constructs,
-temporary results, and the like.
-
-=cut
-
-our $Temporary_index := 0;
-
-sub make_temporary_name($format) {
-	return $format ~ substr('0000' ~  $Temporary_index++, -4);
 }

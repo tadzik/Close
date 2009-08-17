@@ -74,34 +74,30 @@ method expression_statement($/) {
 method foreach_statement($/, $key) {
 	if $key eq 'open' {
 		NOTE('Begin foreach statement');
-		my $past := close::Compiler::Node::create('foreach_statement',
-			:node($/));
-			
-		close::Compiler::Scopes::push($past<parameter_scope>);
 		
-		NOTE("Pushed parameter_scope on stack");
+		my $past := close::Compiler::Node::create('foreach_statement', :node($/));
+		close::Compiler::Scopes::push($past);
+		
+		NOTE("Pushed foreach_statement on stack");
 		DUMP($past)
 	}
 	elsif $key eq 'close' {
-		my $block	:= close::Compiler::Scopes::pop('parameter_scope');
-		my $past	:= $block<foreach_statement>;
+		my $past := close::Compiler::Scopes::pop('foreach_statement');
 		
-		NOTE("Popped scope from stack: ", $block.name());
+		NOTE("Popped scope from stack: ", $past.name());
 
-		my $loop_var;
+		$past<loop_var> := $<header><loop_var>.ast;
 		
-		if $<header><parameter_declaration> {
-			NOTE("Adding loop variable declaration to parameter_scope");
-			$loop_var := $<header><parameter_declaration>.ast;
-			$block.push($loop_var);
-		}
-		else {
-			$loop_var := $<header><simple_identifier>[0].ast;
+		if $past<loop_var><default> { # foreach (int i = 0 in array)
+			ADD_WARNING($past<loop_var>,
+				"Useless initializer in foreach loop variable ",
+				$past<display_name>);
 		}
 		
-		$past<loop_var>	:= $loop_var;
-		$past<list>		:= $<header><list>.ast;
-		$past.push(		$<body>.ast);
+		# TODO: Add some more checks for inappropriate specifiers, etc.
+		
+		$past<list> := $<header><list>.ast;
+		$past.push($<body>.ast);
 		
 		NOTE("done");
 		DUMP($past);
