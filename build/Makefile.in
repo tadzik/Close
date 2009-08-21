@@ -77,6 +77,7 @@ COMPILER_LIBS_PIR := \
 	library/close/Compiler/Namespaces.pir		\
 	library/close/Compiler/Node.pir			\
 	library/close/Compiler/PrettyPrintVisitor.pir	\
+	library/close/Compiler/ScopeAssignmentVisitor.pir \
 	library/close/Compiler/Scopes.pir			\
 	library/close/Compiler/String.pir			\
 	library/close/Compiler/SymbolLookupVisitor.pir	\
@@ -268,6 +269,15 @@ library/close/Compiler/PrettyPrintVisitor.pir: library/close/Compiler/PrettyPrin
 	$(STRIP_PIRA) library/close/Compiler/PrettyPrintVisitor.pira \
 		> library/close/Compiler/PrettyPrintVisitor.pir
 	$(RM_F) library/close/Compiler/PrettyPrintVisitor.pira
+
+library/close/Compiler/ScopeAssignmentVisitor.pir: library/close/Compiler/ScopeAssignmentVisitor.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/ScopeAssignmentVisitor.pira \
+		library/close/Compiler/ScopeAssignmentVisitor.pm
+	$(STRIP_PIRA) library/close/Compiler/ScopeAssignmentVisitor.pira \
+		> library/close/Compiler/ScopeAssignmentVisitor.pir
+	$(RM_F) library/close/Compiler/ScopeAssignmentVisitor.pira
 
 library/close/Compiler/Scopes.pir: library/close/Compiler/Scopes.pm
 	@echo "**** Compiling $< to PIR"

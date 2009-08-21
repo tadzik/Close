@@ -144,25 +144,34 @@ method get_caller_namespace() {
 }
 
 method visit($visitor, $node) {
+	NOTE("Visiting ", NODE_TYPE($node), " node on behalf of ", $visitor.name());
+	
 	my @results := self.already_visited($visitor, $node);
+	DUMP(@results);
 	
 	unless @results {
-		self.already_visited($visitor, $node, Array::empty());
+		NOTE("Not visited yet. Inserting temporary marker.");
+		self.already_visited($visitor, $node, Array::new($node));
 		
 		my &method := self.fetch_visit_method($visitor, $node);
 		@results	:= &method($visitor, $node);
 		
+		NOTE("Visit complete. Storing results.");
 		self.already_visited($visitor, $node, @results);
 	}
 
+	NOTE("done");
+	DUMP(@results);
 	return @results;
 }
 
 method visit_children($visitor, $node) {
 	my @results := Array::empty();	
 	
-	for @($node) {
-		Array::append(@results, $visitor.visit($_));
+	if $node {
+		for @($node) {
+			Array::append(@results, $visitor.visit($_));
+		}
 	}
 
 	return @results;

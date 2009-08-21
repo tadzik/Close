@@ -101,8 +101,6 @@ method visit_children($node) {
 our @Child_attribute_names := (
 	'alias_for',
 	'type',
-	'scope',			# Symbols link to their enclosing scope. Should be a no-op
-	'parameter_scope',
 	'initializer',
 	'function_definition',
 );
@@ -230,28 +228,48 @@ method _type_resolve_type_specifier($node) {
 	}
 	
 	NOTE("Resolving type specifier: ", $type_name);
-	
-	my @cands := close::Compiler::Types::lookup_type_name($node<noun>);
 
-	ASSERT(+@cands > 0,
+	my @scopes := close::Compiler::Types::query_scopes_containing($node<noun>);
+	#my @scopes := close::Compiler::Lookups::query_scopes_containing($node);
+	NOTE("Found ", +@scopes, " candidates for typename resolution");
+	DUMP(@scopes);
+	
+	# if +@scopes == 0 {
+	ASSERT(+@scopes > 0,
 		'For a type-specifier to parse, there must have been at least one type_name that matched');
-
-	my $result_namespace := @cands[0];
+	# } elsif
+	my $resolved;
 	
-	unless +@cands == 1
-		|| $result_namespace =:= close::Compiler::Scopes::current() {
-		my @ns_names := Array::empty();
-		
-		for @cands {
-			@ns_names.push($_.name());
+	if +@scopes == 1 {
+		$resolved := close::Compiler::Scopes::get_symbol(@scopes[0], $type_name);
+		NOTE("Found exactly one candidate: ", $resolved.name());
+		DUMP($resolved);
+	}
+	else { # +@scopes > 1 
+		if !$node<is_rooted> && !$node.namespace() {
+			# type name is an unqualified reference, like foo, not like ::foo or X::foo
+			my $local_scope := close::Compiler::Scopes::get_current();
+			for @scopes {
+				if $_ =:= $local_scope {
+					$resolved := close::Compiler::Scopes::get_symbol($_, $type_name);
+				}
+			}
 		}
-
-		NOTE("Attaching an ambiguous type error");
-		ADD_ERROR($node,
-			"Ambiguous type specifier '", $type_name,
-			"' resolves to ", +@cands, " different types:\n\t",
-			Array::join("\n\t", @ns_names)
-		);
+		
+		unless $resolved {
+			my @names := Array::empty();
+			
+			for @scopes {
+				@names.push($_.name());
+			}
+			
+			NOTE("Attaching an ambiguous type error");
+			ADD_ERROR($node,
+				"Ambiguous type specifier '", $type_name,
+				"' resolves to ", +@scopes, " different types:\n\t",
+				Array::join("\n\t", @names)
+			);
+		}
 	}
 
 	my $original := $node<noun><apparent_type>;
@@ -261,20 +279,19 @@ method _type_resolve_type_specifier($node) {
 		NOTE("No original type stored for ", $original.name());
 	}
 	
-	$node<noun> := close::Compiler::Scopes::get_symbol($result_namespace, 
-		$original.name());
+	$node<noun> := $resolved;
 
-	if !( $original =:= $node<noun> ) {
+	if !( $original =:= $resolved ) {
 		# This is NOT an error. If the grammar wasn't ambiguous, 
 		# there would never have been an original.
 		NOTE("Attaching a type-name-changed-resolution warning");
-		DUMP(:original($original), :new($node<noun>));
+		DUMP(:original($original), :new($resolved));
 		
 		ADD_WARNING($node, 
 			"Type specifier '", $type_name, 
 			"' appears to have changed resolution namespaces.\n",
 			"Original type: ", $original<display_name>, "\n",
-			"Final type: ", $node<noun><display_name>, "\n",
+			"Final type: ", $resolved<display_name>, "\n",
 		);
 	}
 	

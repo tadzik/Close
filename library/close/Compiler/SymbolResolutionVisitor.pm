@@ -132,8 +132,6 @@ type information requires symbol resolution.
 our @Child_attribute_names := (
 	'type',
 	'alias_for',
-	'scope',			# Symbols link to their enclosing scope. Should be a no-op
-	'parameter_scope',
 	'initializer',
 	'function_definition',
 );

@@ -81,6 +81,7 @@ sub _create_decl_function_returning(%attributes) {
 	);
 	$past<is_declarator>	:= 1;
 	$past<is_function>		:= 1;
+	$past<default_scope>	:= 'parameter';
 	set_attributes($past, %attributes);
 		
 	DUMP($past);
@@ -238,6 +239,9 @@ sub _create_foreach_statement(%attributes) {
 sub _create_function_definition(%attributes) {
 	NOTE("Creating new function_definition");
 	my $past := PAST::Block.new(:blocktype('declaration'));
+	
+	$past<default_scope> := 'register';
+	
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
@@ -316,6 +320,7 @@ sub _create_namespace_block(%attributes) {
 		:namespace(@namespace),
 	);
 	
+	$past<default_scope> := 'extern';
 	$past<is_namespace> := 1;
 	$past<path> := Array::clone(@path);
 
@@ -344,17 +349,6 @@ sub _create_parameter_declaration(%attributes) {
 	
 	my $past := %attributes<from>;
 	%attributes<from> := undef;
-	set_attributes($past, %attributes);
-	
-	DUMP($past);
-	return $past;
-}
-
-sub _create_parameter_scope(%attributes) {
-	NOTE("Creating new parameter_scope");
-	my $past := PAST::Block.new(
-		:blocktype('immediate'),
-		:name('parameter scope'));
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
@@ -420,8 +414,9 @@ sub _create_symbol(%attributes) {
 		$past<etype> := $past;
 	}
 
-	if $past<scope> {
-		close::Compiler::Scopes::declare_object($past<scope>, $past);
+	if $past<block> {
+		close::Compiler::Scopes::declare_object($past<block>, $past);
+		$past<block> := $past<block>.name();
 	}
 	
 	DUMP($past);

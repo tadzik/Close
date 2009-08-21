@@ -133,8 +133,6 @@ Figure out your own approach.
 our @Child_attribute_names := (
 	'alias_for',
 	'type',
-	'scope',			# Symbols link to their enclosing scope. Should be a no-op
-	'parameter_scope',
 	'initializer',
 	'function_definition',
 );
@@ -164,14 +162,14 @@ method _generic_visit_UNKNOWN($node) {
 		if $node{$_} {
 			NOTE("Visiting <", $_, "> attribute");
 			Array::append(@results,
-				self.visit($_)
+				self.visit($node{$_})
 			);
 		}
 	}
 	
 	NOTE("Visiting children");
 	Array::append(@results,
-		$SUPER.visit_children($node)
+		self.visit_children($node)
 	);
 	
 	if $node.isa(PAST::Block) {

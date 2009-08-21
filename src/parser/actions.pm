@@ -44,6 +44,9 @@ method translation_unit($/, $key) {
 		NOTE("Resolving symbols");
 		close::Compiler::SymbolResolutionVisitor::resolve_symbols($past);
 
+		NOTE("Setting scopes");
+		close::Compiler::ScopeAssignmentVisitor::assign_scopes($past);
+
 		NOTE("Displaying messages");
 		close::Compiler::MessageVisitor::show_messages($past);
 

@@ -1,5 +1,11 @@
 # $Id$
 
+=head1 MessageVisitor
+
+Visit nodes in the tree, dumping any attached messages.
+
+=cut
+
 class close::Compiler::MessageVisitor;
 
 sub ASSERT($condition, *@message) {
@@ -37,7 +43,75 @@ sub ADD_WARNING($node, *@msg) {
 }
 
 sub NODE_TYPE($node) {
-	close::Compiler::Node::type($node);
+	return close::Compiler::Node::type($node);
+}
+
+################################################################
+
+our $SUPER;
+
+method get_method_prefix() {
+	# Change this to your function prefix. E.g., _prettyprint_
+	return '_show_messages_';
+}
+
+# This is used for visited-by caching. Use the class name.
+our $Visitor_name := 'MessageVisitor';
+
+method name() {
+	return $Visitor_name;
+}
+
+sub print_messages($node) {
+	NOTE("Printing messages for '", NODE_TYPE($node), "' node");
+	
+	my @messages := close::Compiler::Messages::get_messages($node);
+	DUMP(@messages);
+	
+	for @messages {
+		say(close::Compiler::Messages::format_node_message($node, $_));
+	}
+}
+
+=method visit($node)
+
+Delegates to SUPER.visit. This method should be copied unchanged into the new code.
+
+=cut
+
+method visit($node) {
+	my @results;
+	
+	if $node {
+		NOTE("Visiting ", NODE_TYPE($node), " node: ", $node.name());
+		DUMP($node);
+		
+		@results := $SUPER.visit(self, $node);
+	}
+	else {
+		@results := Array::empty();
+	}
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
+=method visit_children($node)
+
+Delegates to SUPER.visit_children. This method should be copied unchanged into 
+the new code.
+
+=cut
+
+method visit_children($node) {
+	NOTE("Visiting ", +@($node), " children of ", NODE_TYPE($node), " node: ", $node.name());
+	DUMP($node);
+
+	my @results := $SUPER.visit_children(self, $node);
+	
+	DUMP(@results);
+	return @results;
 }
 
 ################################################################
@@ -49,33 +123,16 @@ Prints out the error and warning messages.
 
 =cut
 
-sub print_messages($node) {
-	NOTE("Printing messages for '", NODE_TYPE($node), "' node");
-	
-	if $node<messages> {
-		NOTE("The messages");
-		DUMP($node<messages>);
-	}
-	
-	my @messages := close::Compiler::Messages::get_messages($node);
-	DUMP(@messages);
-	
-	for @messages {
-		say(close::Compiler::Messages::format_node_message($node, $_));
-	}
-}
-
 our @Child_attribute_names := (
 	'alias_for',
 	'type',
-	'scope',			# Symbols link to their enclosing scope. Should be a no-op
-	'parameter_scope',
 	'initializer',
 	'function_definition',
 );
 
-method _visit_UNKNOWN($node) {
-	NOTE("No special handling for '", NODE_TYPE($node), "' node:", $node.name());
+method _show_messages_UNKNOWN($node) {
+	NOTE("No custom handler exists for node type: '", NODE_TYPE($node), 
+		"'. Passing through to children.");
 	DUMP($node);
 
 	print_messages($node);
@@ -106,113 +163,35 @@ method _visit_UNKNOWN($node) {
 		close::Compiler::Scopes::pop(NODE_TYPE($node));
 	}
 	
-	NOTE("Done");
-	DUMP($node);
-	return $node;
-}
-
-our $Visitor_name := 'MessageVisitor';
-
-method already_visited($node, $store?) {
-	if $store {
-		$node<visited_by>{$Visitor_name} := $store;
-	}
+	my @results := Array::new($node);
 	
-	return $node<visited_by>{$Visitor_name};
-}
-
-sub get_visit_method($type) {
-	our %visit_method;
-
-	NOTE("Finding visit_method for type '", $type, "'");
-	my $sub :=%visit_method{$type};
-	
-	unless $sub {
-		NOTE("Looking up visit method for '", $type, "'");
-		
-		$sub := Q:PIR {
-			$S0 = '_visit_'
-			$P0 = find_lex '$type'
-			$S1 = $P0
-			$S0 = concat $S0, $S1
-			%r = get_global $S0
-		};
-
-		NOTE("Got sub: ", $sub);
-		DUMP($sub);
-		
-		if $type ne 'UNKNOWN' {
-			unless $sub {
-				$sub := get_visit_method('UNKNOWN');
-			}
-			
-			unless $sub {
-				DIE("No visit method available, ",
-				"including UNKNOWN,  ",
-				"for Node class: ", $type);
-			}
-		}
-		
-		%visit_method{$type} := $sub;
-		DUMP(%visit_method);
-	}
-	
-	NOTE("Returning method '", $sub, "' to visit node of type '", $type, "'");
-	DUMP($sub);
-	return $sub;
-}
-
-sub show_messages($past) {
-	NOTE("Showing messages in PAST tree");
-	DUMP($past);
-	
-	my $visitor	:= close::Compiler::MessageVisitor.new();
-	my $result	:= $visitor.visit($past);
-	
-	DUMP($result);
-	return $result;
-}
-
-method visit($node) {
-	my $result := $node;
-	
-	if $node {
-		my $type	:= NODE_TYPE($node);
-		NOTE("Visiting '", $type, "' node: ", $node.name());
-		DUMP($node);
-		
-		# Don't visit twice.
-		my $visited := self.already_visited($node);
-		
-		if $visited {
-			NOTE("Already visited");
-			return $visited;
-		}
-		
-		self.already_visited($node, $node);
-		
-		my &method	:= get_visit_method($type);
-		$result	:= &method(self, $node);
-		
-		self.already_visited($node, $result);
-		NOTE("Done with ", $type, " node");
-	}
-
-	return $result;
-}
-
-method visit_children($node) {
-	my $count := +@($node);
-	NOTE("Visiting ", $count, " children");
-	DUMP($node);	
-		
-	my @results := Array::empty();	
-	
-	for @($node) {
-		@results.push(self.visit($_));
-	}
-
-	NOTE("Done with children");
+	NOTE("done");
 	DUMP(@results);
 	return @results;
+}
+
+################################################################
+	
+=sub show_messages($past)
+
+The entry point. Creates a new visitor, and runs it against the PAST tree argument.
+
+=cut
+
+sub show_messages($past) {
+	NOTE("Dumping messages from  PAST tree");
+	DUMP($past);
+
+	$SUPER := close::Compiler::Visitor.new();
+	NOTE("Created SUPER-visitor");
+	DUMP($SUPER);
+	
+	my $visitor	:= close::Compiler::MessageVisitor.new();
+	NOTE("Created visitor");
+	DUMP($visitor);
+	
+	$visitor.visit($past);
+	
+	NOTE("done");
+	return $past;
 }

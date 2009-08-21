@@ -60,45 +60,6 @@ sub get_path_of($id) {
 	return @path;
 }
 
-sub lookup_qualified_identifier($ident) {
-	NOTE("Looking up qualified identifier: ", $ident<display_name>);
-	DUMP($ident);
-	
-	my @ident := get_path_of_id($ident);
-	
-	my @search_in;
-	
-	if $ident<is_rooted> {
-		NOTE("identifier is rooted");
-		my @hll_root := Array::new(@ident[0]);
-		my $nsp := close::Compiler::Namespaces::fetch(@hll_root);
-		@search_in := Array::new($nsp);
-	}
-	else {
-		NOTE("identifier is relative");	
-		@search_in := close::Compiler::Scopes::get_search_list();
-	}
-
-	DUMP(:search_in_namespaces(@search_in));
-	
-	my @candidates := Array::empty();
-		
-	for @search_in {
-		NOTE("Searching in: ", $_.name());
-		my @idpath := Array::clone(@ident);
-		my @new_cands :=resolve_qualified_identifier($_, @idpath);
-		
-		if +@new_cands {
-			DUMP(@new_cands);
-			Array::append(@candidates, @new_cands);
-		}
-	}
-
-	NOTE("Found ", +@candidates, " matching symbols");
-	DUMP(@candidates);
-	return @candidates;
-}
-
 sub query_relative_scopes_matching_path($root, @path) {
 	NOTE("Querying scopes relative to ", $root.name(), " that match path ", Array::join('::', @path));
 	
@@ -188,10 +149,6 @@ sub query_scopes_containing($qualified_identifier) {
 	my $name := $qualified_identifier.name();
 	
 	for @scopes {
-say("Checkng: ", $_.name());
-for $_<symtable> {
-say("\t", $_);
-}
 		my $match := close::Compiler::Scopes::get_symbol($_, $name);
 		
 		unless $match {
@@ -199,7 +156,6 @@ say("\t", $_);
 		}
 		
 		if $match {
-say("Found something in: ", $_.name());		
 			@candidates.push($_);
 		}
 	}
@@ -208,68 +164,3 @@ say("Found something in: ", $_.name());
 	DUMP(@candidates);
 	return @candidates;
 }
-
-=sub void resolve_qualified_identifier($root, @identifier)
-
-Returns a list of candidates that match the components in the given qualified
-C<@identifier> relative to C<$root>. 
-
-There are three possible ways to decode 'B' in a scenario like C<B::C>. The 
-first is that B might be a namespace. The second is that B might be an aggregate
-type -- a class, struct, union, or enum. And the third is that B might be an 
-alias for another type.
-
-If B is a namespace, then our options are still open for C -- it could be anything.
-
-If B is an aggregate, then C gets resolved as a member, a method, or a member
-type (e.g., C<typedef int C> within the class). In any case, B must have a 
-symtable entry for C.
-
-If B is an alias for another type or namespace, see above.
-
-=cut
-
-sub resolve_qualified_identifier($root, @identifier) {
-	NOTE("Trying to resolve ", Array::join('::', @identifier), " in namespace: ", $root.name());
-	my @candq := Array::new($root);
-	
-	for @identifier {
-		my $id_part := $_;
-		NOTE("Matching part: ", $id_part);
-		
-		my $num_cands := +@candq;
-		NOTE("# scopes to search at this level: ", $num_cands);
-		
-		while $num_cands-- {
-			my $scope	:= @candq.shift();
-			
-			if ! $scope.isa(PAST::Block) {
-				NOTE("Dead end: not a block, at ", $scope.name());
-			}
-			else {
-				NOTE("Checking for '", $id_part, "' in scope: ", $scope.name());
-				my $nsp	:= close::Compiler::Scopes::get_namespace($scope, $id_part);
-				
-				if $nsp {
-					NOTE("Found matching namespace");
-					@candq.push($nsp);
-				}
-				
-				my $sym	:= close::Compiler::Scopes::get_symbol($scope, $id_part);
-
-				if $sym {
-					NOTE("Found matching symbol");
-					DUMP($sym);
-					
-					# FIXME: I know this won't work. It needs smarts about CUES that
-					# I don't have yet.
-					@candq.push($sym);
-				}
-			}
-		}
-	}
-
-	DUMP(@candq);
-	return @candq;
-}
-

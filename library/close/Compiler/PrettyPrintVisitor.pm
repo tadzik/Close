@@ -87,8 +87,6 @@ method visit_children($node) {
 our @Child_attribute_names := (
 	'alias_for',
 	'type',
-	'scope',			# Symbols link to their enclosing scope. Should be a no-op
-	'parameter_scope',
 	'initializer',
 	'function_definition',
 );
@@ -577,19 +575,6 @@ method _visit_symbol($node) {
 	
 	NOTE("done");
 	DUMP(@results);
-	return @results;
-}
-
-method _visit_parameter_scope($node) {
-	NOTE("Visiting parameter_scope");
-	DUMP($node);
-	
-	my @results := indent_lines2("{ // parameter scope");
-	indent_full();
-	@results := @results ~ self.visit_children($node, "\n");
-	unindent();
-	@results := @results ~ indent_lines2("}");
-	
 	return @results;
 }
 

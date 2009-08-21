@@ -86,11 +86,11 @@ method type_name($/) {
 	NOTE("Checking for typename '", $past<display_name>, "'");
 	
 	$Is_valid_type_name := 0;
-	my $nsp := close::Compiler::Types::query_typename($past);
+	my @matches := close::Compiler::Types::query_matching_types($past);
 	
-	if $nsp {
+	if +@matches {
 		$Is_valid_type_name := 1;
-		$past<apparent_type> := close::Compiler::Scopes::get_symbol($nsp, $past.name());
+		$past<apparent_type> := @matches[0];
 	}
 		
 	DUMP($past);

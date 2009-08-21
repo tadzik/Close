@@ -911,7 +911,7 @@ sub make_test_sub()
 		my @namespace := ('close', 'Namespace');
 		$past.namespace(@namespace);
 		$past.pirflags(" :method");
-		$past<scope> := 'package';
+		$past.scope('package');
 		
 		# Declare params(name, symbol)
 		$past.push(PAST::Var.new(:name('name'), :scope('parameter'), :isdecl(1),

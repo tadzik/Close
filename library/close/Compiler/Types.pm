@@ -54,10 +54,11 @@ sub add_builtins($scope) {
 		NOTE("Adding builtin type: '", $name, "'");
 
 		my $symbol	:= close::Compiler::Node::create('declarator_name',
+			:block($scope),
 			:is_typedef(1),
 			:name($name),
 			:pos($pos),
-			:scope($scope),
+			:scope('builtin'),
 			:source($Builtins)
 		);
 		
@@ -143,85 +144,34 @@ sub is_type($object) {
 	return $result;
 }
 
-=sub Boolean query_typename($past)
+sub query_matching_types($node) {
+	ASSERT($node.isa(PAST::Var) && NODE_TYPE($node) eq 'qualified_identifier',
+		'Type names must be qualified identifiers');
+	NOTE("Looking up type name: ", $node<display_name>);
+	DUMP($node);
 
-Checks the current lexical stack for a type definition matching C<$past>. If 
-C<$past> is a rooted identifier, looks for a class with that name. Else looks for
-any kind of typedef -- a class, a typedef record, etc.
-
-Returns the symbol (declarator) identifying the first matching type found.
-
-=cut
-
-sub query_typename($past) {
-	ASSERT($past.isa(PAST::Var) && NODE_TYPE($past) eq 'qualified_identifier',
-		'query_typename must be called with a qualified_identifier');
-	NOTE("Checking if '", $past.name(), "' is a defined type");
-	DUMP($past);
-	
-	my @results := lookup_type_name($past);
-	NOTE("Found ", +@results, " matching types");
-	DUMP(@results);
-	
-	my $result := undef;
-	
-	if +@results {
-		my $result_nsp := @results[0];
-		ASSERT($result_nsp.isa(PAST::Block),
-			'Type lookup results are scope blocks.');
+	my @scopes := close::Compiler::Lookups::query_scopes_containing($node);
+	NOTE("Found ", +@scopes, " candidate scopes for type");
+	DUMP(@scopes);
 		
-		$result := close::Compiler::Scopes::get_symbol($result_nsp, $past.name());
-		ASSERT($result.isa(PAST::Var) && NODE_TYPE($result) eq 'declarator_name',
-			'Found type should point to a declarator of some kind.');
-		NOTE("Returning matching type from scope '", $result_nsp.name(), "'");
-	}
+	my @candidates := Array::empty();
+	my $cand;
 	
-	DUMP($result);
-	return $result;
-}
-
-=sub lookup_type_name($past)
-
-Searches for type names that match C<$past>. Handles un-rooted qualified paths 
-by searching (but not creating) below the scopes in the current stack.
-
-=cut
-
-sub lookup_type_name($past) {
-	NOTE("Looking up type name '", $past.name(), "'");
-	DUMP($past);
-	ASSERT($past.isa(PAST::Var), 'Parameter must be a PAST::Var.');
-	
-	my %namespaces;
-	my @results		:= Array::empty();
-	my $name		:= $past.name();
-
-	# This loop does some redundant work if the identifier is rooted,
-	# but the %namespaces flag prevents duplicate namespace entries.
-	
-	for close::Compiler::Scopes::get_search_list() {
-		NOTE("Looking in '", $_<node_type>, "' namespace ", $_.name());
-		my $nsp := close::Compiler::Namespaces::query_relative_namespace_of($_, $past);
-				
-		if $nsp {
-			NOTE("Found relative namespace: ", $nsp.name());
-			
-			my $object	:= close::Compiler::Scopes::get_symbol($nsp, $name);
-			DUMP($object);
-			
-			if $object && is_type($object) {
-				unless %namespaces{$nsp} {
-					@results.push($nsp);
-					%namespaces{$nsp} := 1;
-				}
-			}
+	# Refine the list returned by q-scopes-containing to be types only.
+	# Eliminate any symbols or namespaces that collide with type names.
+	for @scopes {
+		$cand := close::Compiler::Scopes::get_symbol($_, $node.name());
+		
+		if $cand && is_type($cand) {
+			@candidates.push($cand);
 		}
 	}
-	
-	NOTE("Returning ", +@results, " results");
-	DUMP(@results);
-	return @results;
+
+	NOTE("Found ", +@candidates, " candidate types");
+	DUMP(@candidates);	
+	return @candidates;
 }
+
 
 our $Merge_specifier_fields := (
 	'is_builtin',

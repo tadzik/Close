@@ -214,7 +214,9 @@ method declarator_part($/) {
 		ASSERT($past<type><is_function>, "It's a function, unless it's a class or something.");
 		
 		if $past<type><is_function> {
-			$past<type><function_definition> := $<body>[0].ast;
+			my $definition := $<body>[0].ast;
+			$past<type><function_definition> := $definition;
+			close::Compiler::Scopes::current().push($definition);
 		}
 	}
 	
@@ -399,15 +401,15 @@ method tspec_builtin_type($/) {
 	
 	my $type_name := close::Compiler::Node::create('qualified_identifier', 
 		:name($name),
+		:display_name($name),
 		:node($/),
 	);
 
-	my $builtin := close::Compiler::Types::query_typename($type_name);
-	
-	ASSERT($builtin,
-		'query_typename should always be able to find a builtin type');
+	my @matches := close::Compiler::Types::query_matching_types($type_name);
+	ASSERT(+@matches == 1, 
+		'query_matching_types should always be able to find a builtin type');
 		
-	$type_name<apparent_type>  := $builtin;
+	$type_name<apparent_type>  := @matches.shift();
 	my $past := close::Compiler::Node::create('type_specifier',
 		:noun($type_name));
 	
