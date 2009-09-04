@@ -80,9 +80,9 @@ COMPILER_LIBS_PIR := \
 	library/close/Compiler/ScopeAssignmentVisitor.pir \
 	library/close/Compiler/Scopes.pir			\
 	library/close/Compiler/String.pir			\
-	library/close/Compiler/SymbolLookupVisitor.pir	\
 	library/close/Compiler/SymbolResolutionVisitor.pir	\
 	library/close/Compiler/Symbols.pir		\
+	library/close/Compiler/TreeRewriteVisitor.pir	\
 	library/close/Compiler/TypeResolutionVisitor.pir\
 	library/close/Compiler/Types.pir			\
 	library/close/Compiler/Types.pir			\
@@ -296,15 +296,6 @@ library/close/Compiler/String.pir: library/close/Compiler/String.pm
 	$(STRIP_PIRA) library/close/Compiler/String.pira \
 		> library/close/Compiler/String.pir
 	$(RM_F) library/close/Compiler/String.pira
-
-library/close/Compiler/SymbolLookupVisitor.pir: library/close/Compiler/SymbolLookupVisitor.pm
-	@echo "**** Compiling $< to PIR"
-	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
-		--output=library/close/Compiler/SymbolLookupVisitor.pira \
-		library/close/Compiler/SymbolLookupVisitor.pm
-	$(STRIP_PIRA) library/close/Compiler/SymbolLookupVisitor.pira \
-		> library/close/Compiler/SymbolLookupVisitor.pir
-	$(RM_F) library/close/Compiler/SymbolLookupVisitor.pira
 	
 library/close/Compiler/SymbolResolutionVisitor.pir: library/close/Compiler/SymbolResolutionVisitor.pm
 	@echo "**** Compiling $< to PIR"
@@ -323,6 +314,15 @@ library/close/Compiler/Symbols.pir: library/close/Compiler/Symbols.pm
 	$(STRIP_PIRA) library/close/Compiler/Symbols.pira \
 		> library/close/Compiler/Symbols.pir
 	$(RM_F) library/close/Compiler/Symbols.pira
+
+library/close/Compiler/TreeRewriteVisitor.pir: library/close/Compiler/TreeRewriteVisitor.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/TreeRewriteVisitor.pira \
+		library/close/Compiler/TreeRewriteVisitor.pm
+	$(STRIP_PIRA) library/close/Compiler/TreeRewriteVisitor.pira \
+		> library/close/Compiler/TreeRewriteVisitor.pir
+	$(RM_F) library/close/Compiler/TreeRewriteVisitor.pira
 
 library/close/Compiler/TypeResolutionVisitor.pir: library/close/Compiler/TypeResolutionVisitor.pm
 	@echo "**** Compiling $< to PIR"
