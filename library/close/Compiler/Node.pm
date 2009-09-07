@@ -79,9 +79,10 @@ sub _create_decl_function_returning(%attributes) {
 	my $past := PAST::Block.new(
 		:name('function returning'), 
 	);
+	$past<default_scope>	:= 'parameter';
 	$past<is_declarator>	:= 1;
 	$past<is_function>		:= 1;
-	$past<default_scope>	:= 'parameter';
+	$past<num_parameters>	:= 0;
 	set_attributes($past, %attributes);
 		
 	DUMP($past);
@@ -183,7 +184,6 @@ sub _create_expr_binary(%attributes) {
 	ASSERT($right, 'Expr_binary must have a :right()');
 	
 	my $past := PAST::Op.new(:name($oper));
-	set_attributes($past, %attributes);
 
 	if %binary_pastops{$oper} {
 		$past.pasttype(%binary_pastops{$oper});
@@ -199,6 +199,8 @@ sub _create_expr_binary(%attributes) {
 		$past.inline($inline);
 	}
 
+	set_attributes($past, %attributes);
+	
 	DUMP($past);
 	return $past;
 }
@@ -238,10 +240,13 @@ sub _create_foreach_statement(%attributes) {
 
 sub _create_function_definition(%attributes) {
 	NOTE("Creating new function_definition");
-	my $past := PAST::Block.new(:blocktype('declaration'));
-	
+	ASSERT(%attributes<from>,
+		'Function definition must be created :from() a compound statement');
+		
+	my $past := %attributes<from>;
+	$past.blocktype('declaration');
 	$past<default_scope> := 'register';
-	
+	%attributes<from> := undef;
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
@@ -257,7 +262,9 @@ sub _create_goto_statement(%attributes) {
 		:name('goto ' ~ $label), 
 		:pasttype('inline'),
 	);
+	
 	set_attributes($past, %attributes);
+	
 	DUMP($past);
 	return $past;
 }
@@ -312,15 +319,23 @@ sub _create_namespace_block(%attributes) {
 
 	my @namespace	:= Array::clone(@path);
 	my $hll		:= @namespace.shift();
+	my $name;
+	
+	if +@namespace {
+		$name := @namespace.pop();
+		@namespace.push($name);
+	}
 	
 	my $past := PAST::Block.new(
 		:blocktype('immediate'),
 		:hll($hll),
-		:name('hll: ' ~ Array::join(' :: ', @path)),
 		:namespace(@namespace),
+		:name($name),
 	);
+
+	close::Compiler::Node::set_name($past, $name);
 	
-	$past<default_scope> := 'extern';
+	$past<default_scope> := 'package';
 	$past<is_namespace> := 1;
 	$past<path> := Array::clone(@path);
 
@@ -349,6 +364,9 @@ sub _create_parameter_declaration(%attributes) {
 	
 	my $past := %attributes<from>;
 	%attributes<from> := undef;
+	%attributes<scope> := 'parameter';
+	%attributes<isdecl> := 1;
+	
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
@@ -582,14 +600,52 @@ sub path_of($node) {
 
 sub set_attributes($past, %attributes) {
 	for %attributes {
-		# FIXME: Detect accessor methods with $past.can(...)
-		if $_ eq 'node' {
-			$past.node(%attributes{$_});
-		}
-		else {
-			$past{$_} := %attributes{$_};
+		# Skip 'em if undef 
+		if %attributes{$_} {
+			# FIXME: Detect accessor methods with $past.can(...)
+			if $_ eq 'name' {
+				close::Compiler::Node::set_name($past, %attributes{$_});
+			}
+			elsif $_ eq 'node' {
+				$past.node(%attributes{$_});
+			}
+			else {
+				$past{$_} := %attributes{$_};
+			}
 		}
 	}
+}
+
+sub set_name($past, $name) {
+	NOTE("Setting node name to '", $name, "'");
+	$past.name($name);
+	
+	NOTE("Recalculating display_name");
+	my $display_name := '';
+	
+	if $past<is_rooted> {
+		if $past<hll> {
+			$display_name := 'hll: ' ~ $past<hll>;
+		}
+		
+		$display_name := $display_name ~ ' :: ';
+	}
+
+	if $past<namespace> && +($past<namespace>) {
+		$display_name := $display_name 
+			~ Array::join(' :: ', $past<namespace>)
+			~ ' :: ';
+	}
+	
+	if $name {
+		$display_name := $display_name ~ $name;
+	}
+	
+	$past<display_name> := $display_name;
+	
+	NOTE("Display_name set to '", $display_name, "'");
+	DUMP($past);
+	return $past;
 }
 
 sub type($past, *@rest) {

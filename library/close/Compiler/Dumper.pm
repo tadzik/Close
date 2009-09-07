@@ -149,9 +149,9 @@ sub info() {
 		if $proceed {
 			# Foo calls NOTE(), calls info(), calls stack_depth() : subtract 3
 			$stack_depth	:= stack_depth() - 3;
+			@result := Array::new($proceed, $stack_depth, $class_name, $caller_name);
 		}
 		
-		@result := Array::new($proceed, $stack_depth, $class_name, $caller_name);
 		%Already_in<INFO>--;
 	}
 	

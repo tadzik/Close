@@ -107,7 +107,7 @@ sub query_relative_scopes_matching_path($root, @path) {
 
 =sub query_scopes_containing($qualified_identifier)
 
-Returns a list of namespaces that match the given C<$qualified_identifier>.
+Returns a list of scopes that match the given C<$qualified_identifier>.
 Even if the identifier is rooted there may be multiple matches for a path. 
 Regardless, the result is an array, possibly empty (but not null), containing
 all the scopes that match. If the identifier is relative, the lexical scope stack

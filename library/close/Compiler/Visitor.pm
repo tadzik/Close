@@ -151,7 +151,8 @@ method visit($visitor, $node) {
 	
 	unless @results {
 		NOTE("Not visited yet. Inserting temporary marker.");
-		self.already_visited($visitor, $node, Array::new($node));
+		#self.already_visited($visitor, $node, Array::new($node));
+		self.already_visited($visitor, $node, Array::empty());
 		
 		my &method := self.fetch_visit_method($visitor, $node);
 		@results	:= &method($visitor, $node);
@@ -174,6 +175,8 @@ method visit_children($visitor, $node) {
 		}
 	}
 
+	NOTE("Returning ", +@results, " results");
+	DUMP(@results);
 	return @results;
 }
 

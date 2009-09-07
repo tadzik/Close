@@ -26,16 +26,20 @@ sub NOTE(*@parts) {
 
 ################################################################
 
+sub NODE_TYPE($node) {
+	return close::Compiler::Node::type($node);
+}
+
+################################################################
+
 =sub add_declarator_to_scope($scope, $declaration)
 
-Hooks a declaration in to a scope block. Adds the declaration to the block's 
-children -- the declaration is a PAST::VarList. Adds each individual
-declarator to the block's symbol table. Returns nothing.
+Insert a single declarator-name into the symtable for a block.
 
 =cut
 
 sub add_declarator($scope, $past) {
-	NOTE("Adding name '", $past.name(), "' to ", $scope<lstype>, " scope '", $scope.name(), "'");
+	NOTE("Adding name '", $past.name(), "' to ", NODE_TYPE($scope), " scope '", $scope.name(), "'");
 	my $name := $past.name();
 	my $already := get_symbol($scope, $name);
 	

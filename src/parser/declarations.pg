@@ -111,9 +111,12 @@ rule declarator_part {
 	<declarator>
 	<dclr_alias>?
 	[ '=' <initializer=expression>
-	| <body=compound_statement>
+	|  <?before '{' >	
+		{*} #= open_block
+		<body=compound_statement>
+		{*} #= close_block
 	]?
-	{*}
+	{*} #= done
 }
 
 =rule namespace_alias_declaration

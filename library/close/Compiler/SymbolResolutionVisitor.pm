@@ -177,6 +177,25 @@ method _resolve_symbols_UNKNOWN($node) {
 	return @results;
 }
 
+method _resolve_symbols_declarator_name($node) {
+	NOTE("Visiting declarator_name node: ", $node.name());
+	
+	if $node<type><is_function> && $node<type><is_defined> {
+		my $definition := $node<type><definition>;
+		
+		ASSERT(NODE_TYPE($definition) eq 'function_definition',
+			'Node type had better be function definition for this.');
+			
+		# FIXME: I don't know what I'm doing here?
+	}
+	
+	my @results := Array::new($node);
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;	
+}
+
 method _resolve_symbols_qualified_identifier($node) {
 	DUMP($node);
 	NOTE("Visiting qualified_identifier node: ", $node<display_name>);
@@ -227,7 +246,7 @@ method _resolve_symbols_qualified_identifier($node) {
 	}				
 	
 	if $resolved {
-		$node<declaration> := $resolved;
+		$node<declarator> := $resolved;
 	}
 	
 	my @results := Array::new($node);

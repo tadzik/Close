@@ -29,7 +29,7 @@ sub ASSERT($condition, *@message) {
 
 sub BACKTRACE() {
 	Q:PIR {{
-	backtrace
+		backtrace
 	}};
 }
 
@@ -42,11 +42,27 @@ sub DUMP(*@pos, *%what) {
 }
 
 sub NOTE(*@parts) {
-	my @info := close::Dumper::info();
 	close::Dumper::NOTE(close::Dumper::info(), @parts);
 }
 
 ################################################################
+
+sub ADD_ERROR($node, *@msg) {
+	close::Compiler::Messages::add_error($node,
+		Array::join('', @msg));
+}
+
+sub ADD_WARNING($node, *@msg) {
+	close::Compiler::Messages::add_warning($node,
+		Array::join('', @msg));
+}
+
+sub NODE_TYPE($node) {
+	return close::Compiler::Node::type($node);
+}
+
+################################################################
+
 
 sub PASSTHRU($/, $key) {
 	my $past := $/{$key}.ast;
@@ -72,28 +88,28 @@ C<hll> set (or not) appropriately.
 
 =cut
 
-sub assemble_qualified_path($past, $/) {
+sub assemble_qualified_path($node_type, $/) {
+	my $past := close::Compiler::Node::create($node_type, :node($/));
+	
 	my @parts	:= Array::empty();
 	
 	for $<path> {
 		@parts.push($_.ast.value());
 	}
 
-	my $display_name := Array::join('::', @parts);
+	my $name;
 	
 	# 'if' here is to handle namespaces, too. A root-only namespace
-	# ('::') has no name.
+	# (like '::') or a hll-only namespace ('hll:foo') will have no name.
 	if +@parts {
-		$past.name(@parts.pop());
+		$name := @parts.pop();
 	}
 	
 	if $<root> {
 		$past<is_rooted> := 1;
-		$display_name := '::' ~ $display_name;
 		
 		if $<hll_name> {
 			$past<hll> := ~ $<hll_name>;
-			$display_name := 'hll:' ~ $<hll_name> ~ $display_name;
 		}
 		
 		# Rooted + empty @parts -> '::x'
@@ -108,8 +124,7 @@ sub assemble_qualified_path($past, $/) {
 		}
 	}
 
-	$past<display_name> := $display_name;
-	
+	close::Compiler::Node::set_name($past, $name);
 	DUMP($past);
 	return ($past);
 }
@@ -303,8 +318,8 @@ sub _get_keyed_block_of_path(@_path, $key) {
 			@path.push($name);
 		}
 
-		$result.name($name);
 		$result.namespace(@path);
+		close::Compiler::Node::set_name($result, $name);
 		$result<init_done> := 0;
 		$result<block_type> := $key;
 
@@ -339,7 +354,7 @@ sub get_class_init_of_path(@path) {
 
 	unless $block<init_done> {
 		$block.blocktype('declaration');
-		$block.name('_init_class_' ~ $block.name());
+		close::Compiler::Node::set_name($block, '_init_class_' ~ $block.name());
 		#$block.pirflags(':init :load');
 		$block<init_done> := 1;
 		#DUMP($block);
@@ -353,7 +368,7 @@ sub get_init_block_of_path(@_path) {
 
 	unless $block<init_done> {
 		$block.blocktype('declaration');
-		$block.name('_init_namespace_' ~ $block.name());
+		close::Compiler::Node::set_name($block, '_init_namespace_' ~ $block.name());
 		$block.pirflags(":anon :init :load");
 		$block<init_done> := 1;
 		
@@ -513,10 +528,10 @@ method adverb($/) {
 	my $past := PAST::Val.new(:node($/));
 	
 	if $<extends> {
-		$past.name(~$<extends>);
+		close::Compiler::Node::set_name($past, ~$<extends>);
 	}
 	else {
-		$past.name(~$<t_adverb><ident>);
+		close::Compiler::Node::set_name($past, ~$<t_adverb><ident>);
 	}
 
 	if $<signature> {

@@ -50,8 +50,38 @@ method translation_unit($/, $key) {
 		NOTE("Displaying messages");
 		close::Compiler::MessageVisitor::show_messages($past);
 
+		NOTE("Rewriting tree for POSTing");
+		$past := close::Compiler::TreeRewriteVisitor::rewrite_tree($past);
+		
+#		$past := fake_tree();
+		
 		NOTE("done");
 		DUMP($past);
 		make $past;		
 	}
+}
+
+sub fake_tree() {
+	my $call := PAST::Op.new(
+		:pasttype('call'),
+		
+		PAST::Var.new(
+			:name('foo'), 
+			:namespace(Array::new('B')), 
+			:scope('package'),
+		),
+	);
+
+	my $past := PAST::Stmts.new(:name('fake_tree'),
+		PAST::Block.new(:name('bar'),
+			:blocktype('declaration'),
+			:hll('close'),
+			:namespace(Array::new('A')),
+			PAST::Op.new(:pirop('return'), :pasttype('pirop'),
+				$call,
+			),
+		),
+	);
+
+	return $past;
 }

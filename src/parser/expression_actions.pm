@@ -142,7 +142,7 @@ sub postfixup($past) {
 			# Rewrite a.b() into (callmethod 'b', a, args)
 			if $func.scope() eq 'attribute' {
 				$past.pasttype('callmethod');
-				$past.name($func.name());
+				close::Compiler::Node::set_name($past, $func.name());
 				$past.shift();
 				$past.unshift($func[0]);
 			}
@@ -153,7 +153,7 @@ sub postfixup($past) {
 				}
 
 				if is_local_function($func) {
-					$past.name($func.name());
+					close::Compiler::Node::set_name($past, $func.name());
 					$past.shift();
 				}
 				# TODO: Need to fix up aliases, etc. here. For now, leave it be.
