@@ -53,7 +53,7 @@ sub _fetch_container(@path) {
 		}
 		
 		unless %config{$part}<> {
-			NOTE("Creating sub-hash ", $part);
+			#NOTE("Creating sub-hash ", $part);
 			%config{$part}<> := 1;
 		}
 		
@@ -133,7 +133,7 @@ method read($filename) {
 	if %Config_data<> ne '$filename' {
 		%Config_data<> := $filename;
 
-		NOTE("Reading config file: ", $filename);
+		#NOTE("Reading config file: ", $filename);
 		
 		my $data := Q:PIR {
 			$P0 = new 'FileHandle'
@@ -142,11 +142,11 @@ method read($filename) {
 			%r = box $S0
 		};
 
-		NOTE("Got config data: ", $data);
+		#NOTE("Got config data: ", $data);
 
 		_parse_config($data);
 
-		DUMP(%Config_data);
+		#DUMP(%Config_data);
 		say("Read config data from ", $filename);
 	}
 }
@@ -161,18 +161,18 @@ sub time() {
 }
 
 method value(@path, *@what) {
-	NOTE("key = ", Array::join('::', @path));
+	#NOTE("key = ", Array::join('::', @path));
 	
 	my $last := @path.pop();
 	my %config := _fetch_container(@path);
 	
 	if +@what {
 		my $value := Array::join('', @what);
-		NOTE("Set value to '", $value, "'");
+		#NOTE("Set value to '", $value, "'");
 		%config{$last} := $value;
 	}
 	
-	NOTE("value = ", %config{$last});
+	#NOTE("value = ", %config{$last});
 	return %config{$last};
 }
 
