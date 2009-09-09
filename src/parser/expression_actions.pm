@@ -60,25 +60,25 @@ sub arg_expr_add_adverb($/, $past, $adverb) {
 	#DUMP($past, "argument-expression);
 }
 
-method asm_expr($/, $key) {
-	my $past := close::Compiler::Node::create('expr_asm', 
-		:asm($<asm>.ast.value()),
-	);
-
-	if $<arg_list> {
-		$past := $<arg_list>[0].ast;
-	}
-	else {
-		$past := close::Compiler::Node::create('expr_call', :node($/));
-	}
-
+method asm_contents($/) {
+	my $past := PAST::Val.new(:returns('String'), :value(substr(~$/, 2, -2)));
+	NOTE("Got asm contents: ", $past.value());
 	
-	DUMP($past);
 	make $past;
 }
 
-method asm_contents($/) {
-	my $past := PAST::Val.new(:returns('String'), :value(substr(~$/, 2, -2)));
+method asm_expr($/) {
+	my $past := close::Compiler::Node::create('expr_asm', 
+		:inline($<asm>.ast.value()),
+	);
+
+	if $<arg_list> {
+		for @($<arg_list>[0].ast) {
+			$past.push($_);
+		}
+	}
+	
+	DUMP($past);
 	make $past;
 }
 

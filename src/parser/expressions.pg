@@ -27,21 +27,15 @@ rule arg_list {
     {*}
 }
 
-rule asm_expr {
-	<.ASM> [ '(' ~ ')' <postfix_call> ]
-	# FIXME: This should be "<postfix_call>"
-	[ '('
-		<arg_list>
-		[ ')'
-		|| <panic: "Missing ')' in argument list" >
-		]
-	]?
-	<asm=asm_contents>
-	{*} #= asm
-}
-
 token asm_contents {
 	'{{' ~ '}}'	<string_literal: '}}' >
+	{*}
+}
+
+rule asm_expr {
+	<.ASM> {{ say "Saw asm keyword" }}
+	[ '(' ~ ')' <arg_list> {{ say "saw arg list" }} ]?
+	<asm=asm_contents> {{ say "saw asm contents" }}
 	{*}
 }
 
@@ -125,16 +119,12 @@ rule postfix_expr {
 	<term>
 	[ <postfix=postfix_xcrement>
 	| <postfix=postfix_member>
-	| <postfix=postfix_call>
+	| '(' ~ ')' <postfix=arg_list>
 	| <postfix=postfix_index>
 	# short if method-ptr, long if any-var
 	#| $<op>='.*' <identifier>
 	]*
 	{*}
-}
-
-rule postfix_call {
-	'(' <arg_list> ')'		{*}
 }
 
 rule postfix_index {
