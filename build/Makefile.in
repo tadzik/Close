@@ -71,11 +71,13 @@ COMPILER_LIBS_PIR := \
 	library/close/Compiler/Array.pir			\
 	library/close/Compiler/Config.pir			\
 	library/close/Compiler/Dumper.pir		\
+	library/close/Compiler/Hash.pir			\
 	library/close/Compiler/Lookups.pir		\
 	library/close/Compiler/Messages.pir		\
 	library/close/Compiler/MessageVisitor.pir	\
 	library/close/Compiler/Namespaces.pir		\
 	library/close/Compiler/Node.pir			\
+	library/close/Compiler/PastCleanupVisitor.pir	\
 	library/close/Compiler/PrettyPrintVisitor.pir	\
 	library/close/Compiler/ScopeAssignmentVisitor.pir \
 	library/close/Compiler/Scopes.pir			\
@@ -216,6 +218,15 @@ library/close/Compiler/Dumper.pir: library/close/Compiler/Dumper.pm
 		> library/close/Compiler/Dumper.pir
 	$(RM_F) library/close/Compiler/Dumper.pira
 
+library/close/Compiler/Hash.pir: library/close/Compiler/Hash.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/Hash.pira \
+		library/close/Compiler/Hash.pm
+	$(STRIP_PIRA) library/close/Compiler/Hash.pira \
+		> library/close/Compiler/Hash.pir
+	$(RM_F) library/close/Compiler/Hash.pira
+
 library/close/Compiler/Lookups.pir: library/close/Compiler/Lookups.pm
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
@@ -260,6 +271,15 @@ library/close/Compiler/Node.pir: library/close/Compiler/Node.pm
 	$(STRIP_PIRA) library/close/Compiler/Node.pira \
 		> library/close/Compiler/Node.pir
 	$(RM_F) library/close/Compiler/Node.pira
+
+library/close/Compiler/PastCleanupVisitor.pir: library/close/Compiler/PastCleanupVisitor.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/PastCleanupVisitor.pira \
+		library/close/Compiler/PastCleanupVisitor.pm
+	$(STRIP_PIRA) library/close/Compiler/PastCleanupVisitor.pira \
+		> library/close/Compiler/PastCleanupVisitor.pir
+	$(RM_F) library/close/Compiler/PastCleanupVisitor.pira
 
 library/close/Compiler/PrettyPrintVisitor.pir: library/close/Compiler/PrettyPrintVisitor.pm
 	@echo "**** Compiling $< to PIR"
@@ -528,3 +548,15 @@ hll_close: $(HLL_CLOSE_PIR)
 
 hll_close_clean: 
 	$(RM_F) $(HLL_CLOSE_CLEAN_RM_FILES)
+
+faketree: faketree.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=faketree.pira \
+		faketree.pm
+	$(STRIP_PIRA) faketree.pira \
+		> faketree.pir
+	$(RM_F) faketree.pira
+	@echo "***************************************"
+	@echo ""
+	$(PARROT) -r faketree.pir

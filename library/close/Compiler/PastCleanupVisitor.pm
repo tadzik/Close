@@ -1,21 +1,21 @@
 # $Id$
 
-=head1 TreeRewriteVisitor
+=head1 PastCleanupVisitor
 
 Transforms the PAST tree into a shape suitable for PAST->POST compilation. This 
 should be the last step before POSTing.
 
 Marshalls the PAST tree into a sequence of function declarations (subs) and 
 object (variable) definitions. Result is an array (mixed) of both, which is 
-encapsulated in a PAST::Stmts container. The C<rewrite_tree> function returns
-the Stmts container. The individual C<_rewrite_tree_XXX> methods return
+encapsulated in a PAST::Stmts container. The C<cleanup_past> function returns
+the Stmts container. The individual C<_cleanup_past_XXX> methods return
 an array of bits to be encapsulated. If a node does not directly represent such
 a bit, it should pass back the result array of its children, otherwise append 
 itself to the child results.
 
 =cut
 
-class close::Compiler::TreeRewriteVisitor;
+class close::Compiler::PastCleanupVisitor;
 
 sub ASSERT($condition, *@message) {
 	close::Dumper::ASSERT(close::Dumper::info(), $condition, @message);
@@ -59,13 +59,47 @@ sub NODE_TYPE($node) {
 
 our $SUPER;
 
+our @remove_attrs := (
+	'adverbs',
+	'apparent_type',
+	'default_scope',
+	'definition',
+	'display_name',
+	'etype',
+	'is_class',
+	'is_declarator',
+	'is_defined',
+	'is_function',
+	'is_rooted',
+	'is_typedef',
+	'node_type',
+	'num_parameters',
+	'noun',
+	'param_list',
+	'pir_name',
+	'pos',
+	'source',
+	'type',
+	'visited_by',
+);
+
+sub cleanup_node($node) {
+	NOTE("Cleaning up ", NODE_TYPE($node), " node: ", $node.name());
+	
+	for @remove_attrs {
+		if Hash::exists($node, $_) {
+			Hash::delete($node, $_);
+		}
+	}
+}
+
 method get_method_prefix() {
 	# Change this to your function prefix. E.g., _prettyprint_
-	return '_rewrite_tree_';
+	return '_cleanup_past_';
 }
 
 # This is used for visited-by caching. Use the class name.
-our $Visitor_name := 'TreeRewriteVisitor';
+our $Visitor_name := 'PastCleanupVisitor';
 
 method name() {
 	return $Visitor_name;
@@ -114,7 +148,7 @@ method visit_children($node) {
 
 ################################################################
 
-=method _rewrite_tree_UNKNOWN($node)
+=method _cleanup_past_UNKNOWN($node)
 
 Does nothing at all with the node.
 
@@ -127,13 +161,13 @@ our @Child_attribute_names := (
 	'function_definition',
 );
 
-method _rewrite_tree_UNKNOWN($node) {	
+our @Result := Array::empty();
+
+method _cleanup_past_UNKNOWN($node) {	
 	NOTE("No custom handler exists for node type: '", NODE_TYPE($node), 
 		"'. Passing through to children.");
 	DUMP($node);
 
-	my @results := Array::empty();
-	
 	if $node.isa(PAST::Block) {
 		# Should I keep a list of push-able block types?
 		NOTE("Pushing this block onto the scope stack");
@@ -142,132 +176,54 @@ method _rewrite_tree_UNKNOWN($node) {
 		NOTE("Visiting symtable entries");
 		for $node<symtable> {
 			my $child := close::Compiler::Scopes::get_symbol($node, $_);
-			Array::append(@results,
-				self.visit($child)
-			);
+			self.visit($child);
 		}
-		NOTE("Now with ", +@results, " results");
 	}
 
 	for @Child_attribute_names {
 		if $node{$_} {
 			NOTE("Visiting <", $_, "> attribute");
-			Array::append(@results,
-				self.visit($node{$_})
-			);
+			self.visit($node{$_});
 		}
 	}
 	
-	NOTE("Now with ", +@results, " results");
-	
 	NOTE("Visiting children");
-	Array::append(@results,
-		self.visit_children($node)
-	);
-	NOTE("Now with ", +@results, " results");
+	self.visit_children($node);
 	
 	if $node.isa(PAST::Block) {
 		NOTE("Popping this block off the scope stack");
 		close::Compiler::Scopes::pop(NODE_TYPE($node));
 	}
 
-	NOTE("done (", +@results, " results)");
-	DUMP(@results);
-	return @results;
-}
-
-method _rewrite_tree_declarator_name($node) {
-	NOTE("Rewriting tree for declarator_name ", $node.name());
+	cleanup_node($node);
+	
+	NOTE("done");
 	DUMP($node);
-	
-	# Pass back the results of any child nodes
-	my @results := self._rewrite_tree_UNKNOWN($node);
-	
-	# And if this is a global object, maybe emit it, too.
-	if $node.scope() eq 'package' {
-		if $node<initializer> {
-			NOTE("Declarator '", $node.name(), "' is added because of an initializer");
-			@results.push($node);
-			
-			my $ref := close::Compiler::Node::make_reference_to($node);
-			
-			my $init_stmt :=PAST::Op.new(
-				:pasttype('bind'),
-				$ref,
-				$node<initializer>
-			);
-			@results.push($init_stmt);		
-		} 
-		elsif $node<type><is_function> && $node<type><is_defined> {
-			NOTE("Found a function: ", NODE_TYPE($node<type>));
-			ASSERT($node<type>.isa(PAST::Block),
-				'defined functions must be blocks');
-			my $definition := $node<type>;
-			$definition.hll($definition<definition>.hll());
-			$definition<definition><hll> := undef;
-			$definition.namespace($definition<definition>.namespace());
-			$definition<definition><namespace> := undef;
-			$definition.name($definition<definition>.name());
-			$definition<definition><name> := undef;
-			$definition<definition>.blocktype('immediate');
-			
-			# Add adverbs for things like :init, :multi, etc.
-			my $pirflags := '';
-			for $node<adverbs> {
-				NOTE("Processing adverb: '", $_, "'");
-				$pirflags := $pirflags ~ ' ' ~ $node<adverbs>{$_}.value();
-			}
-			
-			if $pirflags ne '' {
-				$definition.pirflags($pirflags);
-			}
-			
-			@results.push($definition);
-		}
-		else {
-			unless $node<is_extern> {
-				NOTE("Declarator '", $node.name(), " has no initializer, but is not extern.");
-				@results.push($node);
-			}
-		}
-	}
-	
-	NOTE("done (", +@results, " results)");
-	DUMP(@results);
-	return @results;	
+	return @Result;
 }
 
 ################################################################
 	
-=sub rewrite_tree($past)
+=sub cleanup_past($past)
 
 The entry point. In general, you create a new object of this class, and use it
 to visit the PAST node that is passed from the compiler.
 
 =cut
 
-sub rewrite_tree($past) {
-	NOTE("Rewriting PAST tree into POSTable shape");
+sub cleanup_past($past) {
+	NOTE("Cleaning up PAST tree");
 	DUMP($past);
 
 	$SUPER := close::Compiler::Visitor.new();
 	NOTE("Created SUPER-visitor");
 	DUMP($SUPER);
 	
-	my $visitor	:= close::Compiler::TreeRewriteVisitor.new();
+	my $visitor	:= close::Compiler::PastCleanupVisitor.new();
 	NOTE("Created visitor");
 	DUMP($visitor);
 	
-	my @results	:= $visitor.visit($past);
-	DUMP(@results);
-		
-	NOTE("Post-processing ", +@results, " results");
-	
-	my $result := PAST::Stmts.new();
-	
-	for @results {
-		$result.push($_);
-	}
+	my $result := $visitor.visit($past);
 	
 	NOTE("done");
 	DUMP($result);

@@ -12,6 +12,22 @@ rule cv_qualifier {
 	| <token=VOLATILE>	{*}
 }
 
+=rule dclr_adverb
+
+Matches the adverbs that may modify a declarator.
+
+=cut
+
+rule dclr_adverb {
+	| <token=ADV_ANON>	{*}
+	| <token=ADV_INIT>	{*}
+	| <token=ADV_LOAD>	{*}
+	| <token=ADV_MAIN>	{*}
+	#| <token=ADV_MULTI> '(' ~ ')' <multi_signature>
+	# | <token=ADV_METHOD> (handled by 'method' keyword?)
+	| <token=ADV_VTABLE>	{*}
+}
+
 =rule dclr_alias
 
 Matches a declarator alias, as in C<extern int '$Line' alias line;>
@@ -110,6 +126,7 @@ rule declarator {
 rule declarator_part {
 	<declarator>
 	<dclr_alias>?
+	[ <adverbs=dclr_adverb> ]*
 	[ '=' <initializer=expression>
 	|  <?before '{' >	
 		{*} #= open_block

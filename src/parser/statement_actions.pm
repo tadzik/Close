@@ -28,7 +28,6 @@ method compound_statement($/, $key) {
 		NOTE("Block has ", +@($past), " elements inside");
 		DUMP($past);
 		make $past;
-		NOTE("Done here");
 	} 
 	else {
 		DIE("Unexpected $key value: '", $key, "' in action method compound_statement");

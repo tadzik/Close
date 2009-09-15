@@ -24,7 +24,7 @@ rule declaration_statement {
 	| <namespace_alias_declaration> ';'	{*} #= namespace_alias_declaration
 	| <using_namespace_directive> ';'		{*} #= using_directive
 	| <using_declaration> ';'			{*} #= using_declaration
-	| <declaration> [ ';' | <?after '}' <.ws> > ]	{*} #= declaration
+	| <declaration> [ ';' | <?after '}' <.ws> > ] {{ say "Matched declaration" }}	{*} #= declaration
 }
 
 rule do_while_statement {

@@ -4,6 +4,8 @@ method TOP($/, $key) { PASSTHRU($/, $key); }
 
 method translation_unit($/, $key) {
 	if $key eq 'start' {
+		NOTE("Starting translation unit parse.");
+		
 		my $config := close::Compiler::Config.new();
 		$config.read('close.cfg');
 		
@@ -19,6 +21,8 @@ method translation_unit($/, $key) {
 		close::Compiler::Scopes::print_symbol_table($pervasive);
 	}
 	else {
+		NOTE("Done parsing translation unit.");
+		
 		my $default_nsp := close::Compiler::Scopes::pop('namespace_block');
 
 		for $<extern_statement> {
@@ -53,7 +57,12 @@ method translation_unit($/, $key) {
 		NOTE("Rewriting tree for POSTing");
 		$past := close::Compiler::TreeRewriteVisitor::rewrite_tree($past);
 		
-#		$past := fake_tree();
+		NOTE("Cleaning up tree for POSTing");
+		close::Compiler::PastCleanupVisitor::cleanup_past($past);
+		
+		DUMP($past);
+		
+		#$past := faketree();
 		
 		NOTE("done");
 		DUMP($past);
@@ -61,27 +70,29 @@ method translation_unit($/, $key) {
 	}
 }
 
-sub fake_tree() {
-	my $call := PAST::Op.new(
-		:pasttype('call'),
-		
-		PAST::Var.new(
-			:name('foo'), 
-			:namespace(Array::new('B')), 
-			:scope('package'),
-		),
-	);
-
-	my $past := PAST::Stmts.new(:name('fake_tree'),
-		PAST::Block.new(:name('bar'),
-			:blocktype('declaration'),
+sub faketree() {
+	my $tree := PAST::Stmts.new(
+		PAST::Block.new(
+		#	:blocktype('declaration'),
 			:hll('close'),
-			:namespace(Array::new('A')),
-			PAST::Op.new(:pirop('return'), :pasttype('pirop'),
-				$call,
+			:name('fake'),
+			:namespace(Array::new('std')),
+			PAST::VarList.new(
+				PAST::Var.new(
+					:isdecl(1),
+					:name('args'),
+					:scope('parameter'),
+				),
+			),
+			PAST::Block.new(
+				:name(undef),
+				:namespace(undef),
+				:hll(undef),
+				:blocktype('immediate'),
 			),
 		),
 	);
-
-	return $past;
+	
+	DUMP($tree, 'Tree');
+	return $tree;	
 }

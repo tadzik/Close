@@ -139,6 +139,18 @@ sub _create_declarator_name(%attributes) {
 	return $past;
 }
 
+sub _create_expr_asm(%attributes) {
+	NOTE("Creating expr_asm node");
+	my $past := PAST::Op.new(
+		:name('asm expression'),
+		:pasttype('inline'),
+	);
+	set_attributes($past, %attributes);
+	
+	DUMP($past);
+	return $past;
+}
+
 
 our %binary_pastops;
 %binary_pastops{'&&'} := 'if';
@@ -170,12 +182,8 @@ our %binary_inline;
 %binary_inline{'>'}  := "isgt";
 %binary_inline{'>='}  := "isge";
 
-sub _create_expr_asm(%attributes) {
-
-}
-
 sub _create_expr_binary(%attributes) {
-	NOTE("Creating expr_binary node");
+	NOTE("Creating expr_binary node: ", $oper);
 	my $oper	:= %attributes<operator>;
 	ASSERT($oper, 'Expr_binary must have an :operator()');
 	my $left	:= %attributes<left>;
@@ -199,6 +207,9 @@ sub _create_expr_binary(%attributes) {
 		$past.inline($inline);
 	}
 
+	$past.push($left);
+	$past.push($right);
+	
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
@@ -284,6 +295,7 @@ sub _create_inline(%attributes) {
 
 sub _create_integer_literal(%attributes) {
 	NOTE("Creating integer_literal");
+	DUMP(%attributes);
 
 	unless %attributes<returns> {
 		%attributes<returns> := 'Integer';
@@ -565,6 +577,21 @@ sub get_factory($type) {
 	return $sub;
 }
 
+# Make a symbol reference from a declarator.
+sub make_reference_to($node) {
+	my $past := close::Compiler::Node::create('qualified_identifier', 
+		:declarator($node),
+		:hll($node<hll>),
+		:is_rooted($node<is_rooted>),
+		:namespace($node.namespace()),
+		:node($node),
+		:scope($node.scope()),
+	);
+
+	close::Compiler::Node::set_name($past, $node.name());
+	return $past;
+}
+
 sub path_of($node) {
 	NOTE("Computing path of '", NODE_TYPE($node), "' node: ", $node.name());
 	DUMP($node);
@@ -600,18 +627,15 @@ sub path_of($node) {
 
 sub set_attributes($past, %attributes) {
 	for %attributes {
-		# Skip 'em if undef 
-		if %attributes{$_} {
-			# FIXME: Detect accessor methods with $past.can(...)
-			if $_ eq 'name' {
-				close::Compiler::Node::set_name($past, %attributes{$_});
-			}
-			elsif $_ eq 'node' {
-				$past.node(%attributes{$_});
-			}
-			else {
-				$past{$_} := %attributes{$_};
-			}
+		# FIXME: Detect accessor methods with $past.can(...)
+		if $_ eq 'name' {
+			close::Compiler::Node::set_name($past, %attributes{$_});
+		}
+		elsif $_ eq 'node' {
+			$past.node(%attributes{$_});
+		}
+		else {
+			$past{$_} := %attributes{$_};
 		}
 	}
 }

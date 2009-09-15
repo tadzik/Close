@@ -141,9 +141,9 @@ sub clean_up_heredoc($past, @lines) {
 	my $closing	:= @lines.pop();
 	my $leading_ws := String::substr($closing, 0, String::find_not_cclass('WHITESPACE', $closing));
 	my $strip_indent := String::display_width($leading_ws);
+	
 	NOTE("Need to strip indentation of ", $strip_indent);
 	
-	#say("fixing up heredoc: chomp indent of ", $indent);
 	my $text := '';
 	
 	if $strip_indent > 0 {

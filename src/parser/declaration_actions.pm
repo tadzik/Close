@@ -38,6 +38,15 @@ method cv_qualifier($/) {
 	make $past;
 }
 
+method dclr_adverb($/) {
+	NOTE("Found declarator_adverb: ", ~$<token>);
+	my $past := make_token($<token>);	
+	close::Compiler::Node::set_name($past, adverb_unalias_name($past));
+	
+	DUMP($past);
+	make $past;
+}
+
 =method dclr_alias
 
 Just another kind of declarator.
@@ -243,7 +252,12 @@ method declarator_part($/, $key) {
 		NOTE("Assembling declarator ", $past.name());
 		
 		if $<dclr_alias> {
-			$past<alias> := $<dclr_alias>.ast;
+			$past<alias> := $<dclr_alias>[0].ast;
+		}
+		
+		for $<adverbs> {
+			my $adv := $_.ast;
+			$past<adverbs>{$adv.name()} := $adv;
 		}
 		
 		if $<initializer> {
@@ -252,7 +266,6 @@ method declarator_part($/, $key) {
 
 			DUMP($initializer);
 			$past<initializer> := $initializer;
-			$past.viviself($initializer);
 		}
 		
 		if $<body> {
@@ -275,9 +288,11 @@ method declarator_part($/, $key) {
 					:name($past.name()),
 					:namespace($current_nsp.namespace()),
 				);
+				
 				NOTE("Node type is ", NODE_TYPE($past<type>));
 				ASSERT(NODE_TYPE($past<type>) eq 'decl_function_returning',
 					'is_function should only be true on decl_function_returning nodes, I think');
+					
 				$past<type><is_defined> := 1;
 				$past<type><definition> := $definition;
 				$past<type>.push($definition);
@@ -395,9 +410,9 @@ method parameter_declaration($/) {
 		'Expected current scope would already have this parameter declared (by <declarator_name>)');
 
 	# Insert declaration into current scope.
-	my $scope := close::Compiler::Scopes::current();
-	NOTE("Pushing parameter declaration of ", $past.name(), " into current scope: ", $scope.name());
-	$scope.push($past);
+	#my $scope := close::Compiler::Scopes::current();
+	#NOTE("Pushing parameter declaration of ", $past.name(), " into current scope: ", $scope.name());
+	#$scope.push($past);
 	
 	DUMP($past);
 	make $past;
@@ -427,6 +442,18 @@ method parameter_list($/, $key) {
 		my $past := close::Compiler::Scopes::pop('decl_function_returning');
 		NOTE("Popped scope from stack: ", $past.name());
 
+		my $params := close::Compiler::Node::create('decl_varlist',
+			:name('parameter_list'),
+			:node($/),
+		);
+		
+		for $<param_list> {
+			$params.push($_.ast);
+		}
+		
+		$past.push($params);
+		$past<param_list> := $params;
+		
 		NOTE('End function parameter list: ', +@($past), ' parameters');
 		DUMP($past);
 		make $past;

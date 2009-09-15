@@ -26,17 +26,6 @@ sub NOTE(*@parts) {
 
 ################################################################
 
-sub newOLD($name, $type, $block) {
-	my $symbol := close::Compiler::Node::create('symbol', 
-		:name($name),
-		:block($block),
-		:type($type),
-	);
-
-	DUMP($symbol);
-	return $symbol;
-}
-
 sub print_aggregate($agg) {
 	say(substr($agg<kind> ~ "        ", 0, 8),
 		substr($agg<tag> ~ "                  ", 0, 18));

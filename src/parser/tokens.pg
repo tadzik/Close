@@ -130,7 +130,7 @@ token INTEGER_LIT {
 		| 'x' <xdigit>+	[ _ <xdigit>+ ]*
 		]
 	| 0	$<bad_octal>=<[0..7]>+		# Gets a warning.
-	|	\d+			[ _ \d+ ]*	# Plain old number.
+	| \d+				[ _ \d+ ]*	# Plain old number.
 	]
 	[ <[Uu]> [ L L? ]
 	| [ L L? ] <[Uu]>

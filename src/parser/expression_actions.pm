@@ -92,7 +92,7 @@ sub binary_expr_l2r($/) {
 			:operator(~$_),
 			:left($past),
 			:right($<term>.shift().ast),
-			:node($<op>));
+			:node($_));
 	}
 
 	NOTE("done");

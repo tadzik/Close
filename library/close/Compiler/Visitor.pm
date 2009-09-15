@@ -143,6 +143,8 @@ method get_caller_namespace() {
 	return $nsp;
 }
 
+my @Results_placeholder := Array::empty();
+
 method visit($visitor, $node) {
 	NOTE("Visiting ", NODE_TYPE($node), " node on behalf of ", $visitor.name());
 	
@@ -152,13 +154,15 @@ method visit($visitor, $node) {
 	unless @results {
 		NOTE("Not visited yet. Inserting temporary marker.");
 		#self.already_visited($visitor, $node, Array::new($node));
-		self.already_visited($visitor, $node, Array::empty());
+		self.already_visited($visitor, $node, @Results_placeholder);
 		
 		my &method := self.fetch_visit_method($visitor, $node);
 		@results	:= &method($visitor, $node);
 		
 		NOTE("Visit complete. Storing results.");
-		self.already_visited($visitor, $node, @results);
+		if +@results {
+			self.already_visited($visitor, $node, @results);
+		}
 	}
 
 	NOTE("done");
