@@ -262,7 +262,8 @@ rule tspec_type_specifier {
 }
 
 rule using_namespace_directive {
-	<.USING> <.NAMESPACE> <namespace=namespace_name>
+	<.USING> <.NAMESPACE> <namespace=namespace_path>
+	{*}
 }
 
 rule using_declaration {

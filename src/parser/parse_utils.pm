@@ -195,6 +195,7 @@ sub make_token($capture) {
 	return $token;
 }
 
+
 ##################################################################
 
 =head4 Global symbol table management
@@ -646,19 +647,6 @@ sub open_decl_mode($mode) {
 	#	+@Decl_mode_stack, " now on stack");
 	return $mode;
 }
-
-##################################################################
-
-=head4 Function block management
-
-Functions are the basic coding units in Close. Each function is parsed as a
-PAST::Block. The very first child of a function's ast will be a PAST::Stmts
-block for storing local variable declarations.
-
-Functions declared with the :vtable, :vtable(...), and :method modifiers will
-have access to the 'self' built-in automatically.
-
-=cut
 
 ##################################################################
 

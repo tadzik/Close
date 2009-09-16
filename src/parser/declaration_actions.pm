@@ -541,3 +541,26 @@ method tspec_type_name($/) {
 	DUMP($past);
 	make $past;
 }
+
+method using_namespace_directive($/) {
+	my $using_nsp := $<namespace>.ast;
+	NOTE("Using ", NODE_TYPE($using_nsp), " namespace ", $using_nsp.name());
+	ASSERT(NODE_TYPE($using_nsp) eq 'namespace_path',
+		'Namespace paths must be namespace_name tokens');
+	
+	my $current_nsp := close::Compiler::Scopes::fetch_current_namespace();
+	$using_nsp := close::Compiler::Namespaces::fetch_relative_namespace_of($current_nsp, $using_nsp);
+
+	my $block := close::Compiler::Scopes::current();
+	close::Compiler::Scopes::add_using_namespace($block, $using_nsp);
+	
+	my $past := close::Compiler::Node::create('using_directive',
+		:name('using namespace'),
+		:using_namespace($using_nsp),
+		:node($/),
+	);
+
+	NOTE("Added namespace ", $using_nsp.name(), " to using list of block: ", $block.name());
+	DUMP($past);
+	make $past;
+}

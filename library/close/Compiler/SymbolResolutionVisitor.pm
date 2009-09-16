@@ -247,6 +247,11 @@ method _resolve_symbols_qualified_identifier($node) {
 	
 	if $resolved {
 		$node<declarator> := $resolved;
+		
+		# FIXME: Is this premature? Yes! The symbols aren't resolved yet.
+		$node<hll> := $resolved<hll>;
+		$node.namespace($resolved.namespace());
+		close::Compiler::Node::set_name($node, $resolved.name());
 	}
 	
 	my @results := Array::new($node);

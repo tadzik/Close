@@ -133,22 +133,28 @@ sub query_scopes_containing($qualified_identifier) {
 		NOTE("Searching for relative identifier in ", +@scopes, " namespaces");
 	}
 	
-	my @candidates := Array::empty();
+	DUMP(@scopes);
+	
 	my @path := get_path_of($qualified_identifier);
 	DUMP(@path);
 	
-	for @scopes {
-		Array::append(@candidates, 
-			query_relative_scopes_matching_path($_, @path));
-		NOTE("Now there are ", +@candidates, " candidates");
+	my @candidates := Array::empty();
+	
+	if +@path {	
+		for @scopes {
+			Array::append(@candidates, 
+				query_relative_scopes_matching_path($_, @path));
+		}
+		
+		@scopes := @candidates;
+		@candidates := Array::empty();
 	}
-
+	
 	# We have a list of possible scopes. Look for a symbol or namespace.
-	@scopes := @candidates;
-	@candidates := Array::empty();
 	my $name := $qualified_identifier.name();
 	
 	for @scopes {
+		NOTE("Looking in scope: '", $_.name(), "'");
 		my $match := close::Compiler::Scopes::get_symbol($_, $name);
 		
 		unless $match {

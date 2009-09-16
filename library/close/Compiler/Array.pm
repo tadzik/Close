@@ -214,3 +214,24 @@ sub reverse(@original) {
 	
 	return @result;
 }
+
+sub unique(@original) {
+	my @result := Array::empty();
+	
+	for @original {
+		my $o := $_;
+		my $found := 0;
+		
+		for @result {
+			if  $o =:= $_ {
+				$found := 1;
+			}
+		}
+		
+		unless $found {
+			@result.push($o);
+		}
+	}
+	
+	return @result;
+}

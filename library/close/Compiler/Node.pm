@@ -505,6 +505,15 @@ sub _create_translation_unit(%attributes) {
 	return $past;
 }
 
+sub _create_using_directive(%attributes) {
+	my $past := PAST::Stmts.new(
+	);
+	set_attributes($past, %attributes);
+	
+	DUMP($past);
+	return $past;
+}
+
 sub create($type, *%attributes) {
 	my &code := get_factory($type);
 	ASSERT(&code, 'get_factory() returns a valid Sub, or dies.');

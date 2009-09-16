@@ -38,7 +38,7 @@ Insert a single declarator-name into the symtable for a block.
 
 =cut
 
-sub add_declarator($scope, $past) {
+sub add_declarator_to($past, $scope) {
 	NOTE("Adding name '", $past.name(), "' to ", NODE_TYPE($scope), " scope '", $scope.name(), "'");
 	my $name := $past.name();
 	my $already := get_symbol($scope, $name);
@@ -54,14 +54,55 @@ sub add_declarator($scope, $past) {
 		}
 	}
 	else {
+		unless $past<hll> {
+			$past<hll> := $scope<hll>;
+			$past.namespace($scope.namespace());
+		}
+		
 		set_symbol($scope, $name, $past);
 	}
 }
 
+sub add_declarator($past) {
+	NOTE("Adding declarator: ", $past.name());
+	DUMP($past);
+	ASSERT(NODE_TYPE($past) eq 'declarator_name',
+		"Only declarators can be added.");
+	
+	my $current_nsp := close::Compiler::Scopes::fetch_current_namespace();
+	my $decl_nsp := close::Compiler::Namespaces::fetch_relative_namespace_of($current_nsp, $past);
+	
+	add_declarator_to($past, $decl_nsp);
+	
+}
+		
 sub add_declarator_to_current($past) {
 	my $scope := current();
 	NOTE("Adding name '", $past.name(), "' to ", $scope<lstype>, " scope '", $scope.name(), "'");
-	add_declarator($scope, $past);
+	add_declarator_to($past, $scope);
+}
+
+sub add_using_namespace($scope, $nsp) {
+	NOTE("Adding namespace '", $nsp.name(), "' to ", NODE_TYPE($scope), " scope '", $scope.name(), "'");
+	
+	if $scope<using_namespaces> {
+		my $found := 0;
+		
+		for $scope<using_namespaces> {
+			if $_ =:= $nsp {
+				$found := 1;
+			}
+		}
+		
+		if $found == 0 {
+			$scope<using_namespaces>.shift($nsp);
+		}
+	}
+	else {
+		$scope<using_namespaces> := Array::new($nsp);
+	}
+	
+	NOTE("Now there are ", +($scope<using_namespaces>), " entries");
 }
 
 sub current() {
@@ -137,12 +178,6 @@ sub get_namespace($scope, $name) {
 	return $namespace;
 }
 
-sub get_symbol($scope, $name) {
-	my $object := $scope.symbol($name)<symbol>;
-	DUMP(:name($name), :result($object));
-	return $object;
-}
-
 =sub get_search_list
 
 Returns a copy of the lexical stack - so it can be destroyed - arranged in the 
@@ -152,7 +187,20 @@ top of the lexical stack, the last element is the bottom of the stack, etc.
 =cut
 
 sub get_search_list() {
-	my @list := Array::clone(get_stack());
+	my @list := Array::empty();
+	
+	for get_stack() {
+		@list.push($_);
+		
+		if $_<using_namespaces> {
+			for $_<using_namespaces> {
+				@list.push($_);
+			}
+		}
+	}
+
+	@list := Array::unique(@list);
+	
 	NOTE("Got ", +@list, " scopes to search");
 	return @list;
 }
@@ -166,6 +214,12 @@ sub get_stack() {
 
 	DUMP(@Scope_stack);
 	return @Scope_stack;
+}
+
+sub get_symbol($scope, $name) {
+	my $object := $scope.symbol($name)<symbol>;
+	DUMP(:name($name), :result($object));
+	return $object;
 }
 
 sub pop($type) {
