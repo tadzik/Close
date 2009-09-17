@@ -1,4 +1,4 @@
-# Check basic literals.
+// Check basic literals.
 extern int print();
 extern void plan();
 

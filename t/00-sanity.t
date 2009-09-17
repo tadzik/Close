@@ -1,5 +1,6 @@
 namespace std {
 	void say(string args...) {
+		return 1;
 	}
 }
 

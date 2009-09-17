@@ -121,8 +121,6 @@ BUILD_CLEANUPS := \
   "src/gen_*.pir" \
   src/gen_grammar.pm \
   src/gen_actions.pm \
-  "*.c" \
-  "*$(O)" \
   close@exe@ \
 #IF(win32):  parrot-close.exe \
 #IF(win32):  parrot-close.iss \
