@@ -160,12 +160,12 @@ sub clean_up_heredoc($past, @lines) {
 	DUMP($past);
 }
 
-our $Config;
+our $Config := Scalar::undef();
 
 sub get_config(*@keys) {
 	NOTE("Get config setting: ", Array::join('::', @keys));
 
-	unless $Config {
+	if Scalar::defined($Config) {
 		$Config := close::Compiler::Config.new();
 	}
 	

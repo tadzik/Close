@@ -49,6 +49,7 @@ to the close compiler.
 
     $P0 = compreg 'close'
     $P1 = $P0.'command_line'(args)
+    exit 0
 .end
 
 .include 'src/gen_builtins.pir'

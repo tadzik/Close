@@ -204,11 +204,11 @@ method _rewrite_tree_declarator_name($node) {
 				'defined functions must be blocks');
 			my $definition := $node<type>;
 			$definition.hll($definition<definition>.hll());
-			$definition<definition><hll> := undef;
+			$definition<definition><hll> := Scalar::undef();
 			$definition.namespace($definition<definition>.namespace());
-			$definition<definition><namespace> := undef;
+			$definition<definition><namespace> := Scalar::undef();
 			$definition.name($definition<definition>.name());
-			$definition<definition><name> := undef;
+			$definition<definition><name> := Scalar::undef();
 			$definition<definition>.blocktype('immediate');
 			
 			# Add adverbs for things like :init, :multi, etc.

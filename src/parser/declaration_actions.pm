@@ -208,7 +208,7 @@ method declarator($/) {
 	# int *const *volatile X;  becomes
 	# X -> *volatile -> *const -> int
 	my $pointer_chain;
-	$last_dclr := undef;
+	$last_dclr := Scalar::undef();
 	
 	for $<dclr_pointer> {
 		$_.ast<type> := $pointer_chain;

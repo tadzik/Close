@@ -79,6 +79,7 @@ COMPILER_LIBS_PIR := \
 	library/close/Compiler/Node.pir			\
 	library/close/Compiler/PastCleanupVisitor.pir	\
 	library/close/Compiler/PrettyPrintVisitor.pir	\
+	library/close/Compiler/Scalar.pir 			\
 	library/close/Compiler/ScopeAssignmentVisitor.pir \
 	library/close/Compiler/Scopes.pir			\
 	library/close/Compiler/String.pir			\
@@ -289,6 +290,15 @@ library/close/Compiler/PrettyPrintVisitor.pir: library/close/Compiler/PrettyPrin
 	$(STRIP_PIRA) library/close/Compiler/PrettyPrintVisitor.pira \
 		> library/close/Compiler/PrettyPrintVisitor.pir
 	$(RM_F) library/close/Compiler/PrettyPrintVisitor.pira
+
+library/close/Compiler/Scalar.pir: library/close/Compiler/Scalar.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/Scalar.pira \
+		library/close/Compiler/Scalar.pm
+	$(STRIP_PIRA) library/close/Compiler/Scalar.pira \
+		> library/close/Compiler/Scalar.pir
+	$(RM_F) library/close/Compiler/Scalar.pira
 
 library/close/Compiler/ScopeAssignmentVisitor.pir: library/close/Compiler/ScopeAssignmentVisitor.pm
 	@echo "**** Compiling $< to PIR"

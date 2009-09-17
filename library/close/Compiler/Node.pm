@@ -51,7 +51,10 @@ sub _create_compound_statement(%attributes) {
 	NOTE("Creating compound block");
 	DUMP(%attributes);
 	
-	my $past := PAST::Block.new(:blocktype('immediate'), :name('compound statement'));
+	my $past := PAST::Block.new(
+		:blocktype('immediate'), 
+		:name('compound statement'),
+	);
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
@@ -77,6 +80,7 @@ sub _create_decl_function_returning(%attributes) {
 	NOTE("Creating a function_returning declarator");
 	
 	my $past := PAST::Block.new(
+		:blocktype('declaration'),
 		:name('function returning'), 
 	);
 	$past<default_scope>	:= 'parameter';
@@ -113,7 +117,9 @@ sub _create_decl_pointer_to(%attributes) {
 
 sub _create_decl_temp(%attributes) {
 	NOTE("Creating new temporary-declaration scope");
-	my $past := PAST::Block.new(:blocktype('immediate'));
+	my $past := PAST::Block.new(
+		:blocktype('immediate'),
+	);
 	$past<varlist> := create('decl_varlist', :block($past));
 	set_attributes($past, %attributes);
 	
@@ -242,7 +248,10 @@ sub _create_float_literal(%attributes) {
 
 sub _create_foreach_statement(%attributes) {
 	NOTE("Creating foreach_statement");
-	my $past := PAST::Block.new(:name('foreach statement'));
+	my $past := PAST::Block.new(
+		:blocktype('immediate'),
+		:name('foreach statement'),
+	);
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
@@ -257,7 +266,7 @@ sub _create_function_definition(%attributes) {
 	my $past := %attributes<from>;
 	$past.blocktype('declaration');
 	$past<default_scope> := 'register';
-	%attributes<from> := undef;
+	%attributes<from> := Scalar::undef();
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
@@ -375,7 +384,7 @@ sub _create_parameter_declaration(%attributes) {
 	ASSERT(%attributes<from>, 'Parameter declaration must be created :from() a declarator.');
 	
 	my $past := %attributes<from>;
-	%attributes<from> := undef;
+	%attributes<from> := Scalar::undef();
 	%attributes<scope> := 'parameter';
 	%attributes<isdecl> := 1;
 	

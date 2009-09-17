@@ -62,7 +62,10 @@ method translation_unit($/, $key) {
 		
 		DUMP($past);
 		
-		#$past := faketree();
+		if get_config('Compiler', 'faketree') {
+			NOTE("Replacing compiled tree with faketree() results");
+			$past := faketree();
+		}
 		
 		NOTE("done");
 		DUMP($past);
@@ -71,28 +74,47 @@ method translation_unit($/, $key) {
 }
 
 sub faketree() {
-	my $tree := PAST::Stmts.new(
-		PAST::Block.new(
-		#	:blocktype('declaration'),
-			:hll('close'),
-			:name('fake'),
-			:namespace(Array::new('std')),
-			PAST::VarList.new(
-				PAST::Var.new(
-					:isdecl(1),
-					:name('args'),
-					:scope('parameter'),
-				),
-			),
-			PAST::Block.new(
-				:name(undef),
-				:namespace(undef),
-				:hll(undef),
-				:blocktype('immediate'),
-			),
-		),
+	my $tree := PAST::Stmts.new();
+	my $sub := PAST::Block.new();
+	$tree.push($sub);
+	
+	my $args := PAST::Var.new(
+		:name('args'),
+		:namespace(Scalar::undef()),
+		:isdecl(1),
+		:scope('parameter'),
 	);
 	
+	$args<hll> := Scalar::undef();
+	$args<from> := Scalar::undef();
+	$args<index> := 0;
+	
+	my @a := ( 0, "std" );
+	@a.shift();
+	$sub.blocktype('declaration');
+	#$sub<default_scope> := 'parameter';
+	$sub.hll('close');
+	$sub.name('say');
+	$sub.namespace(@a);
+	#$sub<node_type> := 'function_definition';
+	$sub<symtable><args><symbol> := $args;
+	$sub.push(
+		PAST::VarList.new(
+			:name('parameter_list'),
+			$args,
+		),
+	);
+	$sub.push(
+		PAST::Block.new(
+			:blocktype('immediate'),
+			:namespace(Scalar::undef()),
+			:name(Scalar::undef()),
+			:hll(Scalar::undef()),
+		),
+	);
+	$sub[1]<from> := Scalar::undef();
+	
 	DUMP($tree, 'Tree');
-	return $tree;	
+	return $tree;
+	
 }
