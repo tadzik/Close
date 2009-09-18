@@ -5,7 +5,7 @@ method TOP($/, $key) { PASSTHRU($/, $key); }
 method translation_unit($/, $key) {
 	if $key eq 'start' {
 		NOTE("Starting translation unit parse.");
-		
+
 		my $config := close::Compiler::Config.new();
 		$config.read('close.cfg');
 		
@@ -58,7 +58,7 @@ method translation_unit($/, $key) {
 		$past := close::Compiler::TreeRewriteVisitor::rewrite_tree($past);
 		
 		NOTE("Cleaning up tree for POSTing");
-		close::Compiler::PastCleanupVisitor::cleanup_past($past);
+		#close::Compiler::PastCleanupVisitor::cleanup_past($past);
 		
 		DUMP($past);
 		
@@ -97,7 +97,7 @@ sub faketree() {
 	$sub.name('say');
 	$sub.namespace(@a);
 	#$sub<node_type> := 'function_definition';
-	$sub<symtable><args><symbol> := $args;
+	$sub<child_sym><args><symbol> := $args;
 	$sub.push(
 		PAST::VarList.new(
 			:name('parameter_list'),

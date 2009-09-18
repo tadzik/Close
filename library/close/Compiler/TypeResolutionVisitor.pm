@@ -115,8 +115,8 @@ method _type_resolve_UNKNOWN($node) {
 		NOTE("Pushing this block onto the scope stack");
 		close::Compiler::Scopes::push($node);
 	
-		NOTE("Visiting symtable entries");
-		for $node<symtable> {
+		NOTE("Visiting child symbol entries");
+		for $node<child_sym> {
 			my $symbol := close::Compiler::Scopes::get_symbol($node, $_);
 			self.visit($symbol);
 		}

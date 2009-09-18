@@ -61,7 +61,6 @@ token WS_ALL {
 					$I0 = $P0
 					.return($I0)
 				}}>
-				
 				[ $<lines>=[ \h* <ident> \h* [ \n | $ ] ]  {*} #= check_for_end
 				|| $<lines>=[ \N* \n ]
 				]
@@ -132,8 +131,8 @@ token INTEGER_LIT {
 	| 0	$<bad_octal>=<[0..7]>+		# Gets a warning.
 	| \d+				[ _ \d+ ]*	# Plain old number.
 	]
-	[ <[Uu]> [ L L? ]
-	| [ L L? ] <[Uu]>
+	$<lu_part>=[ <[Uu]> [ <[Ll]> <[Ll]>? ]?
+	| <[Ll]> <[Ll]>? <[Uu]>?
 	]?
 	{*}
 }

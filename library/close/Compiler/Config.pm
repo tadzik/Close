@@ -88,12 +88,14 @@ sub _list_configs($hash, $prefix) {
 }
 
 sub _parse_config($data) {
+	say("Parse config: splitting at ", time());
 	my @lines		:= String::split("\n", $data);
 	my $line_number	:= 0;
 	
 	DUMP(@lines);
 	for @lines {
 		$line_number++;
+		#say("Line number ", $line_number, " at ", time());
 		my $line := String::trim($_);
 
 		if $line && String::char_at($line, 0) ne '#' {
@@ -134,20 +136,18 @@ method read($filename) {
 		%Config_data<> := $filename;
 
 		#NOTE("Reading config file: ", $filename);
-		
+
 		my $data := Q:PIR {
 			$P0 = new 'FileHandle'
 			$P1 = find_lex '$filename'
 			$S0 = $P0.'readall'($P1)
 			%r = box $S0
 		};
-
 		#NOTE("Got config data: ", $data);
 
 		_parse_config($data);
 
 		#DUMP(%Config_data);
-		say("Read config data from ", $filename);
 	}
 }
 
@@ -155,7 +155,6 @@ sub time() {
 	my $result := Q:PIR {
 		$N0 = time
 		%r = box $N0
-		say %r
 	};
 	return $result;
 }

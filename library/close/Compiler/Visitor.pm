@@ -63,10 +63,10 @@ method fetch_visit_method($visitor, $node) {
 	my $sub		:=%visit_methods{$visitor.name()}{$type};
 	my $caller_nsp	:= self.get_caller_namespace();
 	
-	NOTE("Fetching visit_method: ", $sub_name);
+	#NOTE("Fetching visit_method: ", $sub_name);
 	
 	unless $sub {
-		NOTE("Not found in cache. Doing lookup.");
+		#NOTE("Not found in cache. Doing lookup.");
 		
 		$sub := Q:PIR {
 			.local pmc caller_nsp
@@ -97,14 +97,14 @@ method fetch_visit_method($visitor, $node) {
 				"for Node class: ", $type);
 		}
 
-		NOTE("Got sub: ", $sub);
-		DUMP($sub);
+		#NOTE("Got sub: ", $sub);
+		#DUMP($sub);
 		
 		%visit_methods{$visitor.name()}{$type} := $sub;
-		DUMP(%visit_methods);
+		#DUMP(%visit_methods);
 	}
 	
-	NOTE("Returning method '", $sub, "'");
+	#NOTE("Returning method '", $sub, "'");
 	return $sub;
 }
 
@@ -146,27 +146,27 @@ method get_caller_namespace() {
 my @Results_placeholder := Array::empty();
 
 method visit($visitor, $node) {
-	NOTE("Visiting ", NODE_TYPE($node), " node on behalf of ", $visitor.name());
+	#NOTE("Visiting ", NODE_TYPE($node), " node on behalf of ", $visitor.name());
 	
 	my @results := self.already_visited($visitor, $node);
-	DUMP(@results);
+	#DUMP(@results);
 	
 	unless @results {
-		NOTE("Not visited yet. Inserting temporary marker.");
+		#NOTE("Not visited yet. Inserting temporary marker.");
 		#self.already_visited($visitor, $node, Array::new($node));
 		self.already_visited($visitor, $node, @Results_placeholder);
 		
 		my &method := self.fetch_visit_method($visitor, $node);
 		@results	:= &method($visitor, $node);
 		
-		NOTE("Visit complete. Storing results.");
+		#NOTE("Visit complete. Storing results.");
 		if +@results {
 			self.already_visited($visitor, $node, @results);
 		}
 	}
 
-	NOTE("done");
-	DUMP(@results);
+	#NOTE("done");
+	#DUMP(@results);
 	return @results;
 }
 
@@ -179,19 +179,7 @@ method visit_children($visitor, $node) {
 		}
 	}
 
-	NOTE("Returning ", +@results, " results");
-	DUMP(@results);
-	return @results;
-}
-
-sub generic_entry_point($past) {
-	NOTE("GENERIC_VISITING in PAST tree");
-	DUMP($past);
-	
-	my $visitor	:= close::Compiler::Visitor.new();
-	my @results	:= $visitor.visit($past);
-	
-	# You should probably reformat @results to whatever you want, if anything.
-	DUMP(@results);
+	#NOTE("Returning ", +@results, " results");
+	#DUMP(@results);
 	return @results;
 }

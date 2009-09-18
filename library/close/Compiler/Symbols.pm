@@ -31,6 +31,7 @@ sub print_aggregate($agg) {
 		substr($agg<tag> ~ "                  ", 0, 18));
 	
 	for $agg<symtable> {
+		# FIXME: No more .symbols
 		print_symbol($agg.symbol($_)<decl>);
 	}
 }

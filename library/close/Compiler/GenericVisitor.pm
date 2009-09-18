@@ -149,8 +149,8 @@ method _generic_visit_UNKNOWN($node) {
 		NOTE("Pushing this block onto the scope stack");
 		close::Compiler::Scopes::push($node);
 	
-		NOTE("Visiting symtable entries");
-		for $node<symtable> {
+		NOTE("Visiting child_sym entries");
+		for $node<child_sym> {
 			my $child := close::Compiler::Scopes::get_symbol($node, $_);
 			Array::append(@results,
 				self.visit($child)

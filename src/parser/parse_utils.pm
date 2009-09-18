@@ -262,32 +262,6 @@ sub _find_block_of_path(@_path) {
 	return $child;
 }
 
-sub _fetch_namespaces_below($block, @results) {
-	for $block<symtable> {
-		#say("Child: ", $_);
-		my $child := $block.symbol($_);
-
-		if $child<past> {
-			@results.push($child<past>);
-			#DUMP($child<past>);
-		}
-
-		_fetch_namespaces_below($child<namespace>, @results);
-	}
-}
-
-sub get_all_namespaces() {
-	our $Symbol_table;
-
-	my @results := Array::empty();
-
-	if $Symbol_table {
-		_fetch_namespaces_below($Symbol_table, @results);
-	}
-
-	return @results;
-}
-
 # Given a past symbol, return the symbol hash.
 sub get_global_symbol_info($sym) {
 	my @path := namespace_path_of_var($sym);
@@ -967,44 +941,3 @@ sub make_test_sub()
 	return $past;
 }
 
-sub compilation_unit_past()
-{
-	our $Symbol_table;
-	my @ns_list := get_all_namespaces();
-	my $past := PAST::Stmts.new();
-	$past.push(make_test_sub());
-
-	say("Got ", +@ns_list, " namespaces");
-	for @ns_list {
-		#say("Codegen namespace: ", $_.name());
-		#DUMP(($_.namespace(), "namespace"));
-		my @path	:= namespace_path_of_var($_);
-		# Do class first because it might create init_namespace code.
-		my $class	:= get_class_info_if_exists(@path);
-
-		if $class {
-			$_.push(make_init_class_sub($class));
-		}
-
-		my $init	:= get_init_block_of_path(@path);
-		# Despite producing "null" values, this is required for PAST
-		# generation to work on the init sub. (Seriously.)
-		$init.node($_);
-
-		if +@($init) {
-			#say("Adding initializer ", $init.name());
-			$_.unshift($init);
-			#DUMP($init);
-		}
-
-		# Add all the blocks inside.
-		for @($_) {
-			if $_.isa('PAST::Block') && !$_<is_namespace> {
-				#say("Adding: ", $_.name());
-				$past.push($_);
-			}
-		}
-	}
-
-	return $past;
-}

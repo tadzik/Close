@@ -139,8 +139,8 @@ method _rewrite_tree_UNKNOWN($node) {
 		NOTE("Pushing this block onto the scope stack");
 		close::Compiler::Scopes::push($node);
 	
-		NOTE("Visiting symtable entries");
-		for $node<symtable> {
+		NOTE("Visiting child_sym entries");
+		for $node<child_sym> {
 			my $child := close::Compiler::Scopes::get_symbol($node, $_);
 			Array::append(@results,
 				self.visit($child)
@@ -231,12 +231,38 @@ method _rewrite_tree_declarator_name($node) {
 			}
 		}
 	}
-	
+
 	NOTE("done (", +@results, " results)");
 	DUMP(@results);
 	return @results;	
 }
 
+method _rewrite_tree_parameter_declaration($node) {
+	NOTE("Rewriting tree for parameter_declaration ", $node.name());
+	DUMP($node);
+	
+	# Pass back the results of any child nodes
+	my @results := self._rewrite_tree_UNKNOWN($node);
+
+	my $pirflags := '';
+	for $node<adverbs> {
+		my $adverb := $node<adverbs>{$_};
+		
+		NOTE("Processing adverb: '", $_, "'");
+		$pirflags := $pirflags ~ ' :' ~ $adverb.name();
+		
+		if $_ eq 'slurpy' {
+			$node.slurpy(1);
+		}
+	}
+	
+	$node<pirflags> := $pirflags;
+	
+	NOTE("done (", +@results, " results)");
+	DUMP(@results);
+	return @results;	
+}
+	
 ################################################################
 	
 =sub rewrite_tree($past)

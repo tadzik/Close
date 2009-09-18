@@ -106,8 +106,8 @@ method _prettyprint_UNKNOWN($node) {
 		$indent := "\t"; 
 		# FIXME: I don't think we want to prettyprint anything in the symbol table.
 		# Let them come from the declarations inside the block.
-		#NOTE("Visiting symtable entries");
-		#for $node<symtable> {
+		#NOTE("Visiting child_sym entries");
+		#for $node<child_sym> {
 		#	my $child := close::Compiler::Scopes::get_symbol($node, $_);
 		#	self.visit($child);
 		#}

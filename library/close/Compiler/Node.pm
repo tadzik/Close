@@ -32,6 +32,42 @@ sub NODE_TYPE($node) {
 
 ################################################################
 
+our %Adverb_aliases;
+%Adverb_aliases{'...'} := 'slurpy';
+%Adverb_aliases{'?'} := 'optional';
+
+sub _create_adverb(%attributes) {
+	NOTE("Creating adverb");
+
+	my $name;
+	
+	if Hash::exists(%attributes, 'name') {
+		$name := %attributes<name>;
+	} 
+	elsif Hash::exists(%attributes, 'value') {
+		$name := %attributes<value>;
+	}
+	else {
+		DIE('Adverb must be given a :name() or :value()');
+	}
+	
+	if String::char_at($name, 0) eq ':' {
+		$name := String::substr($name, 1);
+	}
+	
+	if %Adverb_aliases{$name} {
+		$name := %Adverb_aliases{$name};
+	}
+	
+	%attributes<name> := $name;
+	
+	my $past := PAST::Val.new(:returns('String'));
+	set_attributes($past, %attributes);
+	
+	DUMP($past);
+	return $past;
+}
+
 sub _create_bareword(%attributes) {
 	NOTE("Creating bareword");
 

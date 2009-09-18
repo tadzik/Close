@@ -1,26 +1,5 @@
 # $Id$
 
-our %Adverb_aliases;
-%Adverb_aliases{'...'} := 'slurpy';
-%Adverb_aliases{'?'} := 'optional';
-
-sub adverb_unalias_name($adverb) {
-	my $name := $adverb.value();
-	NOTE("Unaliasing adverb: '", $name, "'");
-	DUMP($adverb);
-	
-	if %Adverb_aliases{$name} {
-		$name := %Adverb_aliases{$name};
-	}
-	elsif String::char_at($name, 0) eq ':' {
-		$name := String::substr($name, 1);
-	}
-	
-	ASSERT(String::length($name) > 0, 'Adverb name must have some value.');
-	NOTE("Unaliased name is: '", $name, "'");
-	return $name;
-}
-
 =method cv_qualifier
 
 Creates a type-specifier entry, with "is_<?>" set to 1. Type-specifier is used 
@@ -40,8 +19,11 @@ method cv_qualifier($/) {
 
 method dclr_adverb($/) {
 	NOTE("Found declarator_adverb: ", ~$<token>);
-	my $past := make_token($<token>);	
-	close::Compiler::Node::set_name($past, adverb_unalias_name($past));
+	my $past := close::Compiler::Node::create('adverb', 
+		:node($/), 
+		:name(~$<token>),
+		:value(~$<token>),
+	);
 	
 	DUMP($past);
 	make $past;
@@ -267,8 +249,12 @@ method declarator_part($/, $key) {
 			DUMP($initializer);
 			$past<initializer> := $initializer;
 		}
+
+		my $has_body := 0;
 		
 		if $<body> {
+			$has_body := 1;
+			
 			# NB: This assert isn't permanent.
 			ASSERT($past<type><is_function>, 
 				"It's a function, unless it's a class or something.");
@@ -298,6 +284,11 @@ method declarator_part($/, $key) {
 				$past<type>.push($definition);
 			}
 		}
+		
+		Q:PIR {{
+			$P0 = find_lex '$has_body'
+			set_hll_global ['close';'Grammar'], '$!Decl_block', $P0
+		}};
 		
 		NOTE("done");
 		DUMP($past);
@@ -359,9 +350,11 @@ method namespace_definition($/, $key) {
 }
 
 method param_adverb($/) {
-	my $past := make_token($<token>);
-	close::Compiler::Node::set_name($past, adverb_unalias_name($past));
-	
+	my $past := close::Compiler::Node::create('adverb', 
+		:node($/), 
+		:name(~ $<token>),
+		:value(~ $/),
+	);
 	DUMP($past);
 	make $past;
 }
@@ -371,7 +364,7 @@ method param_adverb($/) {
 Matches the declaration of a I<single> declarator, with a limited set of 
 specifiers. When completed, pushes the declared symbol on to the current
 lexical scope. (Note that C<declarator_name> will add the name to the 
-scope's symtable by default.) Returns a C<parameter_declaration> node, which is
+scope's symbol table by default.) Returns a C<parameter_declaration> node, which is
 constructed from the C<declarator> node returned by the C<declarator_name> rule.
 
 Supports the adverbs appropriate to parameters, including C<named>, C<slurpy>,

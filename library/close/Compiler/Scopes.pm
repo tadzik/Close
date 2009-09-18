@@ -34,7 +34,7 @@ sub NODE_TYPE($node) {
 
 =sub add_declarator_to_scope($scope, $declaration)
 
-Insert a single declarator-name into the symtable for a block.
+Insert a single declarator-name into the symbol table for a block.
 
 =cut
 
@@ -173,7 +173,7 @@ sub query_inmost_scope_with_attr($attr, $value?) {
 }
 
 sub get_namespace($scope, $name) {
-	my $namespace := $scope.symbol($name)<namespace>;
+	my $namespace := $scope<child_nsp>{$name};
 	DUMP(:name($name), :result($namespace));
 	return $namespace;
 }
@@ -217,7 +217,7 @@ sub get_stack() {
 }
 
 sub get_symbol($scope, $name) {
-	my $object := $scope.symbol($name)<symbol>;
+	my $object := $scope<child_sym>{$name};
 	DUMP(:name($name), :result($object));
 	return $object;
 }
@@ -239,7 +239,7 @@ sub pop($type) {
 sub print_symbol_table($block) {
 	NOTE("printing...");
 	
-	for $block<symtable> {
+	for $block<child_sym> {
 		close::Compiler::Symbols::print_symbol(get_symbol($block, $_));
 		DUMP($block);
 	}
@@ -265,9 +265,9 @@ sub push_namespace(@path) {
 }
 
 sub set_namespace($scope, $name, $namespace) {
-	$scope.symbol($name, :namespace($namespace));
+	$scope<child_nsp>{$name} := $namespace;
 }
 
 sub set_symbol($scope, $name, $object) {
-	$scope.symbol($name, :symbol($object));
+	$scope<child_sym>{$name} := $object;
 }

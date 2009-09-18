@@ -44,6 +44,17 @@ method INTEGER_LIT($/) {
 			"(zero, oh) prefix for octal literals.");
 	}
 	
+	if $<lu_part> {
+		my $token := $past.value();
+		
+		ADD_WARNING($past,
+			"Integer literals like '", $past.value(),
+			"' accept the U (unsigned) and L (long) suffixes ",
+			" from C, but they are presently ignored.");
+		
+		$past.value(String::substr($token, 0, String::length($token) - String::length(~$<lu_part>)));
+	}
+	
 	DUMP($past);
 	make $past;
 }

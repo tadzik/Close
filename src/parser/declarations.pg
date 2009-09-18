@@ -174,8 +174,9 @@ Matches the adverbs that may appear in a parameter declaration.
 
 =cut
 
+# :named('foo')
 rule param_adverb {
-	| <token=ADV_NAMED>		{*}
+	| <token=ADV_NAMED> ['(' ~ ')' <name=QUOTED_LIT> ]? {*}
 	| <token=ADV_OPTIONAL>	{*}
 	| <token=ADV_SLURPY>		{*}
 }

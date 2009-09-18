@@ -52,7 +52,7 @@ is equivalent to doing C<$str[$index]>, except that doesn't work.
 =cut
 
 sub char_at($str, $index) {
-	NOTE("index = ", $index, ", str = ", $str);
+	#NOTE("index = ", $index, ", str = ", $str);
 	
 	my $result := Q:PIR {
 		$P0 = find_lex '$str'
@@ -61,7 +61,7 @@ sub char_at($str, $index) {
 		%r = box $S1
 	};
 	
-	NOTE("Result = '", $result, "'");
+	#NOTE("Result = '", $result, "'");
 	return $result;
 }
 
@@ -119,7 +119,7 @@ sub find_cclass($class_name, $str, *%opts) {
 	
 	my $cclass := 0 + %Cclass_id{$class_name};
 	
-	NOTE("class = ", $class_name, "(", $cclass, "), offset = ", $offset, ", count = ", $count, ", str = ", $str);
+	#NOTE("class = ", $class_name, "(", $cclass, "), offset = ", $offset, ", count = ", $count, ", str = ", $str);
 
 	my $result := Q:PIR {
 		.local int cclass, offset, count
@@ -139,7 +139,7 @@ sub find_cclass($class_name, $str, *%opts) {
 		
 	};
 	
-	NOTE("Result = ", $result);
+	#NOTE("Result = ", $result);
 	return $result;
 }
 
@@ -212,7 +212,7 @@ sub is_cclass($class_name, $str, *%opts) {
 	my $offset	:= 0 + %opts<offset>;
 	my $class	:= 0 + %Cclass_id{$class_name};
 	
-	NOTE("class = ", $class_name, "(", $class, "), offset = ", $offset, ", str = ", $str);
+	#NOTE("class = ", $class_name, "(", $class, "), offset = ", $offset, ", str = ", $str);
 	
 	my $result := Q:PIR {
 		$P0 = find_lex '$class'
@@ -225,14 +225,14 @@ sub is_cclass($class_name, $str, *%opts) {
 		%r = box $I0
 	};
 	
-	NOTE("Result = ", $result);
+	#NOTE("Result = ", $result);
 	return $result;
 }
 
 sub length($str, *%opts) {
 	my $offset	:= 0 + %opts<offset>;
-	NOTE("Computing length of string beyond offset ", $offset);
-	DUMP($str);
+	#NOTE("Computing length of string beyond offset ", $offset);
+	#DUMP($str);
 	
 	my $result	:= Q:PIR {
 		$P0 = find_lex '$str'
@@ -247,7 +247,7 @@ sub length($str, *%opts) {
 	
 	$result := $result - $offset;
 	
-	NOTE("Result = ", $result);
+	#NOTE("Result = ", $result);
 	return $result;
 }
 
@@ -257,14 +257,14 @@ sub line_number_of($string, *%opts) {
 	DUMP(:string($string), :options(%opts));
 
 	unless $string {
-		NOTE("String is empty or undef. Returning 1");
+		#NOTE("String is empty or undef. Returning 1");
 		return 1;
 	}
 	
 	my $offset := 0 + %opts<offset>;
 	
 	unless %Line_number_info{$string} {
-		NOTE("Initializing line-number information of previously-unseen string");
+		#NOTE("Initializing line-number information of previously-unseen string");
 		DUMP($string);
 		
 		my @lines := Array::empty();
@@ -277,11 +277,11 @@ sub line_number_of($string, *%opts) {
 		}
 		
 		%Line_number_info{$string} := @lines;
-		NOTE("String parsed into ", +@lines, " lines");
-		DUMP(@lines);
+		#NOTE("String parsed into ", +@lines, " lines");
+		#DUMP(@lines);
 	}
 	
-	NOTE("Bsearching for line number of ", $offset, " in string");
+	#NOTE("Bsearching for line number of ", $offset, " in string");
 	
 	my $line := Array::bsearch(%Line_number_info{$string}, $offset, :cmp('<=>'));
 	
@@ -291,7 +291,7 @@ sub line_number_of($string, *%opts) {
 	}
 	
 	$line++;
-	NOTE("Returning line number (1-based): ", $line);
+	#NOTE("Returning line number (1-based): ", $line);
 	return $line;
 }
 
