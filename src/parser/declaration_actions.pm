@@ -363,11 +363,21 @@ method namespace_definition($/, $key) {
 }
 
 method param_adverb($/) {
+	NOTE("Creating parameter adverb from: ", $/);
+
+	my $named;
+	
+	if $<named> {
+		$named := ~ $<named>[0].ast.value();
+	}
+	
 	my $past := close::Compiler::Node::create('adverb', 
 		:node($/), 
-		:name(~ $<token>),
-		:value(~ $/),
+		:name(~$<token>),
+		:named($named),
+		:value(~$<token>),
 	);
+	
 	DUMP($past);
 	make $past;
 }

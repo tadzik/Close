@@ -252,19 +252,23 @@ method _rewrite_tree_parameter_declaration($node) {
 	# Pass back the results of any child nodes
 	my @results := self._rewrite_tree_UNKNOWN($node);
 
-	my $pirflags := '';
+	my @pirflags := Array::empty();
 	for $node<adverbs> {
-		my $adverb := $node<adverbs>{$_};
-		
-		NOTE("Processing adverb: '", $_, "'");
-		$pirflags := $pirflags ~ ' :' ~ $adverb.value();
+		@pirflags.push($node<adverbs>{$_}.value());
 		
 		if $_ eq 'slurpy' {
 			$node.slurpy(1);
 		}
+		elsif $_ eq 'named' {
+			my $name := $node<adverbs>{$_}<named>;
+			
+			if $name {
+				$node.named($name);
+			}
+		}
 	}
 	
-	$node<pirflags> := $pirflags;
+	$node<pirflags> := Array::join(' ', @pirflags);
 	
 	NOTE("done (", +@results, " results)");
 	DUMP(@results);
@@ -279,7 +283,7 @@ The entry point. In general, you create a new object of this class, and use it
 to visit the PAST node that is passed from the compiler.
 
 =cut
-
+ 
 sub rewrite_tree($past) {
 	NOTE("Rewriting PAST tree into POSTable shape");
 	DUMP($past);

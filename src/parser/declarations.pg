@@ -174,7 +174,7 @@ Matches the adverbs that may appear in a parameter declaration.
 
 # :named('foo')
 rule param_adverb {
-	| <token=ADV_NAMED> ['(' ~ ')' <name=QUOTED_LIT> ]? {*}
+	| <token=ADV_NAMED> ['(' ~ ')' <named=QUOTED_LIT> ]? {*}
 	| <token=ADV_OPTIONAL>	{*}
 	| <token=ADV_SLURPY>		{*}
 }
