@@ -254,10 +254,8 @@ method _rewrite_tree_parameter_declaration($node) {
 
 	my @pirflags := Array::empty();
 	for $node<adverbs> {
-		@pirflags.push($node<adverbs>{$_}.value());
-		
-		if $_ eq 'slurpy' {
-			$node.slurpy(1);
+		if $_ eq 'flat' {
+			$node.flat(1);
 		}
 		elsif $_ eq 'named' {
 			my $name := $node<adverbs>{$_}<named>;
@@ -265,6 +263,12 @@ method _rewrite_tree_parameter_declaration($node) {
 			if $name {
 				$node.named($name);
 			}
+		}
+		elsif $_ eq 'slurpy' {
+			$node.slurpy(1);
+		}
+		else {
+			@pirflags.push($node<adverbs>{$_}.value());
 		}
 	}
 	

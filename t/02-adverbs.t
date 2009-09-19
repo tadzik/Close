@@ -9,7 +9,7 @@ use lib qw(lib t . /usr/local/lib/parrot/1.6.0-devel/tools/lib);
 
 use Close::Test;
 use Data::Dumper;
-use Parrot::Test tests => 3 * 5;
+use Parrot::Test tests => 5 * 5;
 use YAML;
 
 our $Test_name = 'literals';
@@ -130,17 +130,75 @@ __END__
         1
         2
         3
-    OTHER_TESTS: |
-            void test_named() {
-                        pmc args = new Hash;
-                        args['num']  = 8;
-                        fflat(msg: ":named works in arg-expressions", 7);
-                        fflat(msg: ":named works in arg-expressions", args :named :flat);
+-
+    NAME: Flattened array parameters
+    SOURCE: |
+            namespace test {
+                void say(pmc what) {
+                    asm(what) {{ say %0 }};
+                }
+                
+                void test_flattened(int p1, int p2, int p3) {
+                    say(p1);
+                    say(p2);
+                    say(p3);
+                }
+                
+                void main() :main {
+                    pmc args;
+                    args = asm {{
+                        %r = new 'ResizablePMCArray'
+                        $P0 = box 1
+                        push %r, $P0
+                        $P0 = box 2
+                        push %r, $P0
+                        $P0 = box 4
+                        push %r, $P0
+                    }};
+                    test_flattened(args :flat);
+                }
             }
-
-            void test_flat() {
-                        pmc args = new ResizablePMCArray;
-                        push args, 4, ":flat works in arg-expressions";
-                        
-                        fflat(args :flat);
+    MESSAGES: |
+    # none
+    OUTPUT: |
+        1
+        2
+        4
+-
+    NAME: Flattened named hash parameters
+    SOURCE: |
+            namespace test {
+                void say(pmc what) {
+                    asm(what) {{ say %0 }};
+                }
+                
+                void test_flattened(
+                        int p1 :named('c'), 
+                        int p2 :named('x'), 
+                        int p3 :named('argyle')
+                 ) {
+                    say(p1);
+                    say(p2);
+                    say(p3);
+                }
+                
+                void main() :main {
+                    pmc args;
+                    args = asm {{
+                        %r = new 'Hash'
+                        $P0 = box 1
+                        %r['argyle'] = $P0
+                        $P0 = box 2
+                        %r['c'] = $P0
+                        $P0 = box 4
+                        %r['x'] = $P0
+                    }};
+                    test_flattened(args :flat :named);
+                }
             }
+    MESSAGES: |
+    # none
+    OUTPUT: |
+        2
+        4
+        1

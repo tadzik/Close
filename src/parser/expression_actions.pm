@@ -3,7 +3,14 @@
 method additive_expr($/) { binary_expr_l2r($/); }
 
 method arg_adverb($/) {
-	my $past := make_token($<token>);
+	NOTE("Creating parameter adverb from: ", $/);
+	
+	my $past := close::Compiler::Node::create('adverb', 
+		:node($/), 
+		:name(~$<token>),
+		:value(~$<token>),
+	);
+	
 	DUMP($past);
 	make $past;
 }
@@ -16,11 +23,16 @@ method arg_expr($/) {
 		$past.named(~$<argname>[0].ast.name());
 	}
 
-	#if +@($<adverbs>.ast) {
-	#	for @($<adverbs>.ast) {
-	#		arg_expr_add_adverb($/, $past, $_);
-	#	}
-	#}
+	for $<arg_adverb> {
+		my $adverb := $_.ast;
+		
+		if $adverb.name() eq 'flat' {
+			$past.flat(1);
+		}
+		elsif $adverb.name() eq 'named' {
+			$past.named(1);
+		}
+	}
 	
 	DUMP($past);
 	make $past;
