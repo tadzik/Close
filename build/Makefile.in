@@ -115,6 +115,12 @@ SOURCES := \
 	src/gen_library.pir \
 	close.pir
 
+PROVE_TESTS := \
+	t/00-sanity.t \
+	t/01-literals.t \
+	t/02-adverbs.t \
+	
+	
 BUILD_CLEANUPS := \
   close.pbc \
   "src/gen_*.pira" \
@@ -427,7 +433,8 @@ help:
 	@echo ""
 
 test: build
-	$(PERL) -I$(LIB_DIR)/tools/lib t/harness --bindir=$(BIN_DIR)
+	prove $(PROVE_TESTS)
+	#$(PERL) -I$(LIB_DIR)/tools/lib t/harness --bindir=$(BIN_DIR)
 
 # basic run for missing libs
 test-installable: installable

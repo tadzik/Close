@@ -165,7 +165,7 @@ our $Config := Scalar::undef();
 sub get_config(*@keys) {
 	NOTE("Get config setting: ", Array::join('::', @keys));
 
-	if Scalar::defined($Config) {
+	unless Scalar::defined($Config) {
 		$Config := close::Compiler::Config.new();
 	}
 	

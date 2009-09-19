@@ -36,12 +36,12 @@ HLL name. Returns the found or created PAST block.
 
 sub fetch(@target) {
 	DUMP(@target);
-	my $block := fetch_relative(fetch_namespace_root(), @target);
+	my $block := fetch_relative(fetch_root(), @target);
 	DUMP($block);
 	return $block;
 }
 
-sub fetch_namespace_root() {
+sub fetch_root() {
 	our $root;
 	
 	unless $root {
@@ -150,7 +150,7 @@ sub path_of($past) {
 
 sub query(@target) {
 	DUMP(@target);
-	my $block := query_relative(fetch_namespace_root(), @target);
+	my $block := query_relative(fetch_root(), @target);
 	DUMP($block);
 	return $block;
 }

@@ -98,6 +98,16 @@ method visit_children($node) {
 	return @results;
 }
 
+method visit_child_syms($node) {
+	NOTE("Visiting ", +@($node), " child_syms of ", NODE_TYPE($node), " node: ", $node.name());
+	DUMP($node);
+
+	my @results := $SUPER.visit_child_syms(self, $node);
+	
+	DUMP(@results);
+	return @results;
+}
+	
 ################################################################
 
 =head3 Symbol Resolution Visitor
@@ -147,11 +157,8 @@ method _resolve_symbols_UNKNOWN($node) {
 		NOTE("Pushing this block onto the scope stack");
 		close::Compiler::Scopes::push($node);
 	
-		#NOTE("Visiting child symbol entries");
-		#for $node<child_sym> {
-		#	my $symbol := close::Compiler::Scopes::get_symbol($node, $_);
-		#	self.visit($symbol);
-		#}
+		# NOTE("Visiting child_sym entries");
+		# Array::append(@results, self.visit_child_syms($node));
 	}
 
 	for @Child_attribute_names {
@@ -200,9 +207,9 @@ method _resolve_symbols_qualified_identifier($node) {
 	DUMP($node);
 	NOTE("Visiting qualified_identifier node: ", $node<display_name>);
 	
-	my @scopes := close::Compiler::Lookups::query_scopes_containing($node);
-	NOTE("Found ", +@scopes, " candidates for symbol resolution");
-	DUMP(@scopes);
+	my @cands := close::Compiler::Lookups::query_scopes_containing_symbol($node);
+	NOTE("Found ", +@cands, " candidates for symbol resolution");
+	DUMP(@cands);
 		
 	# The usual rules apply: 0 candidates = error, 1 = done, and for 2 
 	# or more, its an error unless one is in the local scope (and the
@@ -210,21 +217,23 @@ method _resolve_symbols_qualified_identifier($node) {
 	
 	my $resolved;
 	
-	if +@scopes == 0 {
+	if +@cands == 0 {
 		NOTE("Attaching undeclared symbol error");
 		ADD_ERROR($node, "Undeclared symbol: ", $node<display_name>);
 	}
-	elsif +@scopes == 1 {
-		$resolved := close::Compiler::Scopes::get_symbol(@scopes[0], $node.name());
+	elsif +@cands == 1 {
+		# FIXME: This [0] is wrong. I should do something to disambiguate based on type, maybe.
+		$resolved := close::Compiler::Scopes::get_symbols(@cands[0], $node.name())[0];
 		NOTE("Found one candidate: ", $resolved<display_name>);
 		DUMP($resolved);
 	}
-	elsif +@scopes > 1 {
+	elsif +@cands > 1 {
 		if !$node<is_rooted> && !$node.namespace() {
-			my $local_scope := close::Compiler::Scopes::get_current();
-			for @scopes {
+			my $local_scope := close::Compiler::Scopes::current();
+			for @cands {
 				if $_ =:= $local_scope {
-					$resolved := close::Compiler::Scopes::get_symbol($_, $node.name());
+		# FIXME: This [0] is wrong. I should do something to disambiguate based on type, maybe.
+					$resolved := close::Compiler::Scopes::get_symbols($_, $node.name())[0];
 				}
 			}
 		}
@@ -232,7 +241,7 @@ method _resolve_symbols_qualified_identifier($node) {
 		unless $resolved {
 			my @names := Array::empty();
 			
-			for @scopes {
+			for @cands {
 				@names.push($_.name());
 			}
 		
@@ -243,7 +252,7 @@ method _resolve_symbols_qualified_identifier($node) {
 				Array::join("\n\t", @names),
 			);
 		}
-	}				
+	}	
 	
 	if $resolved {
 		$node<declarator> := $resolved;

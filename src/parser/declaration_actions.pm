@@ -18,13 +18,22 @@ method cv_qualifier($/) {
 }
 
 method dclr_adverb($/) {
-	NOTE("Found declarator_adverb: ", ~$<token>);
+	NOTE("Found declarator_adverb: ", ~$/);
+
+	my $signature;
+	
+	if $<signature> {
+		$signature := ~ $<signature>;
+		NOTE("Got signature: ", $signature);
+	}
+	
 	my $past := close::Compiler::Node::create('adverb', 
 		:node($/), 
 		:name(~$<token>),
+		:signature($signature),
 		:value(~$<token>),
 	);
-	
+
 	DUMP($past);
 	make $past;
 }
@@ -148,7 +157,7 @@ method declaration($/, $key) {
 			# FIXME: Should there be/must there be some kind of add-to-function
 			# call, nstead of current? Maybe things can nest that prevent declarator
 			# being added high enough?
-			close::Compiler::Scopes::add_declarator_to_current($declarator);
+			close::Compiler::Scopes::add_declarator($declarator);
 			
 			# If it's a function definition, add it to current block.
 			if $declarator<type><is_function> {
@@ -233,8 +242,12 @@ method declarator_part($/, $key) {
 		my $past := $<declarator>.ast;
 		NOTE("Assembling declarator ", $past.name());
 		
+		# int '$x' alias x; say(x);
+		# $x is the pirname, x is the alias, x is the name
 		if $<dclr_alias> {
 			$past<alias> := $<dclr_alias>[0].ast;
+			$past<pirname> := $past.name();
+			$past.name($past<alias>.name());
 		}
 		
 		for $<adverbs> {
@@ -398,8 +411,8 @@ method parameter_declaration($/) {
 	
 	# Declare object in current scope, which should be a parameter block.
 	ASSERT(
-		close::Compiler::Scopes::get_symbol(
-			close::Compiler::Scopes::current(), $past.name()) =:= $past,
+		close::Compiler::Scopes::get_symbols(
+			close::Compiler::Scopes::current(), $past.name())[0] =:= $past,
 		'Expected current scope would already have this parameter declared (by <declarator_name>)');
 
 	# Insert declaration into current scope.
@@ -474,9 +487,11 @@ method tspec_builtin_type($/) {
 		:node($/),
 	);
 
-	my @matches := close::Compiler::Types::query_matching_types($type_name);
+	DUMP($type_name);
+	my @matches := close::Compiler::Lookups::query_matching_types($type_name);
+	DUMP(@matches);
 	ASSERT(+@matches == 1, 
-		'query_matching_types should always be able to find a builtin type');
+		'query_matching_types should always be able to find exactly one matching  builtin type');
 		
 	$type_name<apparent_type>  := @matches.shift();
 	my $past := close::Compiler::Node::create('type_specifier',

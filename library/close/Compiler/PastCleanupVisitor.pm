@@ -146,6 +146,16 @@ method visit_children($node) {
 	return @results;
 }
 
+method visit_child_syms($node) {
+	NOTE("Visiting ", +@($node), " child_syms of ", NODE_TYPE($node), " node: ", $node.name());
+	DUMP($node);
+
+	my @results := $SUPER.visit_child_syms(self, $node);
+	
+	DUMP(@results);
+	return @results;
+}
+	
 ################################################################
 
 =method _cleanup_past_UNKNOWN($node)
@@ -173,11 +183,8 @@ method _cleanup_past_UNKNOWN($node) {
 		NOTE("Pushing this block onto the scope stack");
 		close::Compiler::Scopes::push($node);
 	
-		NOTE("Visiting child symbol entries");
-		for $node<child_sym> {
-			my $child := close::Compiler::Scopes::get_symbol($node, $_);
-			self.visit($child);
-		}
+		NOTE("Visiting child_sym entries");
+		self.visit_child_syms($node);
 	}
 
 	for @Child_attribute_names {

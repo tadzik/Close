@@ -112,6 +112,16 @@ method visit_children($node) {
 	return @results;
 }
 
+method visit_child_syms($node) {
+	NOTE("Visiting ", +@($node), " child_syms of ", NODE_TYPE($node), " node: ", $node.name());
+	DUMP($node);
+
+	my @results := $SUPER.visit_child_syms(self, $node);
+	
+	DUMP(@results);
+	return @results;
+}
+	
 ################################################################
 
 =method _rewrite_tree_UNKNOWN($node)
@@ -138,27 +148,10 @@ method _rewrite_tree_UNKNOWN($node) {
 		# Should I keep a list of push-able block types?
 		NOTE("Pushing this block onto the scope stack");
 		close::Compiler::Scopes::push($node);
-	
-		NOTE("Visiting child_sym entries");
-		for $node<child_sym> {
-			my $child := close::Compiler::Scopes::get_symbol($node, $_);
-			Array::append(@results,
-				self.visit($child)
-			);
-		}
-		NOTE("Now with ", +@results, " results");
 	}
 
-	for @Child_attribute_names {
-		if $node{$_} {
-			NOTE("Visiting <", $_, "> attribute");
-			Array::append(@results,
-				self.visit($node{$_})
-			);
-		}
-	}
-	
-	NOTE("Now with ", +@results, " results");
+	# I visit the children first because they are ordered. This matters
+	# for sub declarations.
 	
 	NOTE("Visiting children");
 	Array::append(@results,
@@ -166,7 +159,22 @@ method _rewrite_tree_UNKNOWN($node) {
 	);
 	NOTE("Now with ", +@results, " results");
 	
+	for @Child_attribute_names {
+		if $node{$_} {
+			NOTE("Visiting <", $_, "> attribute");
+			Array::append(@results,
+				self.visit($node{$_})
+			);
+		}
+	}	
+	NOTE("Now with ", +@results, " results");
+	
 	if $node.isa(PAST::Block) {
+		NOTE("Visiting child_sym entries");
+		Array::append(@results, self.visit_child_syms($node));
+		
+		NOTE("Now with ", +@results, " results");
+		
 		NOTE("Popping this block off the scope stack");
 		close::Compiler::Scopes::pop(NODE_TYPE($node));
 	}
@@ -249,7 +257,7 @@ method _rewrite_tree_parameter_declaration($node) {
 		my $adverb := $node<adverbs>{$_};
 		
 		NOTE("Processing adverb: '", $_, "'");
-		$pirflags := $pirflags ~ ' :' ~ $adverb.name();
+		$pirflags := $pirflags ~ ' :' ~ $adverb.value();
 		
 		if $_ eq 'slurpy' {
 			$node.slurpy(1);

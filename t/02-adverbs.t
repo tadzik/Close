@@ -1,84 +1,146 @@
-// $Id$
-// Test that function adverbs work
+#!perl
+# $Id: $
+# 
+# Test literal parsing.
+#
+use strict;
+use warnings;
+use lib qw(lib t . /usr/local/lib/parrot/1.6.0-devel/tools/lib);
 
-namespace close::test02 {
-	void plan(int how_many) {
-		say("1..", how_many);
-	}
-	
-	void say(string args...) {
-		asm(args) {{
-			$P0 = iter %0
-		loop:
-			unless $P0 goto done
-			$P1 = shift $P0
-			$S0 = $P1
-			print $S0
-			goto loop
-			
-		done:
-			print "\n"			
-		}};
-	}
+use Close::Test;
+use Data::Dumper;
+use Parrot::Test tests => 3 * 5;
+use YAML;
 
-	void fflat(
-		int	number	:named("num"), 
-		string	msg		:named("message")
-	) {
-		say("ok ", number, " - ", msg);
-	}
+our $Test_name = 'literals';
 
-	void test_named() {
-		pmc args = new Hash;
-		args['num']  = 8;
-		fflat(msg: ":named works in arg-expressions", 7);
-		fflat(msg: ":named works in arg-expressions", args :named :flat);
-	}
-
-	void test_flat() {
-		pmc args = new ResizablePMCArray;
-		push args, 4, ":flat works in arg-expressions";
-		
-		fflat(args :flat);
-	}
-		
-	void f2() :init
-	{
-		print("1..8\n");
-		print("ok 1 - :init functions run first.\n");
-	}
-
-	void f1() :init
-	{
-		print("ok 2 - :init functions run in definition order\n");
-	}
-
-	void f22(int p1, int p2) :multi(_,_)
-	{
-		print("ok 6 - :multi() functions work (2-ary remix)\n");
-	}
-
-	void f22(int p1) :multi(_)
-	{
-		print("ok 5 - :multi() functions work\n");
-	}
-
-	void test_multi() {
-		f22(1);
-		f22(1, 2);
-	}
-
-	void test_adverbs()
-	{
-		test_flat();
-		test_multi();
-		test_named();
-	}
-
-	void f0() :init
-	{
-		print("ok 3 - :init functions run in definition order\n");
-	}
-
-	extern void _runner() :init { test_adverbs(); }
+my $DATA;
+{
+	local $/ = undef;
+	$DATA = <DATA>;
 }
+
+my @Tests = @{ YAML::Load($DATA) };
+
+foreach my $test (@Tests) {
+	$test->{'NAME'} = test_name() unless $test->{'NAME'};
+
+	test_close($test->{'NAME'}, 
+		$test->{'SOURCE'}, 
+		$test->{'MESSAGES'}, 
+		$test->{'OUTPUT'}
+	);
+}
+
+our $Test_number = 0;
+
+sub test_name {	
+	$Test_number++;
+	return "$Test_name-$Test_number";
+}
+
+__END__
+-
+    NAME: Subs marked :init are called, in order, first.
+    SOURCE: |
+            namespace test {
+                void say(pmc what) {
+                    asm(what) {{ say %0 }};
+                }
+                
+                void t01() :init {
+                    say("line 1");
+                }
+                
+                void t03() :init {
+                    say("line 2");
+                }
+                
+                void t02() :main {
+                    say("line 4");
+                }
+                
+                void t00() :init {
+                    say("line 3");
+                }
+            }
+    MESSAGES: |
+    # none
+    OUTPUT: |
+        line 1
+        line 2
+        line 3
+        line 4
+-
+    NAME: Multi subs work
+    SOURCE: |
+            namespace test {
+                void say(pmc what) {
+                    asm(what) {{ say %0 }};
+                }
+                
+                void identical(pmc p1, pmc p2) :multi(_,_) {
+                    say("line 3");
+                }
+                
+                void identical() :multi() {
+                    say("line 1");
+                }
+                
+                void identical(pmc p1) :multi(_) {
+                    say("line 2");
+                }
+                
+                void main() :main {
+                    identical();
+                    identical(1);
+                    identical(1, 2);
+                }
+            }
+    MESSAGES: |
+    # none
+    OUTPUT: |
+        line 1
+        line 2
+        line 3
+-
+    NAME: Named parameters
+    SOURCE: |
+            namespace test {
+                void say(pmc what) {
+                    asm(what) {{ say %0 }};
+                }
+                
+                void test_named(
+                    int p1 :named('b'),
+                    int p2 :named('a'),
+                    int p3 :named('c')) {
+                    say(p1);
+                    say(p2);
+                    say(p3);
+                }
+                
+                void main() :main {
+                    test_named(c: 3, b: 1, a: 2);
+                }
+            }
+    MESSAGES: |
+    # none
+    OUTPUT: |
+        1
+        2
+        3
+    OTHER_TESTS: |
+            void test_named() {
+                        pmc args = new Hash;
+                        args['num']  = 8;
+                        fflat(msg: ":named works in arg-expressions", 7);
+                        fflat(msg: ":named works in arg-expressions", args :named :flat);
+            }
+
+            void test_flat() {
+                        pmc args = new ResizablePMCArray;
+                        push args, 4, ":flat works in arg-expressions";
+                        
+                        fflat(args :flat);
+            }

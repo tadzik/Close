@@ -16,6 +16,10 @@ method declarator_name($/) {
 	# definition are ambiguous until the ';' or '{' B<after> the 
 	# parameter list) I use a temporary scope for declarations
 	# and other stuff that will invoke this rule.
+	
+	# FIXME: This is bogus. It's only to catch the typedef case, which 
+	# I frankly don't care that much about. Try to remove it. We can put
+	# it back in 0.never.
 	close::Compiler::Scopes::add_declarator_to_current($past);
 	# TODO: Maybe add a warning if it's already defined? "Repeated decl of name..."
 	DUMP($past);
@@ -80,12 +84,19 @@ method type_name($/) {
 	NOTE("Checking for typename '", $past<display_name>, "'");
 	
 	$Is_valid_type_name := 0;
-	my @matches := close::Compiler::Types::query_matching_types($past);
+	my @matches := close::Compiler::Lookups::query_matching_types($past);
 	
 	if +@matches {
 		NOTE("Found valid matching typename");
 		$Is_valid_type_name := 1;
 		$past<apparent_type> := @matches[0];
+		
+		if +@matches > 1 {
+			ADD_ERROR($past,
+				"Ambiguous type specification: '",
+				$past<display_name>,
+				"' matches more than one type.");
+		}
 	}
 	else {
 		NOTE("No valid matching typename");

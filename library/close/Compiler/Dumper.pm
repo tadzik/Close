@@ -46,8 +46,7 @@ sub DIE(@info, @msg) {
 	unless %Already_in<DIE> {
 		%Already_in<DIE>++;
 
-		my $message := @info[2]
-			~ '::' ~ @info[3]
+		my $message := @info[2] ~ '::' ~ @info[3]
 			~ ': ' ~ Array::join('', @msg);
 			
 		Q:PIR {

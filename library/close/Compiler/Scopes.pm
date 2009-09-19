@@ -26,6 +26,16 @@ sub NOTE(*@parts) {
 
 ################################################################
 
+sub ADD_ERROR($node, *@msg) {
+	close::Compiler::Messages::add_error($node,
+		Array::join('', @msg));
+}
+
+sub ADD_WARNING($node, *@msg) {
+	close::Compiler::Messages::add_warning($node,
+		Array::join('', @msg));
+}
+
 sub NODE_TYPE($node) {
 	return close::Compiler::Node::type($node);
 }
@@ -41,26 +51,38 @@ Insert a single declarator-name into the symbol table for a block.
 sub add_declarator_to($past, $scope) {
 	NOTE("Adding name '", $past.name(), "' to ", NODE_TYPE($scope), " scope '", $scope.name(), "'");
 	my $name := $past.name();
-	my $already := get_symbol($scope, $name);
+	my @already := get_symbols($scope, $name);
 	
-	if $already {
-		if $already =:= $past {
-			NOTE("Name was already added (same declarator)");
-		}
-		else {
-			# FIXME: If declarations are compatible, there is no error.
-			# Else, there is a type conflict in redeclaration of $name
-			DIE("Symbol ", $name, " already declared in scope ", $scope.name(), ".");
-		}
+	unless $past<hll> {
+		$past<hll> := $scope<hll>;
+		$past.namespace($scope.namespace());
 	}
-	else {
-		unless $past<hll> {
-			$past<hll> := $scope<hll>;
-			$past.namespace($scope.namespace());
+		
+	if +@already {
+		# This is not a problem if declaring two multi- functions.
+		my $all_multi := 1;
+		
+		for @already {
+			unless Hash::exists($_<adverbs>, 'multi') {
+				$all_multi := 0;
+			}
 		}
 		
-		set_symbol($scope, $name, $past);
+		# FIXME: Need to check for redeclaration of same (compatible) 
+		# symbol, too. extern int x; and int x = 1; for example.
+		# Don't know how to do that yet. See Types.pm.
+		
+		unless $all_multi {
+			ADD_ERROR($past,
+				"Conflicting declaration of symbol '",
+				$past.name(), "' in scope '",
+				$scope<display_name>, "'.  ",
+				"Only :multi() subs or redeclarations of the same symbol are allowed to duplicate names."
+			);
+		}
 	}
+	
+	put_symbol($scope, $name, $past);
 }
 
 sub add_declarator($past) {
@@ -72,8 +94,11 @@ sub add_declarator($past) {
 	my $current_nsp := close::Compiler::Scopes::fetch_current_namespace();
 	my $decl_nsp := close::Compiler::Namespaces::fetch_relative_namespace_of($current_nsp, $past);
 	
-	add_declarator_to($past, $decl_nsp);
+	if $decl_nsp =:= $current_nsp {
+		$decl_nsp := close::Compiler::Scopes::current();
+	}
 	
+	add_declarator_to($past, $decl_nsp);
 }
 		
 sub add_declarator_to_current($past) {
@@ -114,20 +139,7 @@ sub current() {
 sub declare_object($scope, $object) {
 	NOTE("Declaring object '", $object.name(), "' in ", $scope<lstype>, " scope '", $scope.name(), "'");
 	my $name	:= $object.name();
-	my $already	:= get_symbol($scope, $name);
-	
-	if $already {
-		# FIXME: Should check for compatible types, like a redeclaration:
-		# extern int X; and int X = 1;
-		NOTE("Found repeated declaration of object: ", $object.name());
-		close::Compiler::Messages::add_error($object, 
-			'Repeated declaration of symbol \'' ~ $name ~ '\'');
-	}
-	else {
-		set_symbol($scope, $name, $object);
-	}
-
-	DUMP($object);
+	add_declarator_to($object, $scope);
 }
 
 sub dump_stack() {
@@ -216,10 +228,10 @@ sub get_stack() {
 	return @Scope_stack;
 }
 
-sub get_symbol($scope, $name) {
-	my $object := $scope<child_sym>{$name};
-	DUMP(:name($name), :result($object));
-	return $object;
+sub get_symbols($scope, $name) {
+	my @symbols := $scope<child_sym>{$name};
+	DUMP(:name($name), :result(@symbols));
+	return @symbols;
 }
 
 sub pop($type) {
@@ -240,7 +252,10 @@ sub print_symbol_table($block) {
 	NOTE("printing...");
 	
 	for $block<child_sym> {
-		close::Compiler::Symbols::print_symbol(get_symbol($block, $_));
+		for get_symbols($block, $_) {
+			close::Compiler::Symbols::print_symbol($_) ;
+		}
+		
 		DUMP($block);
 	}
 	
@@ -264,10 +279,29 @@ sub push_namespace(@path) {
 	push($nsp);
 }
 
-sub set_namespace($scope, $name, $namespace) {
-	$scope<child_nsp>{$name} := $namespace;
+sub put_symbol($scope, $name, $object) {
+	NOTE("Adding symbol ", $name, " to scope ", $scope.name());
+	
+	unless Hash::exists($scope<child_sym>, $name) {
+		$scope<child_sym>{$name} := Array::empty();
+	}
+	
+	my $found := 0;
+	
+	for $scope<child_sym>{$name} {
+		if $_ =:= $object {
+			NOTE("This object is already present. Skipping.");
+			$found := 1;
+		}
+	}
+	
+	unless $found {
+		$scope<child_sym>{$name}.push($object);
+	}
+	
+	DUMP($scope<child_sym>{$name});
 }
 
-sub set_symbol($scope, $name, $object) {
-	$scope<child_sym>{$name} := $object;
+sub set_namespace($scope, $name, $namespace) {
+	$scope<child_nsp>{$name} := $namespace;
 }

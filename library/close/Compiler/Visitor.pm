@@ -183,3 +183,21 @@ method visit_children($visitor, $node) {
 	#DUMP(@results);
 	return @results;
 }
+
+method visit_child_syms($visitor, $node) {
+	my @results := Array::empty();	
+	
+	if $node &&  $node<child_sym> {
+		for $node<child_sym> {
+			my @children := close::Compiler::Scopes::get_symbols($node, $_);
+			
+			for @children {
+				Array::append(@results, $visitor.visit($_));
+			}
+		}
+	}
+
+	#NOTE("Returning ", +@results, " results");
+	#DUMP(@results);
+	return @results;
+}

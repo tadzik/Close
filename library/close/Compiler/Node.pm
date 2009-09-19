@@ -60,6 +60,15 @@ sub _create_adverb(%attributes) {
 	}
 	
 	%attributes<name> := $name;
+	%attributes<value> := ':' ~ $name;
+	
+	DUMP(%attributes);
+	if Scalar::defined(%attributes<signature>) {
+		%attributes<value> := %attributes<value> ~ '(' ~ %attributes<signature> ~ ')';
+	}
+	else {
+		Hash::delete(%attributes, 'signature');
+	}
 	
 	my $past := PAST::Val.new(:returns('String'));
 	set_attributes($past, %attributes);
@@ -489,6 +498,7 @@ sub _create_symbol(%attributes) {
 		$past<etype> := $past;
 	}
 
+	# TODO: This is only used by Types.pm, and should be moved out.
 	if $past<block> {
 		close::Compiler::Scopes::declare_object($past<block>, $past);
 		$past<block> := $past<block>.name();

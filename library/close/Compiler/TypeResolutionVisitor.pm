@@ -96,6 +96,16 @@ method visit_children($node) {
 	return @results;
 }
 
+method visit_child_syms($node) {
+	NOTE("Visiting ", +@($node), " child_syms of ", NODE_TYPE($node), " node: ", $node.name());
+	DUMP($node);
+
+	my @results := $SUPER.visit_child_syms(self, $node);
+	
+	DUMP(@results);
+	return @results;
+}
+	
 ################################################################
 
 our @Child_attribute_names := (
@@ -115,11 +125,8 @@ method _type_resolve_UNKNOWN($node) {
 		NOTE("Pushing this block onto the scope stack");
 		close::Compiler::Scopes::push($node);
 	
-		NOTE("Visiting child symbol entries");
-		for $node<child_sym> {
-			my $symbol := close::Compiler::Scopes::get_symbol($node, $_);
-			self.visit($symbol);
-		}
+		NOTE("Visiting child_sym entries");
+		self.visit_child_syms($node);
 	}
 
 	for @Child_attribute_names {
@@ -175,7 +182,7 @@ using an unqualified name will match every type currently in scope with that
 name. The rules used for type resolution are as follows:
 
 =item 0. If there are no (0) candidates, abort. The parser was able to resolve at
-least one type for this name, so something has gone horribly wrong.
+least one type for this name, so something has gone horribly wrong in the meantime.
 
 =item 1. If there is exactly one candidate matching the type name, use that.
 
@@ -229,48 +236,42 @@ method _type_resolve_type_specifier($node) {
 	
 	NOTE("Resolving type specifier: ", $type_name);
 
-	my @scopes := close::Compiler::Types::query_scopes_containing($node<noun>);
-	#my @scopes := close::Compiler::Lookups::query_scopes_containing($node);
-	NOTE("Found ", +@scopes, " candidates for typename resolution");
-	DUMP(@scopes);
+	my @types := close::Compiler::Lookups::query_matching_types($node<noun>);
+	NOTE("Found ", +@types , " candidates for typename resolution");
+	DUMP(@types);
 	
-	# if +@scopes == 0 {
-	ASSERT(+@scopes > 0,
+	ASSERT(+@types > 0,
 		'For a type-specifier to parse, there must have been at least one type_name that matched');
-	# } elsif
+	
 	my $resolved;
 	
-	if +@scopes == 1 {
-		$resolved := close::Compiler::Scopes::get_symbol(@scopes[0], $type_name);
-		NOTE("Found exactly one candidate: ", $resolved.name());
-		DUMP($resolved);
+	if +@types == 1 {
+		$resolved := @types[0];
+		NOTE("Found exactly one candidate.");
 	}
-	else { # +@scopes > 1 
-		if !$node<is_rooted> && !$node.namespace() {
-			# type name is an unqualified reference, like foo, not like ::foo or X::foo
-			my $local_scope := close::Compiler::Scopes::get_current();
-			for @scopes {
-				if $_ =:= $local_scope {
-					$resolved := close::Compiler::Scopes::get_symbol($_, $type_name);
-				}
-			}
-		}
+	elsif !$node<is_rooted> && !$node.namespace() {
+		# Unqualified name: prefer local candidate (rule 2a, above).
 		
-		unless $resolved {
-			my @names := Array::empty();
-			
-			for @scopes {
-				@names.push($_.name());
+		my $local_scope := close::Compiler::Scopes::current();
+
+		for close::Compiler::Scopes::get_symbols($local_scope, $node<noun>.name()) {
+			if close::Compiler::Types::is_type($_) {
+				$resolved := $_;
 			}
-			
-			NOTE("Attaching an ambiguous type error");
-			ADD_ERROR($node,
-				"Ambiguous type specifier '", $type_name,
-				"' resolves to ", +@scopes, " different types:\n\t",
-				Array::join("\n\t", @names)
-			);
 		}
 	}
+
+	unless $resolved {
+		my @names := Array::empty();
+		
+		NOTE("Attaching an ambiguous type error");
+		ADD_ERROR($node,
+			"Ambiguous type specifier '", $type_name,
+			"' resolves to ", +@types, " different types.",
+		);
+	}
+
+	DUMP($resolved);
 
 	my $original := $node<noun><apparent_type>;
 	

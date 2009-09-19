@@ -45,12 +45,19 @@ sub elements(%hash) {
 }
 
 sub exists(%hash, $key) {
-	my $result := Q:PIR {{
-		$P0 = find_lex '%hash'
-		$P1 = find_lex '$key'
-		$I0 = exists $P0[$P1]
-		%r = box $I0
-	}};
+	my $result;
+	
+	if %hash {
+		$result := Q:PIR {{
+			$P0 = find_lex '%hash'
+			$P1 = find_lex '$key'
+			$I0 = exists $P0[$P1]
+			%r = box $I0
+		}};
+	}
+	else {
+		$result := 0;
+	}
 	
 	return $result;	
 }

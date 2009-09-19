@@ -24,6 +24,8 @@ sub NOTE(*@parts) {
 	close::Dumper::NOTE(close::Dumper::info(), @parts);
 }
 
+################################################################
+
 sub NODE_TYPE($node) {
 	close::Compiler::Node::type($node);
 }
@@ -119,7 +121,7 @@ sub hash() {
 	return $decl;
 }
 
-my @Type_attributes := (
+our @Type_attributes := (
 	'is_builtin',
 	'is_typedef',
 	'is_class',
@@ -142,34 +144,6 @@ sub is_type($object) {
 	
 	NOTE("Returning: ", $result);
 	return $result;
-}
-
-sub query_matching_types($node) {
-	ASSERT($node.isa(PAST::Var) && NODE_TYPE($node) eq 'qualified_identifier',
-		'Type names must be qualified identifiers');
-	NOTE("Looking up type name: ", $node<display_name>);
-	DUMP($node);
-
-	my @scopes := close::Compiler::Lookups::query_scopes_containing($node);
-	NOTE("Found ", +@scopes, " candidate scopes for type");
-	DUMP(@scopes);
-		
-	my @candidates := Array::empty();
-	my $cand;
-	
-	# Refine the list returned by q-scopes-containing to be types only.
-	# Eliminate any symbols or namespaces that collide with type names.
-	for @scopes {
-		$cand := close::Compiler::Scopes::get_symbol($_, $node.name());
-		
-		if $cand && is_type($cand) {
-			@candidates.push($cand);
-		}
-	}
-
-	NOTE("Found ", +@candidates, " candidate types");
-	DUMP(@candidates);	
-	return @candidates;
 }
 
 

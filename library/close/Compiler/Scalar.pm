@@ -27,17 +27,12 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub defined($what) {
+	NOTE("Checking if something is defined");
+	DUMP($what);
+	
 	my $result := Q:PIR {{
-		$I0 = 1
 		$P0 = find_lex '$what'
-		unless null $P0 goto check_undef
-		$I0 = 0
-		goto done
-	check_undef:
-		$I1 = isa $P0, [ 'parrot' ; 'Undef' ]
-		unless $I1 goto done
-		$I0 = 0
-	done:
+		$I0 = defined $P0
 		%r = box $I0
 	}};
 	

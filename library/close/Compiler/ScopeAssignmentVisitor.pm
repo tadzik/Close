@@ -103,6 +103,16 @@ method visit_children($node) {
 	return @results;
 }
 
+method visit_child_syms($node) {
+	NOTE("Visiting ", +@($node), " child_syms of ", NODE_TYPE($node), " node: ", $node.name());
+	DUMP($node);
+
+	my @results := $SUPER.visit_child_syms(self, $node);
+	
+	DUMP(@results);
+	return @results;
+}
+	
 ################################################################
 
 =method _assign_scope_UNKNOWN($node)
@@ -150,10 +160,7 @@ method _assign_scope_UNKNOWN($node) {
 		close::Compiler::Scopes::push($node);
 	
 		NOTE("Visiting child_sym entries");
-		for $node<child_sym> {
-			my $child := close::Compiler::Scopes::get_symbol($node, $_);
-			self.visit($child);
-		}
+		self.visit_child_syms($node);
 	}
 
 	for @Child_attribute_names {
@@ -203,7 +210,7 @@ method _assign_scope_qualified_identifier($node) {
 		my $scope;
 		
 		if $node<declarator> {
-			$scope := $node<declarator>.scope();
+			$scope := $node<declarator><scope>;
 			
 			ASSERT($scope,
 				'Every declarator should have a scope assigned by SymbolResolutionVisitor');
