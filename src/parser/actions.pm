@@ -2,8 +2,25 @@
 
 method TOP($/, $key) { PASSTHRU($/, $key); }
 
+our $recurse := 0;
+
 method translation_unit($/, $key) {
 	if $key eq 'start' {
+		if $recurse {
+			$recurse := 0;
+			
+			my $source := "namespace std { int strlen(string s); }";
+			
+			my $x := Q:PIR {
+				$P0 = compreg 'close'
+				$P1 = find_lex '$source'
+				$S0 = $P1
+				%r = $P0.'compile'($S0, 'target' => 'past')
+			};
+			
+			DUMP($x);
+		}
+		
 		NOTE("Starting translation unit parse.");
 
 		my $config := close::Compiler::Config.new();
