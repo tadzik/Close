@@ -40,29 +40,20 @@ L<include_file>s and L<using_namespace_directive>s.
 =cut
 
 rule declarative_statement {
-	| <include_file>		{*} #= include_file
+	| <include_directive>	{*} #= include_directive
 	| <namespace_definition>	{*} #= namespace_definition
 	| <declaration_statement>	{*} #= declaration_statement
 }
 
-=rule include_file
+=rule include_directive
 
 Includes a system or user header file.
 
 =cut
 
-rule include_file {
-	<.SINGLE_HASH> <.INCLUDE> [ <file=include_system> | <file=include_user> ] 
-	{*}
-}
-
-token include_system {
-	'<' ~ '>' <string_literal: '>'>
-	{*}
-}
-
-token include_user {
-	<QUOTED_LIT> 
+rule include_directive {
+	<.SINGLE_HASH> <.INCLUDE> 
+	[ <file=SYSTEM_HEADER> | <file=USER_HEADER> ] 
 	{*}
 }
 

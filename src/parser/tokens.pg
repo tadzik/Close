@@ -319,8 +319,6 @@ token GOTO			{ 'goto'		>> }
 token HLL			{ 'hll'			>> }
 token IF			{ 'if'			>> }
 token IN			{ 'in'			>> }
-# NB: 'include' is NOT a reserved word - it only occurs after '#'
-token INCLUDE		{ 'include'		>> }
 token INLINE		{ 'inline' 		>> }
 token INT			{ 'int'			>> }
 token LEXICAL		{ 'lexical' 		>> }
@@ -409,6 +407,18 @@ token	ADV_SLURPY 	{ [ ':slurpy'	>>
 				| '...'		] }
 token	ADV_VTABLE	{ ':vtable'	>> }
 
+=head3 Preprocessing Tokens
+
+While there is no actual preprocessor, these tokens are referred to as 
+preprocessing tokens after the C language elements that inspired them.
+
+=cut
+
+token INCLUDE		{ 'include'	>> }
+token SYSTEM_HEADER	{ \< ~ \>	<string_literal: \>>	{*} }
+token USER_HEADER	{ \" ~ \"	<string_literal: \">	{*} }
+
+	
 =head3 Punctuation
 
 Some punctuation marks are potentially ambiguous because Close attaches

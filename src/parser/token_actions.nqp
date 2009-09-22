@@ -27,6 +27,36 @@ method FLOAT_LIT($/) {
 	make $past;
 }
 
+our @Heredocs_waiting := Array::new();
+our $Heredocs_open := 0;
+
+method HERE_DOC_LIT($/) {
+	my $past := $<QUOTED_LIT>.ast;
+	
+	$past<heredoc_pos> := $past<pos>;	# <pos> updated by $past.node()
+	my $i := +@Heredocs_waiting;
+	my $inserted := 0;
+	
+	while $i-- > 0 {
+		if !$inserted
+			&& @Heredocs_waiting[$i]<heredoc_pos> eq $past<heredoc_pos>
+			&& @Heredocs_waiting[$i].name() eq $past.name()
+		{
+			# Overwrite the old node because it was part
+			# of a failed parse.
+			@Heredocs_waiting[$i] := $past;
+			$inserted := 1;
+		}
+	}
+	
+	unless $inserted {
+		@Heredocs_waiting.push($past);
+	}
+	
+	DUMP(@Heredocs_waiting);
+	make $past;
+}
+
 method IDENTIFIER($/, $key) { PASSTHRU($/, $key); }
 
 method INTEGER_LIT($/) {
@@ -76,33 +106,33 @@ method QUOTED_LIT($/, $key) {
 
 method STRING_LIT($/, $key) { PASSTHRU($/, $key); }
 
-our @Heredocs_waiting := Array::new();
-our $Heredocs_open := 0;
+method SYSTEM_HEADER($/) {
+	NOTE("Parsed system include file token");
+	
+	my $past := close::Compiler::Node::create('include_file',
+		:name(~ $/),
+		:node($/),
+		:quote('angle'),
+		:include_type('system'),
+		:path($<string_literal>.ast),
+	);
+	
+	DUMP($past);
+	make $past;
+}
 
-method HERE_DOC_LIT($/) {
-	my $past := $<QUOTED_LIT>.ast;
+method USER_HEADER($/) {
+	NOTE("Parsed user include file token");
 	
-	$past<heredoc_pos> := $past<pos>;	# <pos> updated by $past.node()
-	my $i := +@Heredocs_waiting;
-	my $inserted := 0;
+	my $past := close::Compiler::Node::create('include_file',
+		:name(~ $/),
+		:node($/),
+		:quote('double'),
+		:include_type('user'),
+		:path($<string_literal>.ast),
+	);
 	
-	while $i-- > 0 {
-		if !$inserted
-			&& @Heredocs_waiting[$i]<heredoc_pos> eq $past<heredoc_pos>
-			&& @Heredocs_waiting[$i].name() eq $past.name()
-		{
-			# Overwrite the old node because it was part
-			# of a failed parse.
-			@Heredocs_waiting[$i] := $past;
-			$inserted := 1;
-		}
-	}
-	
-	unless $inserted {
-		@Heredocs_waiting.push($past);
-	}
-	
-	DUMP(@Heredocs_waiting);
+	DUMP($past);
 	make $past;
 }
 

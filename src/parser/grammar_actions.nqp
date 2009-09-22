@@ -56,56 +56,11 @@ this expression.
 
 =cut
 
-method include_file($/) {
+method include_directive($/) {
 	NOTE("Processing include file: ", ~ $<file>);
 	my $past := parse_include_file($<file>.ast);
 	
 	NOTE("done");
-	DUMP($past);
-	make $past;
-}
-
-=method include_system
-
-Process a 'system' include file. Currently there is no difference between system
-and user include files, other than default search path.
-
-=cut
-
-method include_system($/) {
-	NOTE("Parsed system include file");
-	
-	my $past := close::Compiler::Node::create('include_file',
-		:name(~ $/),
-		:node($/),
-		:quote('<>'),
-		:include_type('system'),
-		:path($<string_literal>.ast),
-	);
-	
-	DUMP($past);
-	make $past;
-}
-
-=method include_user
-
-Process a 'user' include file. Currently there is no difference between system
-and user include files, other than default search path.
-
-=cut
-
-method include_user($/) {
-	NOTE("Parsed user include file");
-	my $qlit := $<QUOTED_LIT>.ast;
-	
-	my $past := close::Compiler::Node::create('include_file',
-		:name(~ $/),
-		:node($/),
-		:quote($qlit<quote>),
-		:include_type('user'),
-		:path($qlit.value()),
-	);
-	
 	DUMP($past);
 	make $past;
 }
