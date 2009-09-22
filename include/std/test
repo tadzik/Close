@@ -1,0 +1,15 @@
+// $Id: $
+
+namespace std {
+	void plan(int how_many);
+	void ok(pmc result, string name);
+//	void is(pmc got, pmc expected, string name);
+//	void isnt(pmc got, pmc expected, string name);
+//	void isa_ok(pmc obj, string class_name, string name) :multi(_, _, _);
+//	void isa_ok(String sub_class, string parent, string name) :multi(String, _, _);
+//	void pass(string name);
+//	void fail(string name);
+//	void diag(string args ...);
+//	void note(string args ...);
+//	void skip(string why, int how_many);
+}

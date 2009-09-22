@@ -1,0 +1,5 @@
+namespace std {
+	void print(string args ...);
+	void say(string args ...);
+}
+
