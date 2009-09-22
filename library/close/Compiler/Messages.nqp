@@ -52,7 +52,7 @@ sub format_node_message($node, $message) {
 		~ ':' ~ $from_line
 		~ ':' ~ $from_char
 		~ ', ' ~ $message<kind>
-		~ ':' ~ $message.value();
+		~ ': ' ~ $message.value();
 	
 	NOTE($result);
 	return $result;
