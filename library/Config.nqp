@@ -37,9 +37,13 @@ sub _get_pmc() {
 		};		
 	}
 	
+	DUMP($_Pmc);
 	return $_Pmc;
 }
 
 sub query($key) {
-	return _get_pmc(){$key};
+	NOTE("Querying for Config setting: '", $key, "'");
+	my $result := _get_pmc(){$key};
+	DUMP($result);
+	return $result;
 }
