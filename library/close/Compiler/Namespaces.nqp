@@ -57,6 +57,16 @@ sub fetch(@path) {
 	return $block;
 }
 
+sub fetch_initload_sub($namespace) {
+	NOTE("Fetching initload sub of namespace: ", $namespace<display_name>);
+	
+	# Created when the namespace_block is created.
+	my $sub := $namespace<initload>;
+	
+	DUMP($sub);
+	return $sub;
+}
+
 sub fetch_root() {
 	NOTE("Fetching root namespace block");
 	our $root;
@@ -65,6 +75,7 @@ sub fetch_root() {
 		NOTE("Creating root namespace block");
 		
 		$root := close::Compiler::Node::create('namespace_definition',
+			:initload('no sub for this block'),
 			:name('namespace root block'),
 			:path(Array::empty()));
 	}

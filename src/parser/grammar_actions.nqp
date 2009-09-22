@@ -2,9 +2,6 @@
 
 class close::Grammar::Actions;
 
-# The tree we build to feed to POST
-our $Compilation_unit;
-
 #method TOP($/, $key) { PASSTHRU($/, $key); }
 method TOP($/, $key) { 
 	my $past := $/{$key}.ast;
@@ -33,6 +30,8 @@ method TOP($/, $key) {
 		NOTE("Displaying messages");
 		close::Compiler::MessageVisitor::show_messages($past);
 
+		$past := get_compilation_unit();
+		
 		NOTE("Rewriting tree for POSTing");
 		$past := close::Compiler::TreeRewriteVisitor::rewrite_tree($past);
 			
@@ -100,8 +99,6 @@ method translation_unit($/, $key) {
 			my $config := close::Compiler::Config.new();
 			$config.read('close.cfg');
 			NOTE("Read config file");
-		
-			$Compilation_unit := close::Compiler::Node::create('compilation_unit');
 		
 			# Calling this forces the init code to run. I'm not sure that matters.
 			my $root_nsp := close::Compiler::Namespaces::fetch(Array::new('close'));

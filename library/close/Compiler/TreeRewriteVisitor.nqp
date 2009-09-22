@@ -148,16 +148,16 @@ method _rewrite_tree_UNKNOWN($node) {
 	return $SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
 }
 
-method _rewrite_tree_function_definition($node) {
-	NOTE("Visiting function_definition node: ", $node<display_name>);
+# method _rewrite_tree_function_definition($node) {
+	# NOTE("Visiting function_definition node: ", $node<display_name>);
 
-	$SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
+	# $SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
 	
-	$Compilation_unit.push($node);
+	# $Compilation_unit.push($node);
 	
-	NOTE("done");
-	return @Fake_results;	
-}
+	# NOTE("done");
+	# return @Fake_results;	
+# }
 
 ################################################################
 	
@@ -186,10 +186,10 @@ sub rewrite_tree($past) {
 		NOTE("Created visitor");
 		DUMP($visitor);
 		
-		$Compilation_unit := close::Compiler::Node::create('compilation_unit');
+		#$Compilation_unit := close::Compiler::Node::create('compilation_unit');
 		$visitor.visit($past);
 		
-		$result := $Compilation_unit;
+		#$result := $Compilation_unit;
 		NOTE("done");
 		DUMP($result);
 	}

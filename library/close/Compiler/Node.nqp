@@ -337,8 +337,8 @@ sub _create_function_definition(%attributes) {
 		'display_name',
 		'etype',
 		'hll',
-		'is_rooted',
-		'isdecl',
+	#	'is_rooted',
+	#	'isdecl',
 		'lexical',
 		'name',
 		'namespace',
@@ -361,30 +361,35 @@ sub _create_function_definition(%attributes) {
 
 	copy_adverbs($from, $past);
 	for @copy_attrs {
+		NOTE("Looking attr: ", $_);
 		if Scalar::defined($from{$_}) 
 			&& !Hash::exists(%attributes, $_) {
+			NOTE("Copying attr: ", $_);
 			%attributes{$_} := $from{$_};
 		}
 	}
 	
 	$from := $from<type>;
-	%attributes<arity> := $from.arity();
-	%attributes<scope> := 'package';		# All functions are package scope refs
+	%attributes<arity>		:= $from.arity();
+	%attributes<is_rooted>	:= 1;
+	%attributes<scope>		:= 'package';		# All functions are package scope refs
 	
 	$past.symbol_defaults(:scope($from.symbol('')<scope>));
-	copy_block($from, $past);
 	
-	unless %attributes<hll> {
+	unless Scalar::defined(%attributes<hll>) {
 		%attributes<hll> := close::Compiler::Scopes::fetch_current_hll();
 	}
 	
-	unless %attributes<namespace> {
+	unless Scalar::defined(%attributes<namespace>) {
 		my $nsp := close::Compiler::Scopes::fetch_current_namespace();
 		%attributes<namespace> := Array::clone($nsp.namespace());
-		%attributes<is_rooted> := 1;
 	}
 	
+	copy_block($from, $past);
 	set_attributes($past, %attributes);
+	
+	# Add every function, in order of creation, to the compilation_unit
+	close::Grammar::Actions::get_compilation_unit().push($past);
 	
 	NOTE("done: ", $past<display_name>);
 	DUMP($past);
@@ -419,20 +424,44 @@ sub _create_include_file(%attributes) {
 
 sub _create_initload_sub(%attributes) {
 	NOTE("Creating init-load sub");
+	
+	ASSERT(%attributes<for>, 'Initload_sub requires a :for(namespace) arg');
+	my $for_namespace := %attributes<for>;
+	Hash::delete(%attributes, 'for');
 
-	ASSERT(%attributes<from>, 'Initload_sub requires a :from() namespace block');
-	my $from := %attributes<from>;
-	Hash::delete(%attributes, 'from');
-	
-	my $past := PAST::Block.new(
-		:blocktype('declaration'),
+	# Declare a function like:    void _nsp_init() :init :load {...}
+	my @parts := Array::clone($for_namespace.namespace());
+	@parts.push('_nsp_init');
+
+	my $declarator := close::Compiler::Node::create('declarator_name', 
+		:hll($for_namespace.hll()),
+		:is_rooted(1),
+		:node($for_namespace),
+		:parts(@parts),
 	);
-	$past.symbol_defaults(:scope('package'));
+
+	$declarator<type> := close::Compiler::Node::create('decl_function_returning', :node($for_namespace));
+	$declarator<etype> := $declarator<type>;
+
+	my $void := PAST::Var.new();
+	$void<node_type> := 'qualified_identifier';
+	set_name($void, 'void');
+	$void<apparent_type> := close::Compiler::Lookups::query_matching_types($void).shift();
+	$void := close::Compiler::Node::create('type_specifier', :node($for_namespace), :noun($void));
+	$declarator := close::Compiler::Types::add_specifier_to_declarator($void, $declarator);
+	my @adverbs := ( ':init', ':load');
 	
-	%attributes<hll>		:= $from.hll();
-	%attributes<name>		:= %attributes<id>;
-	%attributes<namespace>	:= $from.namespace();
-	%attributes<pirflags>	:= ':init :load';
+	for @adverbs {
+		close::Compiler::Node::set_adverb($declarator, 
+			close::Compiler::Node::create('adverb', :name($_), :node($for_namespace)));
+	}
+DUMP($declarator);
+	my $past := close::Compiler::Node::create('function_definition',
+		:from($declarator),
+	);
+
+	# Weird, but true: package by default.
+	$past.symbol_defaults(:scope('package'));
 	
 	set_attributes($past, %attributes);
 	
@@ -504,9 +533,19 @@ sub _create_namespace_definition(%attributes) {
 
 	set_attributes($past, %attributes);
 	
+	NOTE("Creating initload sub");
+	
+	unless $past<initload> {
+		$past<initload> := close::Compiler::Node::create('initload_sub', 
+			:for($past),
+			:lexical(0),
+		);
+	}
+	
 	DUMP($past);
 	return $past;
 }
+
 
 =sub _create_namespace_path
 

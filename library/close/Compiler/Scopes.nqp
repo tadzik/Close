@@ -241,6 +241,8 @@ sub get_stack() {
 	
 	unless Scalar::defined($init_done) {
 		$init_done := 1;
+		# This is bogus. Can I use namespace root instead?
+		
 		my $pervasive := PAST::Block.new(
 			:blocktype('immediate'),
 			:hll('close'),

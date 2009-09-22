@@ -152,6 +152,16 @@ sub clean_up_heredoc($past, @lines) {
 	DUMP($past);
 }
 
+sub get_compilation_unit() {
+	our $compilation_unit;
+	
+	unless $compilation_unit {
+		$compilation_unit := close::Compiler::Node::create('compilation_unit');
+	}
+	
+	return $compilation_unit;
+}
+
 our $Config := Scalar::undef();
 
 sub get_config(*@keys) {
