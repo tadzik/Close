@@ -92,10 +92,10 @@ method _collect_declarations_UNKNOWN($node) {
 our @Results := Array::empty();
 
 method _collect_declarations_declarator_name($node) {
-	NOTE("Visiting declarator_name node: ", $node.name());
+	NOTE("Visiting declarator_name node: ", $node<display_name>);
 	
-	my $nsp := close::Compiler::Namespaces::fetch_namespace_of($node);
-	close::Compiler::Scopes::add_declarator_to($node, $nsp);
+	$SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
+	close::Compiler::Scopes::add_declarator($node);
 	
 	NOTE("done");
 	return @Results;	
@@ -104,8 +104,8 @@ method _collect_declarations_declarator_name($node) {
 method _collect_declarations_function_definition($node) {
 	NOTE("Visiting function_definition node: ", $node<display_name>);
 
-	my $nsp := close::Compiler::Namespaces::fetch_namespace_of($node);
-	close::Compiler::Scopes::add_declarator_to($node, $nsp);
+	$SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
+	close::Compiler::Scopes::add_declarator($node);
 	
 	NOTE("done");
 	return @Results;	

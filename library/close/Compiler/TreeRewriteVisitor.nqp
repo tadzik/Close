@@ -132,99 +132,31 @@ Does nothing at all with the node.
 
 our @Child_attribute_names := (
 	'alias_for',
-	'type',
+	'declarator',
 	'initializer',
-	'function_definition',
+	'type',
 );
 
+our $Compilation_unit;
+
+our @Fake_results := Array::empty();
+
 method _rewrite_tree_UNKNOWN($node) {	
-	NOTE("No custom handler exists for node type: '", NODE_TYPE($node), 
-		"'. Passing through to children.");
+	NOTE("No custom handler exists for '", NODE_TYPE($node), 
+		"' node '", $node.name(), "'. Passing through to children.");
 	DUMP($node);
-
-	my @results := Array::empty();
-	
-	if $node.isa(PAST::Block) {
-		# Should I keep a list of push-able block types?
-		NOTE("Pushing this block onto the scope stack");
-		close::Compiler::Scopes::push($node);
-	}
-
-	# I visit the children first because they are ordered. This matters
-	# for sub declarations.
-	
-	NOTE("Visiting children");
-	Array::append(@results,
-		self.visit_children($node)
-	);
-	NOTE("Now with ", +@results, " results");
-	
-	for @Child_attribute_names {
-		if $node{$_} {
-			NOTE("Visiting <", $_, "> attribute");
-			Array::append(@results,
-				self.visit($node{$_})
-			);
-		}
-	}	
-	NOTE("Now with ", +@results, " results");
-	
-	if $node.isa(PAST::Block) {
-		NOTE("Visiting child_sym entries");
-		Array::append(@results, self.visit_child_syms($node));
-		
-		NOTE("Now with ", +@results, " results");
-		
-		NOTE("Popping this block off the scope stack");
-		close::Compiler::Scopes::pop(NODE_TYPE($node));
-	}
-
-	NOTE("done (", +@results, " results)");
-	DUMP(@results);
-	return @results;
-}
-
-method _rewrite_tree_declarator_name($node) {
-	NOTE("Rewriting tree for declarator_name ", $node.name());
-	DUMP($node);
-	
-	# Pass back the results of any child nodes
-	my @results := self._rewrite_tree_UNKNOWN($node);
-	
-	# And if this is a global object, maybe emit it, too.
-	if $node.scope() eq 'package' {
-		if $node<initializer> {
-			NOTE("Declarator '", $node.name(), "' is added because of an initializer");
-			@results.push($node);
-			
-			my $ref := close::Compiler::Node::make_reference_to($node);
-			
-			my $init_stmt :=PAST::Op.new(
-				:pasttype('bind'),
-				$ref,
-				$node<initializer>
-			);
-			@results.push($init_stmt);		
-		} 
-		else {
-			unless $node<is_extern> {
-				NOTE("Declarator '", $node.name(), " has no initializer, but is not extern.");
-				@results.push($node);
-			}
-		}
-	}
-
-	NOTE("done (", +@results, " results)");
-	DUMP(@results);
-	return @results;	
+	return $SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
 }
 
 method _rewrite_tree_function_definition($node) {
-	my @results := Array::new($node);
+	NOTE("Visiting function_definition node: ", $node<display_name>);
+
+	$SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
 	
-	# Functions get used. No further rewriting needed. (This may change later.)
+	$Compilation_unit.push($node);
 	
-	return @results;
+	NOTE("done");
+	return @Fake_results;	
 }
 
 ################################################################
@@ -253,18 +185,11 @@ sub rewrite_tree($past) {
 		my $visitor	:= close::Compiler::TreeRewriteVisitor.new();
 		NOTE("Created visitor");
 		DUMP($visitor);
-	
-		my @results	:= $visitor.visit($past);
-		DUMP(@results);
 		
-		NOTE("Post-processing ", +@results, " results");
-	
-		$result := close::Compiler::Node::create('compilation_unit');
-	
-		for @results {
-			$result.push($_);
-		}
+		$Compilation_unit := close::Compiler::Node::create('compilation_unit');
+		$visitor.visit($past);
 		
+		$result := $Compilation_unit;
 		NOTE("done");
 		DUMP($result);
 	}

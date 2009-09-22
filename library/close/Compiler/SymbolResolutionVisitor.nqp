@@ -63,50 +63,13 @@ Delegates to SUPER.visit. This method should be copied unchanged into the new co
 =cut
 
 method visit($node) {
-	DUMP($node);
-	my @results;
-	
-	if $node {
-		NOTE("Visiting ", NODE_TYPE($node), " node: ", $node.name());
-		DUMP($node);
-		
-		@results := $SUPER.visit(self, $node);
-	}
-	else {
-		@results := Array::empty();
-	}
+	my @results := $SUPER.visit(self, $node);
 	
 	NOTE("done");
 	DUMP(@results);
 	return @results;
 }
 
-=method visit_children($node)
-
-Delegates to SUPER.visit_children. This method should be copied unchanged into 
-the new code.
-
-=cut
-
-method visit_children($node) {
-	NOTE("Visiting ", +@($node), " children of ", NODE_TYPE($node), " node: ", $node.name());
-	DUMP($node);
-
-	my @results := $SUPER.visit_children(self, $node);
-	
-	DUMP(@results);
-	return @results;
-}
-
-method visit_child_syms($node) {
-	NOTE("Visiting ", +@($node), " child_syms of ", NODE_TYPE($node), " node: ", $node.name());
-	DUMP($node);
-
-	my @results := $SUPER.visit_child_syms(self, $node);
-	
-	DUMP(@results);
-	return @results;
-}
 	
 ################################################################
 
@@ -143,74 +106,26 @@ our @Child_attribute_names := (
 	'type',
 	'alias_for',
 	'initializer',
-	'function_definition',
 );
 
+# Just pass the visitor along.
 method _resolve_symbols_UNKNOWN($node) {	
 	NOTE("No custom handler exists for '", NODE_TYPE($node), 
 		"' node '", $node.name(), "'. Passing through to children.");
-	
 	DUMP($node);
-
-	if $node.isa(PAST::Block) {
-		# Should I keep a list of push-able block types?
-		NOTE("Pushing this block onto the scope stack");
-		close::Compiler::Scopes::push($node);
-	
-		# NOTE("Visiting child_sym entries");
-		# Array::append(@results, self.visit_child_syms($node));
-	}
-
-	for @Child_attribute_names {
-		if $node{$_} {
-			NOTE("Visiting <", $_, "> attribute");
-			self.visit($node{$_});
-		}
-	}
-	
-	NOTE("Visiting children");
-	self.visit_children($node);
-	
-	if $node.isa(PAST::Block) {
-		NOTE("Popping this block off the scope stack");
-		close::Compiler::Scopes::pop(NODE_TYPE($node));
-	}
-
-	# We need to return an array of something.
-	my @results := Array::new($node);
-	
-	NOTE("done");
-	DUMP(@results);
-	return @results;
-}
-
-method _resolve_symbols_declarator_name($node) {
-	NOTE("Visiting declarator_name node: ", $node.name());
-	
-	if $node<type><is_function> && $node<type><is_defined> {
-		my $definition := $node<type><definition>;
-		
-		ASSERT(NODE_TYPE($definition) eq 'function_definition',
-			'Node type had better be function definition for this.');
-			
-		# FIXME: I don't know what I'm doing here?
-	}
-	
-	my @results := Array::new($node);
-	
-	NOTE("done");
-	DUMP(@results);
-	return @results;	
+	return $SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
 }
 
 method _resolve_symbols_qualified_identifier($node) {
-	DUMP($node);
 	NOTE("Visiting qualified_identifier node: ", $node<display_name>);
+	DUMP($node);
 	
 	my @cands := close::Compiler::Lookups::query_scopes_containing_symbol($node);
 	NOTE("Found ", +@cands, " candidates for symbol resolution");
 	DUMP(@cands);
 		
+	# Currently there is no type-based disambiguation. 
+	
 	# The usual rules apply: 0 candidates = error, 1 = done, and for 2 
 	# or more, its an error unless one is in the local scope (and the
 	# identifier is simple).
@@ -222,7 +137,6 @@ method _resolve_symbols_qualified_identifier($node) {
 		ADD_ERROR($node, "Undeclared symbol: ", $node<display_name>);
 	}
 	elsif +@cands == 1 {
-		# FIXME: This [0] is wrong. I should do something to disambiguate based on type, maybe.
 		$resolved := close::Compiler::Scopes::get_symbols(@cands[0], $node.name())[0];
 		NOTE("Found one candidate: ", $resolved<display_name>);
 		DUMP($resolved);

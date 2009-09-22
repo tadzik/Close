@@ -69,49 +69,13 @@ Delegates to SUPER.visit. This method should be copied unchanged into the new co
 =cut
 
 method visit($node) {
-	my @results;
-	
-	if $node {
-		NOTE("Visiting ", NODE_TYPE($node), " node: ", $node.name());
-		DUMP($node);
-		
-		@results := $SUPER.visit(self, $node);
-	}
-	else {
-		@results := Array::empty();
-	}
+	my @results := $SUPER.visit(self, $node);
 	
 	NOTE("done");
 	DUMP(@results);
 	return @results;
 }
 
-=method visit_children($node)
-
-Delegates to SUPER.visit_children. This method should be copied unchanged into 
-the new code.
-
-=cut
-
-method visit_children($node) {
-	NOTE("Visiting ", +@($node), " children of ", NODE_TYPE($node), " node: ", $node.name());
-	DUMP($node);
-
-	my @results := $SUPER.visit_children(self, $node);
-	
-	DUMP(@results);
-	return @results;
-}
-
-method visit_child_syms($node) {
-	NOTE("Visiting ", +@($node), " child_syms of ", NODE_TYPE($node), " node: ", $node.name());
-	DUMP($node);
-
-	my @results := $SUPER.visit_child_syms(self, $node);
-	
-	DUMP(@results);
-	return @results;
-}
 	
 ################################################################
 
@@ -142,51 +106,26 @@ Figure out your own approach.
 
 our @Child_attribute_names := (
 	'alias_for',
-	'type',
+	'declarator',
 	'initializer',
-	'function_definition',
+	'type',
 );
 
-our @Result := ( 0, 0 );
-
+# Just pass the visitor along.
 method _assign_scope_UNKNOWN($node) {	
-	NOTE("No custom handler exists for node type: '", NODE_TYPE($node), 
-		"'. Passing through to children.");
+	NOTE("No custom handler exists for '", NODE_TYPE($node), 
+		"' node '", $node.name(), "'. Passing through to children.");
 	DUMP($node);
-
-	if $node.isa(PAST::Block) {
-		# Should I keep a list of push-able block types?
-		NOTE("Pushing this block onto the scope stack");
-		close::Compiler::Scopes::push($node);
-	
-		NOTE("Visiting child_sym entries");
-		self.visit_child_syms($node);
-	}
-
-	for @Child_attribute_names {
-		if $node{$_} {
-			NOTE("Visiting <", $_, "> attribute");
-			self.visit($node{$_});
-		}
-	}
-	
-	NOTE("Visiting children");
-	self.visit_children($node);
-	
-	if $node.isa(PAST::Block) {
-		NOTE("Popping this block off the scope stack");
-		close::Compiler::Scopes::pop(NODE_TYPE($node));
-	}
-
-	NOTE("done");
-	DUMP($node);
-	return @Result;
+	return $SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
 }
 
+our @Results := Array::empty();
+
 method _assign_scope_declarator_name($node) {
-	NOTE("Assigning scope to declarator_name: ", $node.name());
-	DUMP($node);
+	NOTE("Assigning scope to declarator_name: ", $node<display_name>);
 	
+	$SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
+
 	unless $node.scope() {
 		my $scope;
 		
@@ -204,13 +143,14 @@ method _assign_scope_declarator_name($node) {
 	
 	NOTE("done");
 	DUMP($node);
-	return @Result;
+	return @Results;
 }
 
 method _assign_scope_qualified_identifier($node) {
 	NOTE("Assigning scope to qualified_identifier: ", $node<display_name>);
-	DUMP($node);
 	
+	$SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
+
 	unless $node.scope() {
 		my $scope;
 		
@@ -234,12 +174,13 @@ method _assign_scope_qualified_identifier($node) {
 			$scope := 'package';
 		}
 			
+		NOTE("Setting scope to '$scope'");
 		$node.scope($scope);
 	}
 	
 	NOTE("done");
 	DUMP($node);
-	return @Result;
+	return @Results;
 }
 
 ################################################################

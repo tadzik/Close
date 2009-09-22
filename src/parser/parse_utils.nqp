@@ -95,10 +95,13 @@ sub assemble_qualified_path($node_type, $/) {
 		@parts.push($_.ast.value());
 	}
 
+	NOTE("Parts: [ ", Array::join(' ; ', @parts), " ]");
+	
 	my $hll;
 	
 	if $<hll_name> {
-		$hll := ~ $<hll_name>;
+		$hll := ~ $<hll_name>[0];
+		NOTE("HLL: ", $hll);
 	}
 
 	my $is_rooted := 0;

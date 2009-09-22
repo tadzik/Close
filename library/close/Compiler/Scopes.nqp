@@ -49,15 +49,10 @@ Insert a single declarator-name into the symbol table for a block.
 =cut
 
 sub add_declarator_to($past, $scope) {
-	NOTE("Adding name '", $past.name(), "' to ", NODE_TYPE($scope), " scope '", $scope.name(), "'");
+	NOTE("Adding name '", $past.name(), "' to ", NODE_TYPE($scope), " scope '", $scope<display_name>, "'");
 	my $name := $past.name();
 	my @already := get_symbols($scope, $name);
 	
-	#unless $past<hll> {
-	#	$past<hll> := $scope<hll>;
-	#	$past.namespace($scope.namespace());
-	#}
-		
 	if +@already {
 		# This is not a problem if declaring two multi- functions.
 		my $all_multi := 1;
@@ -73,6 +68,7 @@ sub add_declarator_to($past, $scope) {
 		# Don't know how to do that yet. See Types.pm.
 		
 		unless $all_multi {
+			NOTE("Adding conflicting declaration error");
 			ADD_ERROR($past,
 				"Conflicting declaration of symbol '",
 				$past.name(), "' in scope '",
@@ -88,13 +84,16 @@ sub add_declarator_to($past, $scope) {
 sub add_declarator($past) {
 	NOTE("Adding declarator: ", $past.name());
 	DUMP($past);
-	ASSERT(NODE_TYPE($past) eq 'declarator_name',
-		"Only declarators can be added.");
 	
 	my $decl_nsp := close::Compiler::Namespaces::fetch_namespace_of($past);
 	my $current_nsp := close::Compiler::Scopes::fetch_current_namespace();
 	
+	# If we're declaring it locally, it goes into the current lexical 
+	# block. If non-local, it goes into the namespace block.
+	# (Non-external symbols go inside functions, etc.)
+	# (This is probably wrong - there should be a better way to know what goes where than by namespace.)
 	if $decl_nsp =:= $current_nsp {
+		NOTE("Using current scope");
 		$decl_nsp := close::Compiler::Scopes::current();
 	}
 	
@@ -174,7 +173,8 @@ sub fetch_current_namespace() {
 			~ "Unable to locate current namespace block. "
 			~ " This should never happen.");
 	}
-	
+
+	NOTE("Found namespace: ", $block<display_name>);
 	DUMP($block);
 	return $block;
 }
@@ -220,11 +220,6 @@ sub get_search_list() {
 	for get_stack() {
 		my $block := $_;
 		
-		if $block<is_namespace>{
-			my @path := close::Compiler::Namespaces::path_of($block);
-			$block := close::Compiler::Namespaces::fetch(@path);
-		}
-		
 		@list.push($block);
 		
 		if $_<using_namespaces> {
@@ -248,19 +243,13 @@ sub get_stack() {
 		$init_done := 1;
 		my $pervasive := PAST::Block.new(
 			:blocktype('immediate'),
-			:name('pervasive types'),
 			:hll('close'),
 			:namespace(Scalar::undef()),
 		);
 		$pervasive<node_type> := 'pervasive scope';
+		close::Compiler::Node::set_name($pervasive, 'pervasive types');
 		@scope_stack := Array::new($pervasive);
 		close::Compiler::Types::add_builtins($pervasive);
-		
-		NOTE("Creating (implicit) root namespace_definition block");
-		my $root_nsp	:= close::Compiler::Node::create('namespace_definition',
-			:path(Array::empty()),
-		);
-		close::Compiler::Scopes::push($root_nsp);
 	}
 
 	DUMP(@scope_stack);
@@ -268,8 +257,12 @@ sub get_stack() {
 }
 
 sub get_symbols($scope, $name) {
+	NOTE("Looking up '", $name, "' in scope: ", $scope<display_name>);
+	
 	my @symbols := $scope<child_sym>{$name};
-	DUMP(:name($name), :result(@symbols));
+	
+	NOTE("Found ", +@symbols, " results");
+	DUMP(@symbols);
 	return @symbols;
 }
 
@@ -302,18 +295,20 @@ sub print_symbol_table($block) {
 }
 
 sub push($scope) {
-	unless $scope.isa(PAST::Block) {
-		DIE("Attempt to push non-Block on lexical scope stack.");
-	}
+	ASSERT($scope.isa(PAST::Block), "Can't push a non-Block onto the lexical scope stack");
 
 	get_stack().unshift($scope);
-	NOTE("Open ", $scope<lstype>, " scope: ", $scope.name(),
+	NOTE("Open ", NODE_TYPE($scope), " scope: ", $scope<display_name>,
 		" Now ", +(get_stack()), " on stack.");
 	DUMP($scope);
 }
 
 sub put_symbol($scope, $name, $object) {
-	NOTE("Adding symbol ", $name, " to scope ", $scope.name());
+	NOTE("Adding symbol ", $name, 
+		" to ", NODE_TYPE($scope), 
+		" scope ", $scope<display_name>, " (", $scope<id>, ")");
+	DUMP($scope);
+	DUMP($object);
 	
 	unless Hash::exists($scope<child_sym>, $name) {
 		$scope<child_sym>{$name} := Array::empty();
@@ -332,6 +327,7 @@ sub put_symbol($scope, $name, $object) {
 		$scope<child_sym>{$name}.push($object);
 	}
 	
+	NOTE("Now there are ", +$scope<child_sym>{$name}, " symbols named ", $name);
 	DUMP($scope<child_sym>{$name});
 }
 

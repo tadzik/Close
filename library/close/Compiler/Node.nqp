@@ -369,6 +369,7 @@ sub _create_function_definition(%attributes) {
 	
 	$from := $from<type>;
 	%attributes<arity> := $from.arity();
+	%attributes<scope> := 'package';		# All functions are package scope refs
 	
 	$past.symbol_defaults(:scope($from.symbol('')<scope>));
 	copy_block($from, $past);
@@ -380,11 +381,12 @@ sub _create_function_definition(%attributes) {
 	unless %attributes<namespace> {
 		my $nsp := close::Compiler::Scopes::fetch_current_namespace();
 		%attributes<namespace> := Array::clone($nsp.namespace());
+		%attributes<is_rooted> := 1;
 	}
 	
 	set_attributes($past, %attributes);
 	
-	NOTE("done");
+	NOTE("done: ", $past<display_name>);
 	DUMP($past);
 	return $past;
 }
@@ -556,7 +558,7 @@ sub _create_parameter_declaration(%attributes) {
 
 sub _create_qualified_identifier(%attributes) {
 	NOTE("Creating qualified_identifier");
-DUMP(%attributes);	
+	
 	my @parts := Array::clone(%attributes<parts>);
 	ASSERT(+@parts, 'A qualified_identifier has at least one part');
 	
@@ -902,6 +904,12 @@ sub set_attributes($node, %attributes) {
 	if $set_name {
 		set_name($node, $node.name());
 	}
+
+	if $node<source> {
+		$node<line> := String::line_number_of($node<source>, :offset($node<pos>));
+		$node<char> := String::character_offset_of($node<source>, :line($node<line>), :offset($node<pos>));
+	}
+	
 }
 
 sub set_name($past, $name) {
@@ -913,16 +921,16 @@ sub set_name($past, $name) {
 	
 	if $past<is_rooted> {
 		if $past<hll> {
-			$display_name := 'hll: ' ~ $past<hll>;
+			$display_name := 'hll:' ~ $past<hll>;
 		}
 		
-		$display_name := $display_name ~ ' :: ';
+		$display_name := $display_name ~ ':: ';
 	}
 
 	if $past<namespace> && +($past<namespace>) {
 		$display_name := $display_name 
-			~ Array::join(' :: ', $past<namespace>)
-			~ ' :: ';
+			~ Array::join('::', $past<namespace>)
+			~ '::';
 	}
 	
 	if $name {

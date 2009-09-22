@@ -2,6 +2,9 @@
 
 class close::Grammar::Actions;
 
+# The tree we build to feed to POST
+our $Compilation_unit;
+
 #method TOP($/, $key) { PASSTHRU($/, $key); }
 method TOP($/, $key) { 
 	my $past := $/{$key}.ast;
@@ -68,8 +71,8 @@ method include_directive($/) {
 method namespace_definition($/, $key) {
 	if $key eq 'open' {
 		my $past := close::Compiler::Namespaces::fetch_namespace_of($<namespace_path>.ast);
-		NOTE("Pushed ", NODE_TYPE($past), " block for ", $past<display_name>);
 		close::Compiler::Scopes::push($past);
+		NOTE("Pushed ", NODE_TYPE($past), " block for ", $past<display_name>);
 	}
 	elsif $key eq 'close' {
 		my $past := close::Compiler::Scopes::pop('namespace_definition');
@@ -90,13 +93,21 @@ method namespace_definition($/, $key) {
 
 method translation_unit($/, $key) {
 	if $key eq 'open' {
-		my $config := close::Compiler::Config.new();
-		$config.read('close.cfg');
-		NOTE("Read config file");
+		# If we're in an include file, there's nothing to do. 
 		
-		# Calling this forces the init code to run. I'm not sure that matters.
-		my $context := close::Compiler::Scopes::current();
-		DUMP($context);
+		# Otherwise ...
+		unless in_include_file() {
+			my $config := close::Compiler::Config.new();
+			$config.read('close.cfg');
+			NOTE("Read config file");
+		
+			$Compilation_unit := close::Compiler::Node::create('compilation_unit');
+		
+			# Calling this forces the init code to run. I'm not sure that matters.
+			my $root_nsp := close::Compiler::Namespaces::fetch(Array::new('close'));
+			close::Compiler::Scopes::push($root_nsp);
+			DUMP($root_nsp);
+		}
 	}
 	elsif $key eq 'close' {
 		my $past;

@@ -365,7 +365,7 @@ method parameter_list($/, $key) {
 		
 		for $<param_list> {
 			$params.push($_.ast);
-			close::Compiler::Scopes::add_declarator_to_current($_.ast);
+			close::Compiler::Scopes::add_declarator_to($_.ast, $past);
 			
 			if $_.ast<adverbs><slurpy> {
 				$slurpy := 1;

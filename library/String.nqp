@@ -65,6 +65,28 @@ sub char_at($str, $index) {
 	return $result;
 }
 
+sub character_offset_of($string, *%opts) {
+	DUMP(:string($string), :options(%opts));
+
+	our %Line_number_info;
+	
+	unless %Line_number_info{$string} {
+		_init_line_number_info($string);
+	}
+
+	my $offset	:= 0 + %opts<offset>;
+	
+	unless Hash::exists(%opts, 'line') {
+		%opts<line> := line_number_of($string, :offset($offset));
+	}
+	
+	my $line		:= -1 + %opts<line>;
+	my $line_offset	:= %Line_number_info{$string}[$line];
+	NOTE("Line number offset is: ", $line_offset);
+	my $result := $offset - $line_offset;
+	return $result;
+}
+
 =sub display_width($str) {
 
 Compute the display width of the C<$str>, assuming that tabs
@@ -251,8 +273,6 @@ sub length($str, *%opts) {
 	return $result;
 }
 
-our %Line_number_info;
-
 sub _init_line_number_info($string) {
 	#NOTE("Initializing line-number information of previously-unseen string");
 	#DUMP($string);
@@ -266,6 +286,8 @@ sub _init_line_number_info($string) {
 		@lines.push($i);
 	}
 	
+	our %Line_number_info;
+	
 	%Line_number_info{$string} := @lines;
 	#NOTE("String parsed into ", +@lines, " lines");
 	#DUMP(@lines);
@@ -278,6 +300,8 @@ sub line_number_of($string, *%opts) {
 		NOTE("String is empty or undef. Returning 1");
 		return 1;
 	}
+
+	our %Line_number_info;
 	
 	unless %Line_number_info{$string} {
 		_init_line_number_info($string);
@@ -297,27 +321,6 @@ sub line_number_of($string, *%opts) {
 	#$line ++;
 	NOTE("Returning line number (1-based): ", $line);
 	return $line;
-}
-
-
-sub character_offset_of($string, *%opts) {
-	DUMP(:string($string), :options(%opts));
-
-	unless %Line_number_info{$string} {
-		_init_line_number_info($string);
-	}
-
-	my $offset	:= 0 + %opts<offset>;
-	
-	unless Hash::exists(%opts, 'line') {
-		%opts<line> := line_number_of($string, :offset($offset));
-	}
-	
-	my $line		:= -1 + %opts<line>;
-	my $line_offset	:= %Line_number_info{$string}[$line];
-	NOTE("Line number offset is: ", $line_offset);
-	my $result := $offset - $line_offset;
-	return $result;
 }
 
 sub ltrim_indent($str, $indent) {

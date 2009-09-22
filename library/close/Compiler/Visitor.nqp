@@ -45,7 +45,7 @@ sub NODE_TYPE($node) {
 method already_visited($visitor, $node, $store?) {
 	my $name := $visitor.name();
 	
-	if $store {
+	if Scalar::defined($store) {
 		$node<visited_by>{$name} := $store;
 	}
 	
@@ -163,7 +163,7 @@ method visit($visitor, $node) {
 			@results	:= &method($visitor, $node);
 			
 			#NOTE("Visit complete. Storing results.");
-			if +@results {
+			if Scalar::defined(@results) {
 				self.already_visited($visitor, $node, @results);
 			}
 		}
