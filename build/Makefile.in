@@ -52,8 +52,8 @@ CLOSE_LIB_PBC := library/close/close_lib.pbc
 #OPS_DEPS := build/src/ops/Makefile.in $(OPS_DIR)/close.ops
 
 ACTIONS_PM := \
-	src/parser/parse_utils.pm \
-	src/parser/builtin_actions.pm
+	src/parser/parse_utils.nqp \
+	src/parser/builtin_actions.nqp
 
 BUILTINS_PIR := \
 	src/builtins/literals.pir \
@@ -136,7 +136,7 @@ BUILD_CLEANUPS := \
   "src/gen_*.pira" \
   "src/gen_*.pir" \
   src/gen_grammar.pg \
-  src/gen_actions.pm \
+  src/gen_actions.nqp \
   close@exe@ \
 #IF(win32):  parrot-close.exe \
 #IF(win32):  parrot-close.iss \
@@ -182,68 +182,68 @@ close.pbc: $(SOURCES)
 close@exe@: close.pbc
 	$(PBC_TO_EXE) close.pbc
 
-src/gen_actions.pir: src/gen_actions.pm
-	@echo "**** Compiling gen_actions.pm to PIR"
+src/gen_actions.pir: src/gen_actions.nqp
+	@echo "**** Compiling gen_actions.nqp to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP) --target=pir	\
 		--output=src/gen_actions.pira			\
-		src/gen_actions.pm
+		src/gen_actions.nqp
 	$(STRIP_PIRA) src/gen_actions.pira			\
 		> src/gen_actions.pir
 	
-src/gen_actions.pm: $(ACTIONS_PM) Makefile
-	@echo "**** Collecting gen_actions.pm"
-	cat $(ACTIONS_PM) > src/gen_actions.pm
+src/gen_actions.nqp: $(ACTIONS_PM) Makefile
+	@echo "**** Collecting gen_actions.nqp"
+	cat $(ACTIONS_PM) > src/gen_actions.nqp
 
-src/parser/actions.pir: src/parser/actions.pm
+src/parser/actions.pir: src/parser/actions.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=src/parser/actions.pira \
-		src/parser/actions.pm
+		src/parser/actions.nqp
 	$(STRIP_PIRA) src/parser/actions.pira \
 		> src/parser/actions.pir
 	$(RM_F) src/parser/actions.pira
 
-src/parser/declaration_actions.pir: src/parser/declaration_actions.pm
+src/parser/declaration_actions.pir: src/parser/declaration_actions.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=src/parser/declaration_actions.pira \
-		src/parser/declaration_actions.pm
+		src/parser/declaration_actions.nqp
 	$(STRIP_PIRA) src/parser/declaration_actions.pira \
 		> src/parser/declaration_actions.pir
 	$(RM_F) src/parser/declaration_actions.pira
 
-src/parser/expression_actions.pir: src/parser/expression_actions.pm
+src/parser/expression_actions.pir: src/parser/expression_actions.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=src/parser/expression_actions.pira \
-		src/parser/expression_actions.pm
+		src/parser/expression_actions.nqp
 	$(STRIP_PIRA) src/parser/expression_actions.pira \
 		> src/parser/expression_actions.pir
 	$(RM_F) src/parser/expression_actions.pira
 
-src/parser/name_actions.pir: src/parser/name_actions.pm
+src/parser/name_actions.pir: src/parser/name_actions.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=src/parser/name_actions.pira \
-		src/parser/name_actions.pm
+		src/parser/name_actions.nqp
 	$(STRIP_PIRA) src/parser/name_actions.pira \
 		> src/parser/name_actions.pir
 	$(RM_F) src/parser/name_actions.pira
 
-src/parser/statement_actions.pir: src/parser/statement_actions.pm
+src/parser/statement_actions.pir: src/parser/statement_actions.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=src/parser/statement_actions.pira \
-		src/parser/statement_actions.pm
+		src/parser/statement_actions.nqp
 	$(STRIP_PIRA) src/parser/statement_actions.pira \
 		> src/parser/statement_actions.pir
 	$(RM_F) src/parser/statement_actions.pira
 
-src/parser/token_actions.pir: src/parser/token_actions.pm
+src/parser/token_actions.pir: src/parser/token_actions.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=src/parser/token_actions.pira \
-		src/parser/token_actions.pm
+		src/parser/token_actions.nqp
 	$(STRIP_PIRA) src/parser/token_actions.pira \
 		> src/parser/token_actions.pir
 	$(RM_F) src/parser/token_actions.pira
@@ -268,218 +268,218 @@ src/gen_library.pir: $(COMPILER_LIBS_PIR) Makefile
 	@echo "* Assembling gen_library.pir"
 	@cat $(COMPILER_LIBS_PIR) > src/gen_library.pir
 
-library/close/Compiler/Array.pir: library/close/Compiler/Array.pm
+library/close/Compiler/Array.pir: library/close/Compiler/Array.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/Array.pira \
-		library/close/Compiler/Array.pm
+		library/close/Compiler/Array.nqp
 	$(STRIP_PIRA) library/close/Compiler/Array.pira \
 		> library/close/Compiler/Array.pir
 	$(RM_F) library/close/Compiler/Array.pira
 
-library/close/Compiler/Config.pir: library/close/Compiler/Config.pm
+library/close/Compiler/Config.pir: library/close/Compiler/Config.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/Config.pira \
-		library/close/Compiler/Config.pm
+		library/close/Compiler/Config.nqp
 	$(STRIP_PIRA) library/close/Compiler/Config.pira \
 		> library/close/Compiler/Config.pir
 	$(RM_F) library/close/Compiler/Config.pira
 
-library/close/Compiler/DeclarationCollectionVisitor.pir: library/close/Compiler/DeclarationCollectionVisitor.pm
+library/close/Compiler/DeclarationCollectionVisitor.pir: library/close/Compiler/DeclarationCollectionVisitor.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/DeclarationCollectionVisitor.pira \
-		library/close/Compiler/DeclarationCollectionVisitor.pm
+		library/close/Compiler/DeclarationCollectionVisitor.nqp
 	$(STRIP_PIRA) library/close/Compiler/DeclarationCollectionVisitor.pira \
 		> library/close/Compiler/DeclarationCollectionVisitor.pir
 	$(RM_F) library/close/Compiler/DeclarationCollectionVisitor.pira
 
-library/close/Compiler/Dumper.pir: library/close/Compiler/Dumper.pm
+library/close/Compiler/Dumper.pir: library/close/Compiler/Dumper.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/Dumper.pira \
-		library/close/Compiler/Dumper.pm
+		library/close/Compiler/Dumper.nqp
 	$(STRIP_PIRA) library/close/Compiler/Dumper.pira \
 		> library/close/Compiler/Dumper.pir
 	$(RM_F) library/close/Compiler/Dumper.pira
 
-library/close/Compiler/File.pir: library/close/Compiler/File.pm
+library/close/Compiler/File.pir: library/close/Compiler/File.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/File.pira \
-		library/close/Compiler/File.pm
+		library/close/Compiler/File.nqp
 	$(STRIP_PIRA) library/close/Compiler/File.pira \
 		> library/close/Compiler/File.pir
 	$(RM_F) library/close/Compiler/File.pira
 
-library/close/Compiler/Hash.pir: library/close/Compiler/Hash.pm
+library/close/Compiler/Hash.pir: library/close/Compiler/Hash.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/Hash.pira \
-		library/close/Compiler/Hash.pm
+		library/close/Compiler/Hash.nqp
 	$(STRIP_PIRA) library/close/Compiler/Hash.pira \
 		> library/close/Compiler/Hash.pir
 	$(RM_F) library/close/Compiler/Hash.pira
 
-library/close/Compiler/Lookups.pir: library/close/Compiler/Lookups.pm
+library/close/Compiler/Lookups.pir: library/close/Compiler/Lookups.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/Lookups.pira \
-		library/close/Compiler/Lookups.pm
+		library/close/Compiler/Lookups.nqp
 	$(STRIP_PIRA) library/close/Compiler/Lookups.pira \
 		> library/close/Compiler/Lookups.pir
 	$(RM_F) library/close/Compiler/Lookups.pira
 
-library/close/Compiler/Messages.pir: library/close/Compiler/Messages.pm
+library/close/Compiler/Messages.pir: library/close/Compiler/Messages.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/Messages.pira \
-		library/close/Compiler/Messages.pm
+		library/close/Compiler/Messages.nqp
 	$(STRIP_PIRA) library/close/Compiler/Messages.pira \
 		> library/close/Compiler/Messages.pir
 	$(RM_F) library/close/Compiler/Messages.pira
 
-library/close/Compiler/MessageVisitor.pir: library/close/Compiler/MessageVisitor.pm
+library/close/Compiler/MessageVisitor.pir: library/close/Compiler/MessageVisitor.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/MessageVisitor.pira \
-		library/close/Compiler/MessageVisitor.pm
+		library/close/Compiler/MessageVisitor.nqp
 	$(STRIP_PIRA) library/close/Compiler/MessageVisitor.pira \
 		> library/close/Compiler/MessageVisitor.pir
 	$(RM_F) library/close/Compiler/MessageVisitor.pira
 
-library/close/Compiler/Namespaces.pir: library/close/Compiler/Namespaces.pm
+library/close/Compiler/Namespaces.pir: library/close/Compiler/Namespaces.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/Namespaces.pira \
-		library/close/Compiler/Namespaces.pm
+		library/close/Compiler/Namespaces.nqp
 	$(STRIP_PIRA) library/close/Compiler/Namespaces.pira \
 		> library/close/Compiler/Namespaces.pir
 	$(RM_F) library/close/Compiler/Namespaces.pira
 
-library/close/Compiler/Node.pir: library/close/Compiler/Node.pm
+library/close/Compiler/Node.pir: library/close/Compiler/Node.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/Node.pira \
-		library/close/Compiler/Node.pm
+		library/close/Compiler/Node.nqp
 	$(STRIP_PIRA) library/close/Compiler/Node.pira \
 		> library/close/Compiler/Node.pir
 	$(RM_F) library/close/Compiler/Node.pira
 
-library/close/Compiler/OS.pir: library/close/Compiler/OS.pm
+library/close/Compiler/OS.pir: library/close/Compiler/OS.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/OS.pira \
-		library/close/Compiler/OS.pm
+		library/close/Compiler/OS.nqp
 	$(STRIP_PIRA) library/close/Compiler/OS.pira \
 		> library/close/Compiler/OS.pir
 	$(RM_F) library/close/Compiler/OS.pira
 
-library/close/Compiler/PastCleanupVisitor.pir: library/close/Compiler/PastCleanupVisitor.pm
+library/close/Compiler/PastCleanupVisitor.pir: library/close/Compiler/PastCleanupVisitor.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/PastCleanupVisitor.pira \
-		library/close/Compiler/PastCleanupVisitor.pm
+		library/close/Compiler/PastCleanupVisitor.nqp
 	$(STRIP_PIRA) library/close/Compiler/PastCleanupVisitor.pira \
 		> library/close/Compiler/PastCleanupVisitor.pir
 	$(RM_F) library/close/Compiler/PastCleanupVisitor.pira
 
-library/close/Compiler/PrettyPrintVisitor.pir: library/close/Compiler/PrettyPrintVisitor.pm
+library/close/Compiler/PrettyPrintVisitor.pir: library/close/Compiler/PrettyPrintVisitor.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/PrettyPrintVisitor.pira \
-		library/close/Compiler/PrettyPrintVisitor.pm
+		library/close/Compiler/PrettyPrintVisitor.nqp
 	$(STRIP_PIRA) library/close/Compiler/PrettyPrintVisitor.pira \
 		> library/close/Compiler/PrettyPrintVisitor.pir
 	$(RM_F) library/close/Compiler/PrettyPrintVisitor.pira
 
-library/close/Compiler/Scalar.pir: library/close/Compiler/Scalar.pm
+library/close/Compiler/Scalar.pir: library/close/Compiler/Scalar.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/Scalar.pira \
-		library/close/Compiler/Scalar.pm
+		library/close/Compiler/Scalar.nqp
 	$(STRIP_PIRA) library/close/Compiler/Scalar.pira \
 		> library/close/Compiler/Scalar.pir
 	$(RM_F) library/close/Compiler/Scalar.pira
 
-library/close/Compiler/ScopeAssignmentVisitor.pir: library/close/Compiler/ScopeAssignmentVisitor.pm
+library/close/Compiler/ScopeAssignmentVisitor.pir: library/close/Compiler/ScopeAssignmentVisitor.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/ScopeAssignmentVisitor.pira \
-		library/close/Compiler/ScopeAssignmentVisitor.pm
+		library/close/Compiler/ScopeAssignmentVisitor.nqp
 	$(STRIP_PIRA) library/close/Compiler/ScopeAssignmentVisitor.pira \
 		> library/close/Compiler/ScopeAssignmentVisitor.pir
 	$(RM_F) library/close/Compiler/ScopeAssignmentVisitor.pira
 
-library/close/Compiler/Scopes.pir: library/close/Compiler/Scopes.pm
+library/close/Compiler/Scopes.pir: library/close/Compiler/Scopes.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/Scopes.pira \
-		library/close/Compiler/Scopes.pm
+		library/close/Compiler/Scopes.nqp
 	$(STRIP_PIRA) library/close/Compiler/Scopes.pira \
 		> library/close/Compiler/Scopes.pir
 	$(RM_F) library/close/Compiler/Scopes.pira
 
-library/close/Compiler/String.pir: library/close/Compiler/String.pm
+library/close/Compiler/String.pir: library/close/Compiler/String.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/String.pira \
-		library/close/Compiler/String.pm
+		library/close/Compiler/String.nqp
 	$(STRIP_PIRA) library/close/Compiler/String.pira \
 		> library/close/Compiler/String.pir
 	$(RM_F) library/close/Compiler/String.pira
 	
-library/close/Compiler/SymbolResolutionVisitor.pir: library/close/Compiler/SymbolResolutionVisitor.pm
+library/close/Compiler/SymbolResolutionVisitor.pir: library/close/Compiler/SymbolResolutionVisitor.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/SymbolResolutionVisitor.pira \
-		library/close/Compiler/SymbolResolutionVisitor.pm
+		library/close/Compiler/SymbolResolutionVisitor.nqp
 	$(STRIP_PIRA) library/close/Compiler/SymbolResolutionVisitor.pira \
 		> library/close/Compiler/SymbolResolutionVisitor.pir
 	$(RM_F) library/close/Compiler/SymbolResolutionVisitor.pira
 
-library/close/Compiler/Symbols.pir: library/close/Compiler/Symbols.pm
+library/close/Compiler/Symbols.pir: library/close/Compiler/Symbols.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/Symbols.pira \
-		library/close/Compiler/Symbols.pm
+		library/close/Compiler/Symbols.nqp
 	$(STRIP_PIRA) library/close/Compiler/Symbols.pira \
 		> library/close/Compiler/Symbols.pir
 	$(RM_F) library/close/Compiler/Symbols.pira
 
-library/close/Compiler/TreeRewriteVisitor.pir: library/close/Compiler/TreeRewriteVisitor.pm
+library/close/Compiler/TreeRewriteVisitor.pir: library/close/Compiler/TreeRewriteVisitor.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/TreeRewriteVisitor.pira \
-		library/close/Compiler/TreeRewriteVisitor.pm
+		library/close/Compiler/TreeRewriteVisitor.nqp
 	$(STRIP_PIRA) library/close/Compiler/TreeRewriteVisitor.pira \
 		> library/close/Compiler/TreeRewriteVisitor.pir
 	$(RM_F) library/close/Compiler/TreeRewriteVisitor.pira
 
-library/close/Compiler/TypeResolutionVisitor.pir: library/close/Compiler/TypeResolutionVisitor.pm
+library/close/Compiler/TypeResolutionVisitor.pir: library/close/Compiler/TypeResolutionVisitor.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/TypeResolutionVisitor.pira \
-		library/close/Compiler/TypeResolutionVisitor.pm
+		library/close/Compiler/TypeResolutionVisitor.nqp
 	$(STRIP_PIRA) library/close/Compiler/TypeResolutionVisitor.pira \
 		> library/close/Compiler/TypeResolutionVisitor.pir
 	$(RM_F) library/close/Compiler/TypeResolutionVisitor.pira
 
-library/close/Compiler/Types.pir: library/close/Compiler/Types.pm
+library/close/Compiler/Types.pir: library/close/Compiler/Types.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/Types.pira \
-		library/close/Compiler/Types.pm
+		library/close/Compiler/Types.nqp
 	$(STRIP_PIRA) library/close/Compiler/Types.pira \
 		> library/close/Compiler/Types.pir
 	$(RM_F) library/close/Compiler/Types.pira
 
-library/close/Compiler/Visitor.pir: library/close/Compiler/Visitor.pm
+library/close/Compiler/Visitor.pir: library/close/Compiler/Visitor.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=library/close/Compiler/Visitor.pira \
-		library/close/Compiler/Visitor.pm
+		library/close/Compiler/Visitor.nqp
 	$(STRIP_PIRA) library/close/Compiler/Visitor.pira \
 		> library/close/Compiler/Visitor.pir
 	$(RM_F) library/close/Compiler/Visitor.pira
@@ -665,11 +665,11 @@ hll_close: $(HLL_CLOSE_PIR)
 hll_close_clean: 
 	$(RM_F) $(HLL_CLOSE_CLEAN_RM_FILES)
 
-faketree: faketree.pm
+faketree: faketree.nqp
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
 		--output=faketree.pira \
-		faketree.pm
+		faketree.nqp
 	$(STRIP_PIRA) faketree.pira \
 		> faketree.pir
 	$(RM_F) faketree.pira
