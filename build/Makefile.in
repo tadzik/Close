@@ -59,6 +59,7 @@ BUILTINS_PIR := \
 
 COMPILER_LIBS_PIR := \
 	library/Config.pir	\
+	library/String.pir	\
 	library/close/Compiler/Array.pir			\
 	library/close/Compiler/Config.pir			\
 	library/close/Compiler/DeclarationCollectionVisitor.pir	\
@@ -76,7 +77,6 @@ COMPILER_LIBS_PIR := \
 	library/close/Compiler/Scalar.pir 			\
 	library/close/Compiler/ScopeAssignmentVisitor.pir	\
 	library/close/Compiler/Scopes.pir			\
-	library/close/Compiler/String.pir			\
 	library/close/Compiler/SymbolResolutionVisitor.pir	\
 	library/close/Compiler/Symbols.pir		\
 	library/close/Compiler/TreeRewriteVisitor.pir	\
