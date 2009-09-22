@@ -92,14 +92,27 @@ sub _create_bareword(%attributes) {
 	
 }
 
+# Not sure I'll ever use this.
+sub _create_compilation_unit(%attributes) {
+	NOTE("Creating compilation_unit");
+	
+	my $past := PAST::Stmts.new();
+	set_attributes($past, %attributes);
+	
+	NOTE("Created new compilation_unit node");
+	DUMP($past);
+	return $past;
+}
+
 sub _create_compound_statement(%attributes) {
 	NOTE("Creating compound block");
 	DUMP(%attributes);
 	
 	my $past := PAST::Block.new(
 		:blocktype('immediate'), 
-		:name('compound statement'),
 	);
+	$past.symbol_defaults(:scope('register'));
+	%attributes<name> := %attributes<id>;
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
@@ -125,15 +138,21 @@ sub _create_decl_function_returning(%attributes) {
 	NOTE("Creating a function_returning declarator");
 	
 	my $past := PAST::Block.new(
-		:blocktype('declaration'),
-		:name('function returning'), 
+		:blocktype('immediate'),
 	);
-	$past<default_scope>	:= 'parameter';
+	$past.symbol_defaults(:scope('parameter'));
 	$past<is_declarator>	:= 1;
 	$past<is_function>		:= 1;
-	$past<num_parameters>	:= 0;
+	%attributes<name> := %attributes<id>;
 	set_attributes($past, %attributes);
-		
+	
+	$past<parameters> := close::Compiler::Node::create('decl_varlist',
+		:name('parameter_list'),
+		:node($past),
+	);
+	
+	$past.push($past<parameters>);
+	
 	DUMP($past);
 	return $past;
 }
@@ -160,30 +179,40 @@ sub _create_decl_pointer_to(%attributes) {
 	return $past;
 }
 
-sub _create_decl_temp(%attributes) {
-	NOTE("Creating new temporary-declaration scope");
-	my $past := PAST::Block.new(
-		:blocktype('immediate'),
-	);
-	$past<varlist> := create('decl_varlist', :block($past));
-	set_attributes($past, %attributes);
-	
-	DUMP($past);
-	return $past;
-}
-
 sub _create_decl_varlist(%attributes) {
-	NOTE("Creating new declaration-VarList");
-	my $past := PAST::VarList.new(:name('decl-varlist'));
+	NOTE("Creating new decl_varlist");
+	my $past := PAST::VarList.new();
 	set_attributes($past, %attributes);
-
 	DUMP($past);
 	return $past;
 }
 
 sub _create_declarator_name(%attributes) {
 	NOTE("Creating declarator_name");
+
+	# Calling create_symbol will call set_attributes, so 
+	# get everything stored first.
 	%attributes<isdecl> := 1;
+	
+	my @parts := Array::clone(%attributes<parts>);
+	# If this fails, it's because dcl_name matches namespaces, but I can't 
+	# think of when I'd use that.
+	ASSERT(+@parts, 'A declarator_name has at least one part');
+	
+	%attributes<name> := @parts.pop();
+
+	if %attributes<is_rooted> {
+		# Use exactly what we have left.
+		%attributes<namespace> := @parts;
+	}
+	elsif +@parts {
+		# Figure out "full" namespace.
+		my $outer_nsp := close::Compiler::Scopes::fetch_current_namespace();
+		my @namespace := Array::clone($outer_nsp.namespace());
+		@parts := Array::append(@namespace, @parts);
+		%attributes<namespace> := @parts;
+	}
+
 	my $past := _create_symbol(%attributes);
 	
 	DUMP($past);
@@ -295,8 +324,8 @@ sub _create_foreach_statement(%attributes) {
 	NOTE("Creating foreach_statement");
 	my $past := PAST::Block.new(
 		:blocktype('immediate'),
-		:name('foreach statement'),
 	);
+	%attributes<name> := %attributes<id>;
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
@@ -304,16 +333,58 @@ sub _create_foreach_statement(%attributes) {
 }
 
 sub _create_function_definition(%attributes) {
+	our @copy_attrs := (
+		'display_name',
+		'etype',
+		'hll',
+		'is_rooted',
+		'isdecl',
+		'lexical',
+		'name',
+		'namespace',
+		'pir_name',
+		'type',
+	);
+	
 	NOTE("Creating new function_definition");
-	ASSERT(%attributes<from>,
-		'Function definition must be created :from() a compound statement');
-		
-	my $past := %attributes<from>;
-	$past.blocktype('declaration');
-	$past<default_scope> := 'register';
-	%attributes<from> := Scalar::undef();
+	ASSERT(%attributes<from> && %attributes<from><type><is_function>,
+		'Function definition must be created :from() a declarator');
+	
+	my $from := %attributes<from>;
+	Hash::delete(%attributes, 'from');
+	
+	DUMP($from);
+	my $past := PAST::Block.new(
+		:blocktype('declaration'),
+		:lexical(0),
+	);
+
+	copy_adverbs($from, $past);
+	for @copy_attrs {
+		if Scalar::defined($from{$_}) 
+			&& !Hash::exists(%attributes, $_) {
+			%attributes{$_} := $from{$_};
+		}
+	}
+	
+	$from := $from<type>;
+	%attributes<arity> := $from.arity();
+	
+	$past.symbol_defaults(:scope($from.symbol('')<scope>));
+	copy_block($from, $past);
+	
+	unless %attributes<hll> {
+		%attributes<hll> := close::Compiler::Scopes::fetch_current_hll();
+	}
+	
+	unless %attributes<namespace> {
+		my $nsp := close::Compiler::Scopes::fetch_current_namespace();
+		%attributes<namespace> := Array::clone($nsp.namespace());
+	}
+	
 	set_attributes($past, %attributes);
 	
+	NOTE("done");
 	DUMP($past);
 	return $past;
 }
@@ -327,6 +398,39 @@ sub _create_goto_statement(%attributes) {
 		:name('goto ' ~ $label), 
 		:pasttype('inline'),
 	);
+	
+	set_attributes($past, %attributes);
+	
+	DUMP($past);
+	return $past;
+}
+
+sub _create_include_file(%attributes) {
+	NOTE("Creating include_file");
+
+	my $past := PAST::Block.new();
+	set_attributes($past, %attributes);
+	
+	DUMP($past);
+	return $past;
+}
+
+sub _create_initload_sub(%attributes) {
+	NOTE("Creating init-load sub");
+
+	ASSERT(%attributes<from>, 'Initload_sub requires a :from() namespace block');
+	my $from := %attributes<from>;
+	Hash::delete(%attributes, 'from');
+	
+	my $past := PAST::Block.new(
+		:blocktype('declaration'),
+	);
+	$past.symbol_defaults(:scope('package'));
+	
+	%attributes<hll>		:= $from.hll();
+	%attributes<name>		:= %attributes<id>;
+	%attributes<namespace>	:= $from.namespace();
+	%attributes<pirflags>	:= ':init :load';
 	
 	set_attributes($past, %attributes);
 	
@@ -365,7 +469,7 @@ sub _create_integer_literal(%attributes) {
 sub _create_label_name(%attributes) {
 	my $name := %attributes<name>;
 	ASSERT($name, 'Label_name must have a :name()');
-	NOTE("Creating label_name: ", $name);
+	NOTE("Creating label_name: '", $name, "'");
 	
 	my $past := PAST::Val.new(
 		:returns('String'),
@@ -376,48 +480,57 @@ sub _create_label_name(%attributes) {
 	return $past;
 }
 
-sub _create_namespace_block(%attributes) {
-	NOTE("Creating new namespace_block");	
+sub _create_namespace_definition(%attributes) {
+	NOTE("Creating new namespace_definition");	
 	
 	my @path := %attributes<path>;
-	ASSERT(@path, 'Caller must provide a :path() value');
-	DUMP(@path);
+	ASSERT(Scalar::defined(@path), 'Caller must provide a :path() value');
 
 	my @namespace	:= Array::clone(@path);
-	my $hll		:= @namespace.shift();
-	my $name;
 	
-	if +@namespace {
-		$name := @namespace.pop();
-		@namespace.push($name);
+	my $past := PAST::Block.new();
+	$past.symbol_defaults(:scope('package'));
+
+	if @namespace {
+		%attributes<hll>		:= @namespace.shift();
 	}
 	
-	my $past := PAST::Block.new(
-		:blocktype('immediate'),
-		:hll($hll),
-		:namespace(@namespace),
-		:name($name),
-	);
+	%attributes<is_namespace> := 1;
+	%attributes<is_rooted>	:= 1;
+	%attributes<lexical>	:= 0;
+	%attributes<namespace>	:= @namespace;
 
-	close::Compiler::Node::set_name($past, $name);
-	
-	$past<default_scope> := 'package';
-	$past<is_namespace> := 1;
-	$past<path> := Array::clone(@path);
-
-	for %attributes {
-		unless $_ eq 'name' || $past{$_} {
-			$past{$_} := %attributes{$_};
-		}
-	}
+	set_attributes($past, %attributes);
 	
 	DUMP($past);
 	return $past;
 }
 
+=sub _create_namespace_path
+
+Note that this creates a PAST Block because the only (declarative) use for the
+namespace_path target is in a namespace_definition.
+
+=cut
+
 sub _create_namespace_path(%attributes) {
 	NOTE("Creating namespace_path");
 	my $past := PAST::Var.new();
+	
+	my @parts := %attributes<parts>;
+	
+	unless %attributes<is_rooted> {
+		my $outer_nsp := close::Compiler::Scopes::fetch_current_namespace();
+		my @namespace := Array::clone($outer_nsp.namespace());
+		@parts := Array::append(@namespace, @parts);
+	}
+	
+	%attributes<namespace>	:= @parts;
+	
+	unless %attributes<hll> {
+		%attributes<hll> := close::Compiler::Scopes::fetch_current_hll();
+	}
+	
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
@@ -429,7 +542,7 @@ sub _create_parameter_declaration(%attributes) {
 	ASSERT(%attributes<from>, 'Parameter declaration must be created :from() a declarator.');
 	
 	my $past := %attributes<from>;
-	%attributes<from> := Scalar::undef();
+	Hash::delete(%attributes, 'from');
 	%attributes<scope> := 'parameter';
 	%attributes<isdecl> := 1;
 	
@@ -441,7 +554,19 @@ sub _create_parameter_declaration(%attributes) {
 
 sub _create_qualified_identifier(%attributes) {
 	NOTE("Creating qualified_identifier");
+DUMP(%attributes);	
+	my @parts := Array::clone(%attributes<parts>);
+	ASSERT(+@parts, 'A qualified_identifier has at least one part');
+	
+	%attributes<name> := @parts.pop();
+	
+	if +@parts || %attributes<is_rooted> {
+		# Only empty namespace if rooted
+		%attributes<namespace> := @parts;
+	}
+	
 	my $past := PAST::Var.new();
+	
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
@@ -459,8 +584,7 @@ sub _create_quoted_literal(%attributes) {
 	set_attributes($past, %attributes);
 	
 	DUMP($past);
-	return $past;
-	
+	return $past;	
 }
 
 sub _create_return_statement(%attributes) {
@@ -479,6 +603,7 @@ sub _create_return_statement(%attributes) {
 sub _create_symbol(%attributes) {
 	NOTE("Creating new symbol");
 	my $past := PAST::Var.new();
+
 	set_attributes($past, %attributes);
 
 	unless $past<pir_name> {
@@ -549,12 +674,10 @@ sub _create_translation_unit(%attributes) {
 	my $past := PAST::Block.new(
 		:blocktype('immediate'),
 		:hll(close::Compiler::Scopes::fetch_current_hll()),
-		:name('translation unit'),
 	);
+	%attributes<name> := %attributes<id>;
 	set_attributes($past, %attributes);
 	
-	close::Compiler::Types::add_builtins($past);
-		
 	NOTE("Created new translation_unit node");
 	DUMP($past);
 	return $past;
@@ -569,10 +692,63 @@ sub _create_using_directive(%attributes) {
 	return $past;
 }
 
+################################################################
+
+sub set_adverb($node, $adverb) {
+	my $name := $adverb.name();
+	NOTE("Setting adverb '", $name, "' on ", NODE_TYPE($node), " node ", $node.name());
+	$node<adverbs>{$name} := $adverb;
+
+	if $name eq 'flat' {
+		$node.flat(1);
+	}
+	elsif $name eq 'named' {
+		my $named := $adverb<named>;
+		
+		if $named {
+			$node.named($name);
+		}
+	}
+	elsif $name eq 'slurpy' {
+		$node.slurpy(1);
+	}
+	else {
+		my $pirflags := $adverb.value();
+		
+		if $node<pirflags> {
+			$pirflags := $node<pirflags> ~ ' ' ~ $pirflags;
+		}
+		
+		$node<pirflags> := $pirflags;
+	}
+	
+	NOTE("done");
+	DUMP($node);
+}
+
+sub copy_adverbs($from, $to) {
+	for $from<adverbs> {
+		set_adverb($to, $from<adverbs>{$_});
+	}
+}
+
+sub copy_block($from, $to) {
+	for $from<symtable> {
+		$to<symtable>{$_} := $from<symtable>{$_};
+	}
+
+	copy_adverbs($from, $to);
+
+	for @($from) {
+		$to.push($_);
+	}
+}
+
 sub create($type, *%attributes) {
 	my &code := get_factory($type);
 	ASSERT(&code, 'get_factory() returns a valid Sub, or dies.');
 
+	%attributes<id> := make_id($type);
 	%attributes<node_type> := $type;
 	my $past:= &code(%attributes);
 	
@@ -641,18 +817,31 @@ sub get_factory($type) {
 	return $sub;
 }
 
+sub make_id($type) {
+	our %id_counter;
+	
+	unless %id_counter{$type} {
+		%id_counter{$type} := 0;
+	}
+	
+	my $id := '_' ~ $type ~ %id_counter{$type}++;
+	return $id;
+}
+	
 # Make a symbol reference from a declarator.
 sub make_reference_to($node) {
+	my @parts := Array::clone($node.namespace());
+	@parts.push($node.name());
+	
 	my $past := close::Compiler::Node::create('qualified_identifier', 
 		:declarator($node),
 		:hll($node<hll>),
 		:is_rooted($node<is_rooted>),
-		:namespace($node.namespace()),
+		:parts(@parts),
 		:node($node),
 		:scope($node.scope()),
 	);
 
-	close::Compiler::Node::set_name($past, $node.name());
 	return $past;
 }
 
@@ -689,18 +878,27 @@ sub path_of($node) {
 	return @path;
 }
 
-sub set_attributes($past, %attributes) {
+sub set_attributes($node, %attributes) {
+	my $set_name := 0;
+	
 	for %attributes {
-		# FIXME: Detect accessor methods with $past.can(...)
-		if $_ eq 'name' {
-			close::Compiler::Node::set_name($past, %attributes{$_});
+		if Scalar::defined(%attributes{$_}) {
+			# FIXME: Detect accessor methods with $node.can(...)
+			if $_ eq 'name' || $_ eq 'namespace' || $_ eq 'hll' {
+				$set_name := 1;
+				$node{$_} := %attributes{$_};
+			}
+			elsif $_ eq 'node' {
+				$node.node(%attributes{$_});
+			}
+			else {
+				$node{$_} := %attributes{$_};
+			}
 		}
-		elsif $_ eq 'node' {
-			$past.node(%attributes{$_});
-		}
-		else {
-			$past{$_} := %attributes{$_};
-		}
+	}
+	
+	if $set_name {
+		set_name($node, $node.name());
 	}
 }
 

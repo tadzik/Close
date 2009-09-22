@@ -222,17 +222,21 @@ sub cleanup_past($past) {
 	NOTE("Cleaning up PAST tree");
 	DUMP($past);
 
-	$SUPER := close::Compiler::Visitor.new();
-	NOTE("Created SUPER-visitor");
-	DUMP($SUPER);
+	if close::Compiler::Config::query('Compiler', name(0), 'disabled') {
+		NOTE("Configured off - skipping");
+	}
+	else {
+		$SUPER := close::Compiler::Visitor.new();
+		NOTE("Created SUPER-visitor");
+		DUMP($SUPER);
 	
-	my $visitor	:= close::Compiler::PastCleanupVisitor.new();
-	NOTE("Created visitor");
-	DUMP($visitor);
+		my $visitor	:= close::Compiler::PastCleanupVisitor.new();
+		NOTE("Created visitor");
+		DUMP($visitor);
 	
-	my $result := $visitor.visit($past);
+		$visitor.visit($past);
 	
-	NOTE("done");
-	DUMP($result);
-	return $result;
+		NOTE("done");
+		DUMP($past);
+	}
 }

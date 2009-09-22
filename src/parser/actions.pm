@@ -1,67 +1,26 @@
 # $Id$
 
-method TOP($/, $key) { PASSTHRU($/, $key); }
+class close::Grammar::Actions;
 
-our $recurse := 0;
-
-method translation_unit($/, $key) {
-	if $key eq 'start' {
-		if $recurse {
-			$recurse := 0;
-			
-			my $source := "namespace std { int strlen(string s); }";
-			
-			my $x := Q:PIR {
-				$P0 = compreg 'close'
-				$P1 = find_lex '$source'
-				$S0 = $P1
-				%r = $P0.'compile'($S0, 'target' => 'past')
-			};
-			
-			DUMP($x);
-		}
+#method TOP($/, $key) { PASSTHRU($/, $key); }
+method TOP($/, $key) { 
+	my $past := $/{$key}.ast;
 		
-		NOTE("Starting translation unit parse.");
-
-		my $config := close::Compiler::Config.new();
-		$config.read('close.cfg');
-		
-		NOTE("Begin translation unit!");
-		
-		my $pervasive := close::Compiler::Node::create('translation_unit');
-		close::Compiler::Scopes::push($pervasive);
-
-		my @root_nsp_path := Array::new('close');
-		my $root_nsp := close::Compiler::Namespaces::fetch(@root_nsp_path);
-		close::Compiler::Scopes::push($root_nsp);
-		
-		close::Compiler::Scopes::print_symbol_table($pervasive);
-	}
-	else {
-		NOTE("Done parsing translation unit.");
-		
-		my $default_nsp := close::Compiler::Scopes::pop('namespace_block');
-
-		for $<extern_statement> {
-			$default_nsp.push($_.ast);
-		}
-		
-		my $past := close::Compiler::Scopes::pop('translation_unit');
-		$past.push($default_nsp);
-		
-		close::Compiler::Scopes::dump_stack();
+	unless in_include_file() {
+		DUMP($past);
 
 		if get_config('Compiler', 'PrettyPrint') {
 			NOTE("Pretty-printing input");
-				
 			my $prettified := close::Compiler::PrettyPrintVisitor::print($past);
-			
 			NOTE("Pretty print done\n", $prettified);
 		}
 
+		NOTE("Collecting declarations");
+		close::Compiler::DeclarationCollectionVisitor::collect_declarations($past);
+		
 		NOTE("Resolving types");
 		close::Compiler::TypeResolutionVisitor::resolve_types($past);
-		
+			
 		NOTE("Resolving symbols");
 		close::Compiler::SymbolResolutionVisitor::resolve_symbols($past);
 
@@ -73,65 +32,204 @@ method translation_unit($/, $key) {
 
 		NOTE("Rewriting tree for POSTing");
 		$past := close::Compiler::TreeRewriteVisitor::rewrite_tree($past);
-		
+			
 		NOTE("Cleaning up tree for POSTing");
-		#close::Compiler::PastCleanupVisitor::cleanup_past($past);
-		
+		close::Compiler::PastCleanupVisitor::cleanup_past($past);
+
 		DUMP($past);
+	}	
+	
+	if get_config('Compiler', 'faketree') {
+		NOTE("Replacing compiled tree with faketree() results");
+		$past := faketree();
+	}
+	
+	make $past;
+}
+
+method declarative_statement($/, $key) { PASSTHRU($/, $key); }
+
+=method include_file
+
+Processes an included file. The compiled PAST subtree is used as the result of 
+this expression.
+
+=cut
+
+our @system_include_paths := Array::new(
+	'include',
+);
+
+our %Include_search_paths;
+%Include_search_paths<system> := @system_include_paths;
+%Include_search_paths<user> := Array::new('.');
+
+method include_file($/) {
+	NOTE("Processing include file: ", ~ $<file>);
+	my $file := $<file>.ast;
+	my $search_path := %Include_search_paths<user>;
+	
+	if $file<type> eq 'system' {
+		$search_path := %Include_search_paths<system>;
+	}
+
+	my $path := File::find_first($file<path>, $search_path);
+	NOTE("Found path: ", $path);
+	my $past := $file;
+	
+	if $path {
+		push_include_file();
 		
-		if get_config('Compiler', 'faketree') {
-			NOTE("Replacing compiled tree with faketree() results");
-			$past := faketree();
+		my $content := File::slurp($path);
+		$file<contents> := $content;
+		DUMP($file);
+
+		close::Compiler::Scopes::push($past);
+		
+		# Don't capture this to $past - the translation_unit rule
+		# knows to store included nodes into the current $past.
+		Q:PIR {
+			.local pmc parser
+			parser = compreg 'close'
+			
+			.local string source
+			$P0 = find_lex '$content'
+			source = $P0
+			%r = parser.'compile'(source, 'target' => 'past')
+		};
+		
+		close::Compiler::Scopes::pop('include_file');
+		pop_include_file();
+	}
+	else {
+		NOTE("Bogus include file - not found");
+		ADD_ERROR($past, "Include file ",
+			$file.name(), " not found.");
+	}
+	
+	NOTE("done");
+	DUMP($past);
+	make $past;
+}
+
+=method include_system
+
+Process a 'system' include file. Currently there is no difference between system
+and user include files, other than default search path.
+
+=cut
+
+method include_system($/) {
+	NOTE("Parsed system include file");
+	
+	my $past := close::Compiler::Node::create('include_file',
+		:name(~ $/),
+		:node($/),
+		:quote('<>'),
+		:include_type('system'),
+		:path($<string_literal>.ast),
+	);
+	
+	DUMP($past);
+	make $past;
+}
+
+=method include_user
+
+Process a 'user' include file. Currently there is no difference between system
+and user include files, other than default search path.
+
+=cut
+
+method include_user($/) {
+	NOTE("Parsed user include file");
+	my $qlit := $<QUOTED_LIT>.ast;
+	
+	my $past := close::Compiler::Node::create('include_file',
+		:name(~ $/),
+		:node($/),
+		:quote($qlit<quote>),
+		:include_type('user'),
+		:path($qlit.value()),
+	);
+	
+	DUMP($past);
+	make $past;
+}
+
+method namespace_definition($/, $key) {
+	if $key eq 'open' {
+		my $past := close::Compiler::Namespaces::fetch_namespace_of($<namespace_path>.ast);
+		NOTE("Pushed ", NODE_TYPE($past), " block for ", $past<display_name>);
+		close::Compiler::Scopes::push($past);
+	}
+	elsif $key eq 'close' {
+		NOTE("Popping namespace_definition block");
+		my $past := close::Compiler::Scopes::pop('namespace_definition');
+
+		for $<declaration_sequence><decl> {
+			$past.push($_.ast);
+		}
+		
+		NOTE("done");
+		DUMP($past);
+		make $past;
+	}
+	else {
+		$/.panic("Unexpected value '", $key, "' for $key parameter");
+	}
+}
+
+method translation_unit($/, $key) {
+	if $key eq 'open' {
+		my $config := close::Compiler::Config.new();
+		$config.read('close.cfg');
+		NOTE("Read config file");
+		
+		# Calling this forces the init code to run. I'm not sure that matters.
+		my $context := close::Compiler::Scopes::current();
+		DUMP($context);
+	}
+	elsif $key eq 'close' {
+		my $past;
+		
+		if in_include_file() {
+			# NB: Don't pop, because this might be a #include
+			NOTE("Not popping - this is a #include");
+			$past := close::Compiler::Scopes::current();
+		}
+		else {
+			NOTE("Popping namespace_definition block");
+			$past := close::Compiler::Scopes::pop('namespace_definition');
+		}
+		
+		NOTE("Adding declarations to translation unit context scope.");
+		for $<declaration_sequence><decl> {
+			$past.push($_.ast);
 		}
 		
 		NOTE("done");
 		DUMP($past);
 		make $past;		
 	}
+	else {
+		$/.panic("Unexpected value '", $key, "' for $key parameter");
+	}
 }
 
 sub faketree() {
-	my $tree := PAST::Stmts.new();
-	my $sub := PAST::Block.new();
-	$tree.push($sub);
+	my $sub := PAST::Block.new(:blocktype('declaration'), :name('compilation_unit'));
+	$sub.lexical(0);
+	$sub :=PAST::Stmts.new();
+	$sub<id> := "compilation_unit";
 	
-	my $args := PAST::Var.new(
-		:name('args'),
-		:namespace(Scalar::undef()),
-		:isdecl(1),
-		:scope('parameter'),
-	);
+	my $sub2 := PAST::Block.new(:blocktype('declaration'), :name('foo'));
+	$sub2.lexical(0);
+	$sub.push($sub2);
 	
-	$args<hll> := Scalar::undef();
-	$args<from> := Scalar::undef();
-	$args<index> := 0;
-	
-	my @a := ( 0, "std" );
-	@a.shift();
-	$sub.blocktype('declaration');
-	#$sub<default_scope> := 'parameter';
-	$sub.hll('close');
-	$sub.name('say');
-	$sub.namespace(@a);
-	#$sub<node_type> := 'function_definition';
-	$sub<child_sym><args><symbol> := $args;
-	$sub.push(
-		PAST::VarList.new(
-			:name('parameter_list'),
-			$args,
-		),
-	);
-	$sub.push(
-		PAST::Block.new(
-			:blocktype('immediate'),
-			:namespace(Scalar::undef()),
-			:name(Scalar::undef()),
-			:hll(Scalar::undef()),
-		),
-	);
-	$sub[1]<from> := Scalar::undef();
-	
-	DUMP($tree, 'Tree');
-	return $tree;
-	
+	$sub2 := PAST::Block.new(:blocktype('declaration'), :name('bar'));
+	$sub2.lexical(0);
+	$sub.push($sub2);
+
+	return $sub;
 }

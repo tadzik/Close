@@ -1,4 +1,5 @@
 # $Id$
+class close::Grammar::Actions;
 
 method built_in($/, $key)                { PASSTHRU($/, $key); }
 
@@ -159,6 +160,16 @@ method builtin_issame($/) {
 }
 
 
+
+# Given a past symbol, return the symbol hash.
+sub get_global_symbol_info($sym) {
+	my @path := namespace_path_of_var($sym);
+	my $block := close::Compiler::Namespaces::fetch(@path);
+
+	#say("Found block: ", $block.name());
+	my $name := $sym.name();
+	return $block.symbol($name);
+}
 
 sub symbol_defined_anywhere($past) {
 	if $past.scope() ne 'package' {

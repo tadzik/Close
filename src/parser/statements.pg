@@ -56,21 +56,6 @@ rule expression_statement {
 	{*}
 }
 
-=rule extern_statement
-
-An C<extern_statement> is a statement that may appear outside a function. 
-Because "normal" statements are assumed to be part of a namespace or class 
-init block, all of them are permitted. In addition, a C<namespace_definition>
-may only appear outside a function.
-
-=cut
-
-rule extern_statement {
-	| <namespace_definition>	{*} #= namespace_definition
-#	| <namespace_directive>
-	| <local_statement>		{*} #= local_statement
-}
-
 # foreach (int x in array) say("# ", x);
 # string x; foreach (x in hash) say(x, " => ", hash[x]);
 

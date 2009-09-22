@@ -1,4 +1,5 @@
 # $Id$
+class close::Grammar::Actions;
 
 method additive_expr($/) { binary_expr_l2r($/); }
 
@@ -80,6 +81,7 @@ method asm_contents($/) {
 }
 
 method asm_expr($/) {
+	NOTE("Got asm_expr");
 	my $past := close::Compiler::Node::create('expr_asm', 
 		:inline($<asm>.ast.value()),
 	);
@@ -90,6 +92,7 @@ method asm_expr($/) {
 		}
 	}
 	
+	NOTE("asm_expr has ", +@($past), " args");
 	DUMP($past);
 	make $past;
 }
@@ -111,6 +114,8 @@ sub binary_expr_l2r($/) {
 	DUMP($past);
 	make $past;
 }
+
+method constant($/, $key)               { PASSTHRU($/, $key); }
 
 method expression($/, $key) { PASSTHRU($/, $key); }
 
@@ -164,6 +169,7 @@ sub postfixup($past) {
 					DIE("No decl info stored for symbol '", $func.name(), "'");
 				}
 
+				ASSERT(0, "Sub is_local_function has been deleted.");
 				if is_local_function($func) {
 					close::Compiler::Node::set_name($past, $func.name());
 					$past.shift();

@@ -400,6 +400,16 @@ method _prettyprint_foreach_statement($node) {
 	return @result;
 }
 
+method _prettyprint_include_file($node) {
+	NOTE("PrettyPrinting include_file: ", $node.name());
+	
+	my @results := Array::new( "#include " ~ $node.name() );
+	
+	NOTE("done");
+	DUMP(@results);
+	return @results;
+}
+
 method _prettyprint_integer_literal($node) {
 	NOTE("Visiting integer_literal: ", $node.name());
 	

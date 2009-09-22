@@ -250,21 +250,21 @@ sub assign_scopes($past) {
 	NOTE("Assigning scopes in PAST tree");
 	DUMP($past);
 
-	$SUPER := close::Compiler::Visitor.new();
-	NOTE("Created SUPER-visitor");
-	DUMP($SUPER);
-	
-	my $visitor	:= close::Compiler::ScopeAssignmentVisitor.new();
-	NOTE("Created visitor");
-	DUMP($visitor);
-	
-	my @results	:= $visitor.visit($past);
-	
-	DUMP(@results);
+	if close::Compiler::Config::query('Compiler', name(0), 'disabled') {
+		NOTE("Configured off - skipping");
+	}
+	else {
+		$SUPER := close::Compiler::Visitor.new();
+		NOTE("Created SUPER-visitor");
+		DUMP($SUPER);
 		
-	my $result := $past; 
-	
-	NOTE("done");
-	DUMP($result);
-	return $result;
+		my $visitor	:= close::Compiler::ScopeAssignmentVisitor.new();
+		NOTE("Created visitor");
+		DUMP($visitor);
+		
+		$visitor.visit($past);
+		
+		NOTE("done");
+		DUMP($past);
+	}
 }

@@ -244,6 +244,7 @@ The C<RESERVED> token matches any of the reserved words in Close.
 
 token RESERVED {
 	[ 'alias'		# Declaration
+	| 'and'			# Operator
 	| 'asm'			# In-line assembly expression
 	| 'auto'		# Declaration
 	| 'break'		# Control flow in loops and switches.
@@ -260,16 +261,19 @@ token RESERVED {
 	| 'extern'		# Symbol scope
 	| 'float'		# Builtin type
 	| 'foreach'		# Loop syntax
+	# NB: Moved 'for' down because it's a prefix of the others, and tokens don't backtrack.
 	| 'for'			# Loop syntax
 	| 'goto'			# Control flow
 	| 'hll'			# Directive
 	| 'if'			# if statement
-	| 'in'			# foreach statement (x in list)
 	| 'inline'		# Declaration
 	| 'int'			# Builtin type
+	# NB: Moved 'in' down because it's a prefix of the others, and tokens don't backtrack.
+	| 'in'			# foreach statement (x in list)
 	| 'lexical'		# Storage class
 	| 'method'		# Declaration
 	| 'namespace'		# Directive
+	| 'or'			# Operator
 	| 'pmc'			# Builtin type
 	| 'register'		# Storage class
 	| 'repeat'		# Loop syntax
@@ -315,6 +319,8 @@ token GOTO			{ 'goto'		>> }
 token HLL			{ 'hll'			>> }
 token IF			{ 'if'			>> }
 token IN			{ 'in'			>> }
+# NB: 'include' is NOT a reserved word - it only occurs after '#'
+token INCLUDE		{ 'include'		>> }
 token INLINE		{ 'inline' 		>> }
 token INT			{ 'int'			>> }
 token LEXICAL		{ 'lexical' 		>> }
@@ -421,5 +427,7 @@ token	SINGLE_COLON	{ ':'	<!before ':'> }
 token	SINGLE_MINUS	{ '-'	<!before '-'> }
 token	SINGLE_PLUS	{ '+'	<!before '+'> }
 token	SINGLE_BANG	{ '!'	<!before '='> }
+token	SINGLE_HASH	{ '#'	<!before '#'> }
 
 token	COLON_SPACE	{ ':'	<?before <.WS_ALL>> }
+

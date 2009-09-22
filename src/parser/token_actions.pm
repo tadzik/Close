@@ -1,4 +1,5 @@
 # $Id$
+class close::Grammar::Actions;
 
 method BAREWORD($/) {
 	NOTE("Parsed BAREWORD");

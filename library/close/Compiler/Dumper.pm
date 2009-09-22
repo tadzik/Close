@@ -164,26 +164,34 @@ sub get_config($class, $sub) {
 }
 
 sub make_prefix($depth) {
+	if $depth < 1 {
+		$depth := 1;
+	}
+	
 	return String::repeat('| ', $depth - 1) ~ '+- ';
 }
 
 sub stack_depth() {
 	our $Stack_root;
+	our $Stack_root_offset;
 	our $Root_sub;
 	our $Root_nsp;
 	
 	unless $Stack_root {
 		$Stack_root := get_config('Stack', 'Root');
+		$Stack_root_offset := 0 + get_config('Stack', 'Root_offset');
 		
 		unless $Stack_root {
 			$Stack_root := 'parrot::close::Compiler::main';
+			$Stack_root_offset := 6; # 6 PCT subs on stack when parsing.
 		}
 		
 		my @parts	:= String::split('::', $Stack_root);
 		$Root_sub	:= @parts.pop();
 		$Root_nsp	:= Array::join('::', @parts);
 		
-		say("Stack root: ", $Stack_root);
+		#say("Stack root: ", $Stack_root);
+		#say("Stack root_offset: ", $Stack_root_offset);
 	}
 	
 
@@ -201,7 +209,7 @@ sub stack_depth() {
 		$P0 = get_global '$Root_nsp'
 		nsp_name = $P0
 		
-	while_not_main:
+	while_not_root:
 		inc depth				# depth++
 			
 		key = new 'Key'			# key = new Key('sub' ; depth)
@@ -214,22 +222,24 @@ sub stack_depth() {
 		$S0 = caller				# $S0 = caller.name()
 		$S1 = substr $S0, 0, 6
 
-		if $S1 == '_block' goto while_not_main
+		if $S1 == '_block' goto while_not_root
 
 		inc show_depth			# found a 'real' sub name
 		
-		unless $S0 == sub_name goto while_not_main
+		unless $S0 == sub_name goto while_not_root
 		
 		namespace = caller.'get_namespace'()
 		
-		$P0 = namespace.'get_name'()	# 
+		$P0 = namespace.'get_name'()
 		$S0 = join '::', $P0
 				
-		unless $S0 == nsp_name goto while_not_main
+		unless $S0 == nsp_name goto while_not_root
 		
 		# Done: depth indicates depth from "parrot::close::Compiler::main" to present.
 		%r = box show_depth
 	};
+	
+	$depth := $depth - $Stack_root_offset;
 	
 	return $depth;
 }

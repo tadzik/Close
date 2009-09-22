@@ -19,10 +19,75 @@ rule TOP {
 	<translation_unit> {*} #= translation_unit
 }
 
+=rule declaration_sequence 
+
+A I<declaration_sequence> is a sequence of L<declarative_statement>s. This is a
+convenience target for namespace and translation unit definitions.
+
+=cut
+
+rule declaration_sequence {
+	<decl=declarative_statement>*
+}
+
+=rule declarative_statement
+
+A I<declarative_statement> is a statement that declares or defines a symbol, 
+defines a namespace, or include another source file containing declarations
+and/or definitions. This includes L<declaration_statement>s, as well as 
+L<include_file>s and L<using_namespace_directive>s. 
+
+=cut
+
+rule declarative_statement {
+	| <include_file>		{*} #= include_file
+	| <namespace_definition>	{*} #= namespace_definition
+	| <declaration_statement>	{*} #= declaration_statement
+}
+
+=rule include_file
+
+Includes a system or user header file.
+
+=cut
+
+rule include_file {
+	<.SINGLE_HASH> <.INCLUDE> [ <file=include_system> | <file=include_user> ] 
+	{*}
+}
+
+token include_system {
+	'<' ~ '>' <string_literal: '>'>
+	{*}
+}
+
+token include_user {
+	<QUOTED_LIT> 
+	{*}
+}
+
+=rule namespace_definition
+
+A namespace definition is a block that assigns a namespace path to all the
+declarations contained in the block.
+
+    namespace Foo {
+        void bark();	// Defines Foo::bark();
+    }
+
+=cut
+
+rule namespace_definition {
+	<is_extern=EXTERN>? <.NAMESPACE> <namespace_path> 
+	'{'	{*} #= open
+		<declaration_sequence>
+	'}'	{*} #= close
+}
+
 =head5 C<translation_unit>
 
 A I<translation unit> is a compiled file, with all of the ancillary included 
-bits that may appear. Essentialy, whatever is needed to produce a C<.pbc>
+bits that may appear. Essentially, whatever is needed to produce a C<.pbc>
 file as output.
 
 In Close, a translation unit is defined as a sequence of zero or more 
@@ -32,8 +97,8 @@ variables, classes, or functions.
 =cut
 
 rule translation_unit {
-	{*} #= start
-	<extern_statement>*
-	[ $ || <panic: 'Syntax error'> ]
-	{*} #= finish
+	{*} #= open
+	<declaration_sequence>
+	[ $ || <panic: 'Syntax error. Parsing terminated before end of input.'> ]
+	{*} #= close
 }

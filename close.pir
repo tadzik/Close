@@ -55,6 +55,12 @@ to the close compiler.
 .include 'src/gen_builtins.pir'
 .include 'src/gen_grammar.pir'
 .include 'src/gen_actions.pir'
+.include 'src/parser/actions.pir'
+.include 'src/parser/declaration_actions.pir'
+.include 'src/parser/expression_actions.pir'
+.include 'src/parser/name_actions.pir'
+.include 'src/parser/statement_actions.pir'
+.include 'src/parser/token_actions.pir'
 .include 'src/gen_library.pir'
 
 =back

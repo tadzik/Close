@@ -148,7 +148,7 @@ method _type_resolve_UNKNOWN($node) {
 	my @results := Array::new($node);
 	
 	NOTE("done");
-	DUMP(@results);
+	#DUMP(@results);
 	return @results;
 }
 
@@ -315,16 +315,24 @@ Traverses the PAST tree, resolving all of the type names.
 sub resolve_types($past) {
 	NOTE("Resolving types in PAST tree");
 	DUMP($past);
-	
-	$SUPER := close::Compiler::Visitor.new();
-	NOTE("Created SUPER-visitor");
-	DUMP($SUPER);
-	
-	my $visitor	:= close::Compiler::TypeResolutionVisitor.new();
-	NOTE("Created visitor");
-	DUMP($visitor);
 
-	my @result	:= $visitor.visit($past);
+	my @result;
+	
+	if close::Compiler::Config::query('Compiler', name(0), 'disabled') {
+		NOTE("Configured off - skipping");
+	}
+	else {
+		NOTE("Resolving types");
+		$SUPER := close::Compiler::Visitor.new();
+		NOTE("Created SUPER-visitor");
+		DUMP($SUPER);
+		
+		my $visitor := close::Compiler::TypeResolutionVisitor.new();
+		NOTE("Created visitor");
+		DUMP($visitor);
+
+		@result := $visitor.visit($past);
+	}
 	
 	NOTE("done");
 	DUMP(@result);

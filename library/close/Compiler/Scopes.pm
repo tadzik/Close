@@ -53,10 +53,10 @@ sub add_declarator_to($past, $scope) {
 	my $name := $past.name();
 	my @already := get_symbols($scope, $name);
 	
-	unless $past<hll> {
-		$past<hll> := $scope<hll>;
-		$past.namespace($scope.namespace());
-	}
+	#unless $past<hll> {
+	#	$past<hll> := $scope<hll>;
+	#	$past.namespace($scope.namespace());
+	#}
 		
 	if +@already {
 		# This is not a problem if declaring two multi- functions.
@@ -91,8 +91,8 @@ sub add_declarator($past) {
 	ASSERT(NODE_TYPE($past) eq 'declarator_name',
 		"Only declarators can be added.");
 	
+	my $decl_nsp := close::Compiler::Namespaces::fetch_namespace_of($past);
 	my $current_nsp := close::Compiler::Scopes::fetch_current_namespace();
-	my $decl_nsp := close::Compiler::Namespaces::fetch_relative_namespace_of($current_nsp, $past);
 	
 	if $decl_nsp =:= $current_nsp {
 		$decl_nsp := close::Compiler::Scopes::current();
@@ -107,8 +107,13 @@ sub add_declarator_to_current($past) {
 	add_declarator_to($past, $scope);
 }
 
-sub add_using_namespace($scope, $nsp) {
-	NOTE("Adding namespace '", $nsp.name(), "' to ", NODE_TYPE($scope), " scope '", $scope.name(), "'");
+sub add_using_namespace($scope, $using_nsp) {
+	ASSERT(NODE_TYPE($using_nsp) eq 'using_directive',
+		'This is only valid for using_directives');
+		
+	my $nsp := $using_nsp<using_namespace>;
+	NOTE("Adding namespace '", $nsp<display_name>, "' to ", NODE_TYPE($scope), 
+		" scope '", $scope.name(), "'");
 	
 	if $scope<using_namespaces> {
 		my $found := 0;
@@ -116,6 +121,9 @@ sub add_using_namespace($scope, $nsp) {
 		for $scope<using_namespaces> {
 			if $_ =:= $nsp {
 				$found := 1;
+				NOTE("Already present");
+				ADD_WARNING($using_nsp,
+					"Using namespace directive is redundant.");
 			}
 		}
 		
@@ -143,7 +151,7 @@ sub declare_object($scope, $object) {
 }
 
 sub dump_stack() {
-	DUMP(@Scope_stack);
+	DUMP(get_stack());
 }
 
 sub fetch_current_hll() {
@@ -169,6 +177,13 @@ sub fetch_current_namespace() {
 	
 	DUMP($block);
 	return $block;
+}
+
+sub fetch_current_filename() {
+	my $filename := Q:PIR {
+		%r = find_dynamic_lex '$?FILES'
+	};
+	return $filename;
 }
 
 # FIXME: Don't know how to deal with ?value
@@ -202,7 +217,14 @@ sub get_search_list() {
 	my @list := Array::empty();
 	
 	for get_stack() {
-		@list.push($_);
+		my $block := $_;
+		
+		if $block<is_namespace>{
+			my @path := close::Compiler::Namespaces::path_of($block);
+			$block := close::Compiler::Namespaces::fetch(@path);
+		}
+		
+		@list.push($block);
 		
 		if $_<using_namespaces> {
 			for $_<using_namespaces> {
@@ -217,15 +239,37 @@ sub get_search_list() {
 	return @list;
 }
 
-our @Scope_stack;
-
 sub get_stack() {
-	unless @Scope_stack {
-		@Scope_stack := Array::empty();
+	our @scope_stack;
+	our $init_done;
+	
+	unless Scalar::defined($init_done) {
+		$init_done := 1;
+		my $pervasive := PAST::Block.new(
+			:blocktype('immediate'),
+			:name('pervasive types'),
+			:hll('close'),
+			:namespace(Scalar::undef()),
+		);
+		$pervasive<node_type> := 'pervasive scope';
+		@scope_stack := Array::new($pervasive);
+		close::Compiler::Types::add_builtins($pervasive);
+		
+		NOTE("Creating (implicit) root namespace_definition block");
+		my $root_path	:= close::Compiler::Node::create('namespace_path',
+			:name(Scalar::undef()),
+			:namespace(Array::empty()),
+			:hll('close'),
+			:is_rooted(1),
+		);
+		my $root_nsp	:= close::Compiler::Node::create('namespace_definition',
+			:path(Array::empty()),
+		);
+		close::Compiler::Scopes::push($root_nsp);
 	}
 
-	DUMP(@Scope_stack);
-	return @Scope_stack;
+	DUMP(@scope_stack);
+	return @scope_stack;
 }
 
 sub get_symbols($scope, $name) {
@@ -271,12 +315,6 @@ sub push($scope) {
 	NOTE("Open ", $scope<lstype>, " scope: ", $scope.name(),
 		" Now ", +(get_stack()), " on stack.");
 	DUMP($scope);
-}
-
-sub push_namespace(@path) {
-	my $nsp := close::Compiler::Namespaces::fetch(@path);
-	DUMP($nsp);
-	push($nsp);
 }
 
 sub put_symbol($scope, $name, $object) {

@@ -1,4 +1,5 @@
 # $Id$
+class close::Grammar::Actions;
 
 =method declarator_name
 
@@ -10,18 +11,6 @@ resulting PAST::Var is not resolved.
 method declarator_name($/) {
 	my $past := assemble_qualified_path('declarator_name', $/);
 	NOTE("Created declarator_name for ", $past<display_name>);
-	
-	# NOTE: Because the parser may decide to use a different parse of 
-	# this symbol (for example, a symbol declaration and a function
-	# definition are ambiguous until the ';' or '{' B<after> the 
-	# parameter list) I use a temporary scope for declarations
-	# and other stuff that will invoke this rule.
-	
-	# FIXME: This is bogus. It's only to catch the typedef case, which 
-	# I frankly don't care that much about. Try to remove it. We can put
-	# it back in 0.never.
-	close::Compiler::Scopes::add_declarator_to_current($past);
-	# TODO: Maybe add a warning if it's already defined? "Repeated decl of name..."
 	DUMP($past);
 	make $past;
 }
@@ -41,15 +30,11 @@ method namespace_name($/, $key) { PASSTHRU($/, $key); }
 method namespace_path($/) {
 	my $past := assemble_qualified_path('namespace_path', $/);
 	NOTE("Created namespace_path for ", $past<display_name>);
-	
-	# Namespace might be empty for ::, or for single-element paths.
-	unless $past.namespace() {
-		$past.namespace(Array::empty());
-	}
-	
+		
 	# Name might be empty for hll-root only path.
 	if $past.name() {
 		$past.namespace().push($past.name());
+		$past.name(Scalar::undef());
 	}
 
 	DUMP($past);

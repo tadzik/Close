@@ -206,32 +206,6 @@ method _rewrite_tree_declarator_name($node) {
 			);
 			@results.push($init_stmt);		
 		} 
-		elsif $node<type><is_function> && $node<type><is_defined> {
-			NOTE("Found a function: ", NODE_TYPE($node<type>));
-			ASSERT($node<type>.isa(PAST::Block),
-				'defined functions must be blocks');
-			my $definition := $node<type>;
-			$definition.hll($definition<definition>.hll());
-			$definition<definition><hll> := Scalar::undef();
-			$definition.namespace($definition<definition>.namespace());
-			$definition<definition><namespace> := Scalar::undef();
-			$definition.name($definition<definition>.name());
-			$definition<definition><name> := Scalar::undef();
-			$definition<definition>.blocktype('immediate');
-			
-			# Add adverbs for things like :init, :multi, etc.
-			my $pirflags := '';
-			for $node<adverbs> {
-				NOTE("Processing adverb: '", $_, "'");
-				$pirflags := $pirflags ~ ' ' ~ $node<adverbs>{$_}.value();
-			}
-			
-			if $pirflags ne '' {
-				$definition.pirflags($pirflags);
-			}
-			
-			@results.push($definition);
-		}
 		else {
 			unless $node<is_extern> {
 				NOTE("Declarator '", $node.name(), " has no initializer, but is not extern.");
@@ -245,40 +219,14 @@ method _rewrite_tree_declarator_name($node) {
 	return @results;	
 }
 
-method _rewrite_tree_parameter_declaration($node) {
-	NOTE("Rewriting tree for parameter_declaration ", $node.name());
-	DUMP($node);
+method _rewrite_tree_function_definition($node) {
+	my @results := Array::new($node);
 	
-	# Pass back the results of any child nodes
-	my @results := self._rewrite_tree_UNKNOWN($node);
-
-	my @pirflags := Array::empty();
-	for $node<adverbs> {
-		if $_ eq 'flat' {
-			$node.flat(1);
-		}
-		elsif $_ eq 'named' {
-			my $name := $node<adverbs>{$_}<named>;
-			
-			if $name {
-				$node.named($name);
-			}
-		}
-		elsif $_ eq 'slurpy' {
-			$node.slurpy(1);
-		}
-		else {
-			@pirflags.push($node<adverbs>{$_}.value());
-		}
-	}
+	# Functions get used. No further rewriting needed. (This may change later.)
 	
-	$node<pirflags> := Array::join(' ', @pirflags);
-	
-	NOTE("done (", +@results, " results)");
-	DUMP(@results);
-	return @results;	
+	return @results;
 }
-	
+
 ################################################################
 	
 =sub rewrite_tree($past)
@@ -292,26 +240,34 @@ sub rewrite_tree($past) {
 	NOTE("Rewriting PAST tree into POSTable shape");
 	DUMP($past);
 
-	$SUPER := close::Compiler::Visitor.new();
-	NOTE("Created SUPER-visitor");
-	DUMP($SUPER);
+	my $result := $past;
 	
-	my $visitor	:= close::Compiler::TreeRewriteVisitor.new();
-	NOTE("Created visitor");
-	DUMP($visitor);
+	if close::Compiler::Config::query('Compiler', name(0), 'disabled') {
+		NOTE("Configured off - skipping");
+	}
+	else {
+		$SUPER := close::Compiler::Visitor.new();
+		NOTE("Created SUPER-visitor");
+		DUMP($SUPER);
 	
-	my @results	:= $visitor.visit($past);
-	DUMP(@results);
+		my $visitor	:= close::Compiler::TreeRewriteVisitor.new();
+		NOTE("Created visitor");
+		DUMP($visitor);
+	
+		my @results	:= $visitor.visit($past);
+		DUMP(@results);
 		
-	NOTE("Post-processing ", +@results, " results");
+		NOTE("Post-processing ", +@results, " results");
 	
-	my $result := PAST::Stmts.new();
+		$result := close::Compiler::Node::create('compilation_unit');
 	
-	for @results {
-		$result.push($_);
+		for @results {
+			$result.push($_);
+		}
+		
+		NOTE("done");
+		DUMP($result);
 	}
 	
-	NOTE("done");
-	DUMP($result);
 	return $result;
 }

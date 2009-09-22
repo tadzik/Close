@@ -148,25 +148,78 @@ my @Results_placeholder := Array::empty();
 method visit($visitor, $node) {
 	#NOTE("Visiting ", NODE_TYPE($node), " node on behalf of ", $visitor.name());
 	
-	my @results := self.already_visited($visitor, $node);
-	#DUMP(@results);
-	
-	unless @results {
-		#NOTE("Not visited yet. Inserting temporary marker.");
-		#self.already_visited($visitor, $node, Array::new($node));
-		self.already_visited($visitor, $node, @Results_placeholder);
+	my @results;
+
+	if Scalar::defined($node) {
+		@results := self.already_visited($visitor, $node);
+		#DUMP(@results);
 		
-		my &method := self.fetch_visit_method($visitor, $node);
-		@results	:= &method($visitor, $node);
-		
-		#NOTE("Visit complete. Storing results.");
-		if +@results {
-			self.already_visited($visitor, $node, @results);
+		unless Scalar::defined(@results) {
+			#NOTE("Not visited yet. Inserting temporary marker.");
+			#self.already_visited($visitor, $node, Array::new($node));
+			self.already_visited($visitor, $node, @Results_placeholder);
+			
+			my &method := self.fetch_visit_method($visitor, $node);
+			@results	:= &method($visitor, $node);
+			
+			#NOTE("Visit complete. Storing results.");
+			if +@results {
+				self.already_visited($visitor, $node, @results);
+			}
 		}
+	}
+	else {
+		@results := Array::empty();
 	}
 
 	#NOTE("done");
 	#DUMP(@results);
+	return @results;
+}
+
+method visit_node_generic_noresults($visitor, $node, @child_attrs) {
+	if $node.isa(PAST::Block) {
+		NOTE("Pushing this block onto the scope stack");
+		close::Compiler::Scopes::push($node);
+		self.visit_child_syms($visitor, $node);
+	}
+
+	for @child_attrs {
+		if $node{$_} {
+			self.visit($visitor, $node{$_});
+		}
+	}
+	
+	self.visit_children($visitor, $node);
+	
+	if $node.isa(PAST::Block) {
+		close::Compiler::Scopes::pop(NODE_TYPE($node));
+	}
+	
+	return @Results_placeholder;
+}
+
+method visit_node_generic_results($visitor, $node, @child_attrs) {
+	my @results := Array::empty();
+	
+	if $node.isa(PAST::Block) {
+		NOTE("Pushing this block onto the scope stack");
+		close::Compiler::Scopes::push($node);
+		Array::append(@results, self.visit_child_syms($visitor, $node));
+	}
+
+	for @child_attrs {
+		if $node{$_} {
+			Array::append(@results, self.visit($visitor, $node{$_}));
+		}
+	}
+	
+	Array::append(@results, self.visit_children($visitor, $node));
+	
+	if $node.isa(PAST::Block) {
+		close::Compiler::Scopes::pop(NODE_TYPE($node));
+	}
+	
 	return @results;
 }
 

@@ -127,9 +127,13 @@ is searched in order.
 =cut
 
 sub _query_scopes_matching_path_of($qualified_identifier) {
+	DUMP($qualified_identifier);
+	
 	my @scopes := get_search_list_of($qualified_identifier);
+	DUMP(@scopes);
 	
 	my @path := get_path_of($qualified_identifier);
+	DUMP(@path);
 	
 	if +@path {
 		my @candidates := Array::empty();
@@ -142,6 +146,8 @@ sub _query_scopes_matching_path_of($qualified_identifier) {
 		@scopes := @candidates;
 	}
 	
+	NOTE("Got ", +@scopes, " results");
+	DUMP(@scopes);
 	return @scopes;
 }
 
@@ -157,7 +163,7 @@ sub query_scopes_containing($qualified_identifier) {
 	my @candidates := Array::empty();
 	
 	for @scopes {
-		NOTE("Looking in scope: '", $_.name(), "'");
+		NOTE("Looking in scope: '", $_<display_name>, "'");
 		if close::Compiler::Scopes::get_symbols($_, $name) > 0
 			|| close::Compiler::get_namespace($_, $name) {
 			@candidates.push($_);
@@ -194,6 +200,7 @@ sub query_symbols_matching($qualified_identifier) {
 	ASSERT($qualified_identifier<display_name>,
 		'Every qualified_identifier should have a <display_name>. Make it so.');
 	NOTE("Querying for symbols matching ", $qualified_identifier<display_name>);
+	DUMP($qualified_identifier);
 	
 	my @scopes		:= _query_scopes_matching_path_of($qualified_identifier);
 	my $name		:= $qualified_identifier.name();

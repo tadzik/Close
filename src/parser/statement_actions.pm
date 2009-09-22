@@ -1,4 +1,5 @@
 # $Id$
+class close::Grammar::Actions;
 
 method statement($/, $key)              { PASSTHRU($/, $key); }
 
@@ -12,10 +13,10 @@ method null_statement($/) {
 
 method compound_statement($/, $key) {
 	if $key eq 'open' {
-		NOTE("Creating new block for compound_statement, pushing on scope stack");
+		NOTE("Creating new compound_statement, pushing on scope stack");
 		my $past := close::Compiler::Node::create('compound_statement');
-		DUMP($past);
 		close::Compiler::Scopes::push($past);
+		DUMP($past);
 	}
 	elsif $key eq 'close' {
 		my $past := close::Compiler::Scopes::pop('compound_statement');

@@ -53,13 +53,7 @@ CLOSE_LIB_PBC := library/close/close_lib.pbc
 
 ACTIONS_PM := \
 	src/parser/parse_utils.pm \
-	src/parser/actions.pm \
-	src/parser/builtin_actions.pm \
-	src/parser/declaration_actions.pm \
-	src/parser/expression_actions.pm \
-	src/parser/name_actions.pm \
-	src/parser/statement_actions.pm \
-	src/parser/token_actions.pm
+	src/parser/builtin_actions.pm
 
 BUILTINS_PIR := \
 	src/builtins/literals.pir \
@@ -70,13 +64,16 @@ BUILTINS_PIR := \
 COMPILER_LIBS_PIR := \
 	library/close/Compiler/Array.pir			\
 	library/close/Compiler/Config.pir			\
+	library/close/Compiler/DeclarationCollectionVisitor.pir		\
 	library/close/Compiler/Dumper.pir		\
+	library/close/Compiler/File.pir			\
 	library/close/Compiler/Hash.pir			\
 	library/close/Compiler/Lookups.pir		\
 	library/close/Compiler/Messages.pir		\
 	library/close/Compiler/MessageVisitor.pir	\
 	library/close/Compiler/Namespaces.pir		\
 	library/close/Compiler/Node.pir			\
+	library/close/Compiler/OS.pir			\
 	library/close/Compiler/PastCleanupVisitor.pir	\
 	library/close/Compiler/PrettyPrintVisitor.pir	\
 	library/close/Compiler/Scalar.pir 			\
@@ -107,28 +104,39 @@ LIBRARY_SRC := \
 	library/close/print.cl \
 	library/close/ok.cl \
 	library/close/string.cl
-
-SOURCES := \
+	
+GEN_SOURCES := \
 	src/gen_grammar.pir \
 	src/gen_actions.pir \
+	src/parser/actions.pir	\
+	src/parser/declaration_actions.pir	\
+	src/parser/expression_actions.pir	\
+	src/parser/name_actions.pir	\
+	src/parser/statement_actions.pir	\
+	src/parser/token_actions.pir	\
 	src/gen_builtins.pir \
-	src/gen_library.pir \
+	src/gen_library.pir
+
+SOURCES := $(GEN_SOURCES) \
 	close.pir
 
-PROVE_TESTS := \
-	t/00-sanity.t \
-	t/01-literals.t \
-	t/02-adverbs.t \
+LANGUAGE_TESTS := \
+	t/language/00-sanity.t \
+	t/language/01-literals.t \
+	t/language/02-adverbs.t \
+	t/language/03-arithmetic-expr.t \
+	t/language/05-comparison-expr.t \
+	t/language/06-bitwise-expr.t \
+	t/language/07-logical-expr.t \
 	
 	
 BUILD_CLEANUPS := \
   close.pbc \
+  $(GEN_SOURCES) \
   "src/gen_*.pira" \
   "src/gen_*.pir" \
-  src/gen_grammar.pm \
+  src/gen_grammar.pg \
   src/gen_actions.pm \
-  "t/*_[0-9].pir" \
-  "t/*_[0-9][0-9].pir" \
   close@exe@ \
 #IF(win32):  parrot-close.exe \
 #IF(win32):  parrot-close.iss \
@@ -138,7 +146,15 @@ BUILD_CLEANUPS := \
 LIB_CLEANUPS := \
 	$(COMPILER_LIBS_PIR)
 	
-TEST_CLEANUPS :=
+TEST_CLEANUPS := \
+	"t/*.bak" \
+	"t/*.c=" \
+	"t/*_[0-9].pir" \
+	"t/*_[0-9][0-9].pir" \
+	"t/language/*.bak" \
+	"t/language/*.c=" \
+	"t/language/*_[0-9].pir" \
+	"t/language/*_[0-9][0-9].pir" \
 
 # the default target
 build: \
@@ -178,6 +194,60 @@ src/gen_actions.pm: $(ACTIONS_PM) Makefile
 	@echo "**** Collecting gen_actions.pm"
 	cat $(ACTIONS_PM) > src/gen_actions.pm
 
+src/parser/actions.pir: src/parser/actions.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=src/parser/actions.pira \
+		src/parser/actions.pm
+	$(STRIP_PIRA) src/parser/actions.pira \
+		> src/parser/actions.pir
+	$(RM_F) src/parser/actions.pira
+
+src/parser/declaration_actions.pir: src/parser/declaration_actions.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=src/parser/declaration_actions.pira \
+		src/parser/declaration_actions.pm
+	$(STRIP_PIRA) src/parser/declaration_actions.pira \
+		> src/parser/declaration_actions.pir
+	$(RM_F) src/parser/declaration_actions.pira
+
+src/parser/expression_actions.pir: src/parser/expression_actions.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=src/parser/expression_actions.pira \
+		src/parser/expression_actions.pm
+	$(STRIP_PIRA) src/parser/expression_actions.pira \
+		> src/parser/expression_actions.pir
+	$(RM_F) src/parser/expression_actions.pira
+
+src/parser/name_actions.pir: src/parser/name_actions.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=src/parser/name_actions.pira \
+		src/parser/name_actions.pm
+	$(STRIP_PIRA) src/parser/name_actions.pira \
+		> src/parser/name_actions.pir
+	$(RM_F) src/parser/name_actions.pira
+
+src/parser/statement_actions.pir: src/parser/statement_actions.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=src/parser/statement_actions.pira \
+		src/parser/statement_actions.pm
+	$(STRIP_PIRA) src/parser/statement_actions.pira \
+		> src/parser/statement_actions.pir
+	$(RM_F) src/parser/statement_actions.pira
+
+src/parser/token_actions.pir: src/parser/token_actions.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=src/parser/token_actions.pira \
+		src/parser/token_actions.pm
+	$(STRIP_PIRA) src/parser/token_actions.pira \
+		> src/parser/token_actions.pir
+	$(RM_F) src/parser/token_actions.pira
+
 src/gen_builtins.pir: $(BUILTINS_PIR)
 	@echo "**** Collecting gen_builtins.pir"
 	$(CAT) $(BUILTINS_PIR) > src/gen_builtins.pir
@@ -216,6 +286,15 @@ library/close/Compiler/Config.pir: library/close/Compiler/Config.pm
 		> library/close/Compiler/Config.pir
 	$(RM_F) library/close/Compiler/Config.pira
 
+library/close/Compiler/DeclarationCollectionVisitor.pir: library/close/Compiler/DeclarationCollectionVisitor.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/DeclarationCollectionVisitor.pira \
+		library/close/Compiler/DeclarationCollectionVisitor.pm
+	$(STRIP_PIRA) library/close/Compiler/DeclarationCollectionVisitor.pira \
+		> library/close/Compiler/DeclarationCollectionVisitor.pir
+	$(RM_F) library/close/Compiler/DeclarationCollectionVisitor.pira
+
 library/close/Compiler/Dumper.pir: library/close/Compiler/Dumper.pm
 	@echo "**** Compiling $< to PIR"
 	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
@@ -224,6 +303,15 @@ library/close/Compiler/Dumper.pir: library/close/Compiler/Dumper.pm
 	$(STRIP_PIRA) library/close/Compiler/Dumper.pira \
 		> library/close/Compiler/Dumper.pir
 	$(RM_F) library/close/Compiler/Dumper.pira
+
+library/close/Compiler/File.pir: library/close/Compiler/File.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/File.pira \
+		library/close/Compiler/File.pm
+	$(STRIP_PIRA) library/close/Compiler/File.pira \
+		> library/close/Compiler/File.pir
+	$(RM_F) library/close/Compiler/File.pira
 
 library/close/Compiler/Hash.pir: library/close/Compiler/Hash.pm
 	@echo "**** Compiling $< to PIR"
@@ -278,6 +366,15 @@ library/close/Compiler/Node.pir: library/close/Compiler/Node.pm
 	$(STRIP_PIRA) library/close/Compiler/Node.pira \
 		> library/close/Compiler/Node.pir
 	$(RM_F) library/close/Compiler/Node.pira
+
+library/close/Compiler/OS.pir: library/close/Compiler/OS.pm
+	@echo "**** Compiling $< to PIR"
+	$(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
+		--output=library/close/Compiler/OS.pira \
+		library/close/Compiler/OS.pm
+	$(STRIP_PIRA) library/close/Compiler/OS.pira \
+		> library/close/Compiler/OS.pir
+	$(RM_F) library/close/Compiler/OS.pira
 
 library/close/Compiler/PastCleanupVisitor.pir: library/close/Compiler/PastCleanupVisitor.pm
 	@echo "**** Compiling $< to PIR"
@@ -434,9 +531,11 @@ help:
 	@echo "  help:              Print this help message."
 	@echo ""
 
-test: build
-	prove $(PROVE_TESTS)
+test: build test-language
 	#$(PERL) -I$(LIB_DIR)/tools/lib t/harness --bindir=$(BIN_DIR)
+
+test-language:
+	prove $(LANGUAGE_TESTS)
 
 # basic run for missing libs
 test-installable: installable

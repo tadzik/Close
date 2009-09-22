@@ -45,21 +45,18 @@ sub fetch_root() {
 	our $root;
 	
 	unless $root {
-		$root := PAST::Block.new(:name('namespace root block'));
+		$root := close::Compiler::Node::create('namespace_definition',
+			:name('namespace root block'),
+			:path(Array::empty()));
 	}
 	
 	return $root;
 }
 
 sub fetch_namespace_of($past_var) {
-	ASSERT($past_var.isa(PAST::Var), '$past_var parameter must be a PAST::Var node');
-	NOTE("Fetching namespace path: ", format_path_of($past_var));
-	
-	my @path := path_of($past_var);
-	my $result := fetch(@path);
-	
-	DUMP($result);
-	return $result;
+	return fetch_relative_namespace_of(
+		close::Compiler::Scopes::fetch_current_namespace(),
+		$past_var);
 }
 
 sub fetch_relative($origin, @target) {
@@ -74,7 +71,7 @@ sub fetch_relative($origin, @target) {
 		my $child := close::Compiler::Scopes::get_namespace($block, $_);
 		
 		unless $child {
-			$child := close::Compiler::Node::create('namespace_block', :path(@path));
+			$child := close::Compiler::Node::create('namespace_definition', :path(@path));
 			close::Compiler::Scopes::set_namespace($block, $_, $child);
 		}
 		
@@ -101,12 +98,12 @@ Note that these namespaces are I<always> created.
 
 sub fetch_relative_namespace_of($namespace, $past_var) {
 	DUMP(:namespace($namespace), :past_var($past_var));
-	ASSERT($past_var.isa(PAST::Var), '$past_var parameter must be a PAST::Var node');
 	
 	my $result;
 	
 	if $past_var<is_rooted> {
-		$result := fetch_namespace_of($past_var);
+		my @path := path_of($past_var);
+		$result := fetch(@path);
 	}
 	else {
 		NOTE("Fetching namespace path: ", format_path_of($past_var));
@@ -140,6 +137,7 @@ sub path_of($past) {
 	
 	my @path := Array::clone($past.namespace());
 	
+	# Test this - the root block does not have it.
 	if $past<hll> {
 		@path.unshift($past<hll>);
 	}

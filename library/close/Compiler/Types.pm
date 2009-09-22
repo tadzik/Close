@@ -58,7 +58,7 @@ sub add_builtins($scope) {
 		my $symbol	:= close::Compiler::Node::create('declarator_name',
 			:block($scope),
 			:is_typedef(1),
-			:name($name),
+			:parts(Array::new($name)),
 			:pos($pos),
 			:scope('builtin'),
 			:source($Builtins)

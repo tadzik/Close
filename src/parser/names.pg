@@ -38,7 +38,7 @@ The C<new_alias_name> token is used only in declarations.
 
 =cut
 
-rule new_alias_name {
+token new_alias_name {
 	<alias=BAREWORD> {*}
 }
 
@@ -55,7 +55,7 @@ C<BAREWORD>.
 
 =cut
 
-rule label_name {
+token label_name {
 	<label=BAREWORD> {*}
 }
 
@@ -94,7 +94,7 @@ in particular I<PDD 21: Namespaces>, for details.
 =token namespace_name
 
 Individual (sub)namespaces can take on pretty much any name in Parrot. For this
-reason, Close treats them as identifiers, permitting the C<QUOTED> form. 
+reason, Close treats them as identifiers, permitting the C<QUOTED_LIT> form. 
 
 =cut
 
@@ -128,10 +128,12 @@ alone.
 
     namespace :: { ... }
 
+(This is why C<namespace_path> is different from C<qualified_identifier>.)
+
 =item # Relative path
 
 Finally, you may specify a namespace by providing a relative path from the
-current namespace (I<only!>) to an inner namespace. 
+current namespace to an inner namespace. 
 
     namespace A {
         namespace B { ... }
@@ -186,10 +188,13 @@ rule qualified_identifier {
 
 =rule declarator_name
 
-When declaring new names, there are some possible complicationgs. First, a 
-I<namespace> may be declared -- meaning there is no guarantee of an identifier
-at the end of the name. Second, the name may refer to a symbol in another hll, 
-which requires support for quoted literals.
+A new declarator may need to express all or part of its name using quotes - for
+example, a reference to any Perl variable must quote the sigil. Thus, 
+I<declarator_name> is similar to C<qualified_identifier>, but any of the 
+path elements may be quoted.
+
+(Note that names requiring quotes are not valid for use beyond declarators. 
+An alias must be created for any unusual symbol names.)
 
 =cut
 

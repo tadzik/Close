@@ -99,13 +99,12 @@ rule dclr_postfix {
 	| :dba('function parameter list')
 	    '(' ~ ')' <parameter_list>		{*} #= parameter_list
 	| :dba('hash or array declaration')
-	    '[' ~ ']' <dclr_array_or_hash>		{*} #= dclr_array_or_hash
+	    '[' ~ ']' <dclr_array_or_hash>	{*} #= dclr_array_or_hash
 }
 
 rule declaration {
-	<specifier>+				{*} #= specifiers
-	<symbol=declarator_part>
-	[ ','  <symbol=declarator_part> ]*	{*} #= declarators
+	<specifier_list> <symbol=declarator_part> [ ','  <symbol=declarator_part> ]*	
+	{*}
 }
 
 =rule declarator
@@ -127,7 +126,9 @@ rule declarator_part {
 	<declarator>
 	<dclr_alias>?
 	[ <adverbs=dclr_adverb> ]*
+	{*} #= declarator
 	[ '=' <initializer=expression>
+		{*} #= initializer
 	|  <?before '{' >	
 		{*} #= open_block
 		<body=compound_statement>
@@ -146,24 +147,6 @@ rule namespace_alias_declaration {
 	<.NAMESPACE> <namespace_name> 
 	<.ALIAS> <alias=new_alias_name>
 	{*}
-}
-
-=rule namespace_definition
-
-A namespace definition is a block that assigns a namespace path to all the
-declarations contained in the block.
-
-    namespace Foo {
-        void bark();	// Defines Foo::bark();
-    }
-
-=cut
-
-rule namespace_definition {
-	<EXTERN>? <.NAMESPACE> <namespace_path> 
-	'{'	{*} #= open
-		<extern_statement>*
-	'}'	{*} #= close
 }
 
 =rule param_adverb
@@ -186,7 +169,7 @@ Matches a single parameter declaration, with optional trailing tokens.
 =cut
 
 rule parameter_declaration {
-	<specifier>+
+	<specifier_list>
 	<parameter=declarator> 
 	[ <adverbs=param_adverb> ]*
 	<default=expression>?
@@ -213,6 +196,10 @@ rule specifier {
 	| <tspec_function_attr>	{*} #= tspec_function_attr
 	| <tspec_storage_class>	{*} #= tspec_storage_class
 	| <tspec_type_specifier>	{*} #= tspec_type_specifier
+}
+
+rule specifier_list {
+	<specifier>+ {*}
 }
 
 =rule tspec_builtin_type
