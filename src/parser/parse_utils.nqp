@@ -190,13 +190,64 @@ sub make_token($capture) {
 	return $token;
 }
 
+our %Include_search_paths;
+%Include_search_paths<system> := Array::new(
+	'include',
+);
+
+%Include_search_paths<user> := Array::new('.');
+
+sub include_search_path($file) {
+	return %Include_search_paths{$file<include_type>};
+}
+
+sub parse_include_file($file) {
+	my @search_path := include_search_path($file);
+	my $path := File::find_first($file<path>, @search_path);
+	
+	NOTE("Found path: ", $path);
+	my $file := $file;
+	
+	if $path {
+		push_include_file();
+		
+		my $content := File::slurp($path);
+		$file<contents> := $content;
+		DUMP($file);
+
+		close::Compiler::Scopes::push($file);
+		
+		# Don't capture this to $file - the translation_unit rule
+		# knows to store included nodes into the current $file.
+		Q:PIR {
+			.local pmc parser
+			parser = compreg 'close'
+			
+			.local string source
+			$P0 = find_lex '$content'
+			source = $P0
+			%r = parser.'compile'(source, 'target' => 'past')
+		};
+		
+		close::Compiler::Scopes::pop('include_file');
+		pop_include_file();
+	}
+	else {
+		NOTE("Bogus include file - not found");
+		ADD_ERROR($file, "Include file ",
+			$file.name(), " not found.");
+	}
+	
+	return $file;
+}
+
 sub pop_include_file() {
 	NOTE("Popping include file stack");
 	return @File_stack.pop();
 }
 
 sub push_include_file() {
-	my $current_file := close::Compiler::Scopes::fetch_current_filename();
+	my $current_file := close::Compiler::Scopes::current_file();
 	NOTE("Pushing '", $current_file, "' on file stack");
 	@File_stack.push($current_file);
 }

@@ -55,7 +55,7 @@ to the close compiler.
 .include 'src/gen_builtins.pir'
 .include 'src/gen_grammar.pir'
 .include 'src/gen_actions.pir'
-.include 'src/parser/actions.pir'
+.include 'src/parser/grammar_actions.pir'
 .include 'src/parser/declaration_actions.pir'
 .include 'src/parser/expression_actions.pir'
 .include 'src/parser/name_actions.pir'
@@ -66,10 +66,3 @@ to the close compiler.
 =back
 
 =cut
-
-# Local Variables:
-#   mode: pir
-#   fill-column: 100
-# End:
-# vim: expandtab shiftwidth=4 ft=pir:
-

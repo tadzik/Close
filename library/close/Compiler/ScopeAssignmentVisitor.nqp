@@ -188,13 +188,18 @@ method _assign_scope_declarator_name($node) {
 	DUMP($node);
 	
 	unless $node.scope() {
-		my $block := close::Compiler::Scopes::query_inmost_scope_with_attr('default_scope');
-		ASSERT($block,
-			'It should not be possible to declare an object without having a default scope.');
-		ASSERT($block<default_scope>,
-			'Having a default scope implies having a valid one.');
-		NOTE("Setting scope of object '", $node<display_name>, "' to ", $block<default_scope>);
-		$node.scope($block<default_scope>);
+		my $scope;
+		
+		for close::Compiler::Scopes::get_stack() {
+			unless $scope {
+				$scope := $_.symbol_defaults()<scope>;
+			}
+		}
+		
+		ASSERT($scope, 
+			'There must be a default scope set for every declaration.');
+		NOTE("Setting scope of object '", $node<display_name>, "' to ", $scope);
+		$node.scope($scope);
 	}
 	
 	NOTE("done");

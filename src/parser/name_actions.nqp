@@ -30,13 +30,6 @@ method namespace_name($/, $key) { PASSTHRU($/, $key); }
 method namespace_path($/) {
 	my $past := assemble_qualified_path('namespace_path', $/);
 	NOTE("Created namespace_path for ", $past<display_name>);
-		
-	# Name might be empty for hll-root only path.
-	if $past.name() {
-		$past.namespace().push($past.name());
-		$past.name(Scalar::undef());
-	}
-
 	DUMP($past);
 	make $past;
 }

@@ -253,35 +253,39 @@ sub length($str, *%opts) {
 
 our %Line_number_info;
 
+sub _init_line_number_info($string) {
+	#NOTE("Initializing line-number information of previously-unseen string");
+	#DUMP($string);
+	
+	my @lines := Array::new(-1);
+	my $len := String::length($string);
+	my $i := -1;
+	
+	while $i < $len {
+		$i := String::find_cclass('NEWLINE', $string, :offset($i + 1));
+		@lines.push($i);
+	}
+	
+	%Line_number_info{$string} := @lines;
+	#NOTE("String parsed into ", +@lines, " lines");
+	#DUMP(@lines);
+}
+
 sub line_number_of($string, *%opts) {
 	DUMP(:string($string), :options(%opts));
 
 	unless $string {
-		#NOTE("String is empty or undef. Returning 1");
+		NOTE("String is empty or undef. Returning 1");
 		return 1;
+	}
+	
+	unless %Line_number_info{$string} {
+		_init_line_number_info($string);
 	}
 	
 	my $offset := 0 + %opts<offset>;
 	
-	unless %Line_number_info{$string} {
-		#NOTE("Initializing line-number information of previously-unseen string");
-		DUMP($string);
-		
-		my @lines := Array::empty();
-		my $len := String::length($string);
-		my $i := -1;
-		
-		while $i < $len {
-			$i := String::find_cclass('NEWLINE', $string, :offset($i + 1));
-			@lines.push($i);
-		}
-		
-		%Line_number_info{$string} := @lines;
-		#NOTE("String parsed into ", +@lines, " lines");
-		#DUMP(@lines);
-	}
-	
-	#NOTE("Bsearching for line number of ", $offset, " in string");
+	NOTE("Bsearching for line number of ", $offset, " in string");
 	
 	my $line := Array::bsearch(%Line_number_info{$string}, $offset, :cmp('<=>'));
 	
@@ -289,10 +293,31 @@ sub line_number_of($string, *%opts) {
 		# Likely case - token is between the newlines.
 		$line := (-$line) - 1;
 	}
-	
-	$line++;
-	#NOTE("Returning line number (1-based): ", $line);
+
+	#$line ++;
+	NOTE("Returning line number (1-based): ", $line);
 	return $line;
+}
+
+
+sub character_offset_of($string, *%opts) {
+	DUMP(:string($string), :options(%opts));
+
+	unless %Line_number_info{$string} {
+		_init_line_number_info($string);
+	}
+
+	my $offset	:= 0 + %opts<offset>;
+	
+	unless Hash::exists(%opts, 'line') {
+		%opts<line> := line_number_of($string, :offset($offset));
+	}
+	
+	my $line		:= -1 + %opts<line>;
+	my $line_offset	:= %Line_number_info{$string}[$line];
+	NOTE("Line number offset is: ", $line_offset);
+	my $result := $offset - $line_offset;
+	return $result;
 }
 
 sub ltrim_indent($str, $indent) {

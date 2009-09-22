@@ -45,16 +45,17 @@ sub add_warning($past, $msg) {
 }
 
 sub format_node_message($node, $message) {
-	return "In file 'i-dont-know-what', "
-		~ get_line_number_of_past($node)
-		~ ",\n" ~ $message<kind>
-		~ ': ' ~ $message.value();
-}
+	my $from_line := String::line_number_of($node<source>, :offset($node<pos>));
+	my $from_char := String::character_offset_of($node<source>, :line($from_line), :offset($node<pos>));
+
+	my $result := '' ~ close::Compiler::Scopes::current_file()
+		~ ':' ~ $from_line
+		~ ':' ~ $from_char
+		~ ', ' ~ $message<kind>
+		~ ':' ~ $message.value();
 	
-sub get_line_number_of_past($past) {
-	my $from_line := String::line_number_of($past<source>, :offset($past<pos>));
-	
-	return "at line number " ~ $from_line;
+	NOTE($result);
+	return $result;
 }
 
 sub get_messages($past) {

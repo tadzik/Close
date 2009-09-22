@@ -142,7 +142,7 @@ current namespace to an inner namespace.
 =cut
 
 rule namespace_path {
-	| [ HLL ':' <hll_name> ]? 
+	| [ <.HLL> ':' <hll_name> ]? 
 		$<root>='::' 
 		[ <path=namespace_name> [ '::' <path=namespace_name> ]* ]?
 	{*}

@@ -26,52 +26,27 @@ sub NOTE(*@parts) {
 
 ################################################################
 
-=sub fetch(@target)
+=sub fetch(@path)
 
-Looks up the PAST block used to store namespace information for the C<@target> 
-path. Creates and initializes blocks as needed. C<@target> must begin with the 
+Looks up the PAST block used to store namespace information for the C<@path> 
+path. Creates and initializes blocks as needed. C<@path> must begin with the 
 HLL name. Returns the found or created PAST block.
 
 =cut
 
-sub fetch(@target) {
-	DUMP(@target);
-	my $block := fetch_relative(fetch_root(), @target);
-	DUMP($block);
-	return $block;
-}
+sub fetch(@path) {
+	NOTE("Fetching namespace with path: [ ", Array::join(" ; ", @path), " ]");
 
-sub fetch_root() {
-	our $root;
+	my $block := fetch_root();
+	my @current := Array::empty();
 	
-	unless $root {
-		$root := close::Compiler::Node::create('namespace_definition',
-			:name('namespace root block'),
-			:path(Array::empty()));
-	}
-	
-	return $root;
-}
-
-sub fetch_namespace_of($past_var) {
-	return fetch_relative_namespace_of(
-		close::Compiler::Scopes::fetch_current_namespace(),
-		$past_var);
-}
-
-sub fetch_relative($origin, @target) {
-	DUMP(:origin($origin), :path(@target));
-	
-	my $block := $origin;
-	my @path := path_of($origin);
-	
-	for @target {
-		@path.push($_);
+	for @path {
+		@current.push($_);
 		
 		my $child := close::Compiler::Scopes::get_namespace($block, $_);
 		
 		unless $child {
-			$child := close::Compiler::Node::create('namespace_definition', :path(@path));
+			$child := close::Compiler::Node::create('namespace_definition', :path(@current));
 			close::Compiler::Scopes::set_namespace($block, $_, $child);
 		}
 		
@@ -80,7 +55,22 @@ sub fetch_relative($origin, @target) {
 	
 	DUMP($block);
 	return $block;
+}
+
+sub fetch_root() {
+	NOTE("Fetching root namespace block");
+	our $root;
+	
+	unless $root {
+		NOTE("Creating root namespace block");
 		
+		$root := close::Compiler::Node::create('namespace_definition',
+			:name('namespace root block'),
+			:path(Array::empty()));
+	}
+	
+	DUMP($root);
+	return $root;
 }
 
 =sub fetch_relative_namespace_of($namespace, $past_var)
@@ -96,29 +86,27 @@ Note that these namespaces are I<always> created.
 
 =cut
 
-sub fetch_relative_namespace_of($namespace, $past_var) {
-	DUMP(:namespace($namespace), :past_var($past_var));
+sub fetch_namespace_of($node) {
+	NOTE("Fetching namespace of ", $node<display_name>);
+
+	my @path := path_of($node);
 	
-	my $result;
-	
-	if $past_var<is_rooted> {
-		my @path := path_of($past_var);
-		$result := fetch(@path);
+	if $node<is_rooted> {
+		NOTE("Fetching absolute path");
 	}
 	else {
-		NOTE("Fetching namespace path: ", format_path_of($past_var));
-		NOTE("Relative to: ", format_path_of($namespace));
-		
-		my @path := path_of($past_var);
-		
-		$result := fetch_relative($namespace, @path);
+		my $nsp := close::Compiler::Scopes::fetch_current_namespace();
+		NOTE("Fetching relative to current namespace: ", $nsp<display_name>);
+		@path := Array::concat($nsp<path>, @path);
 	}
+	
+	my $result := fetch(@path);
 
 	DUMP($result);
 	return $result;
 }
 
-
+	
 sub format_path_of($past) {
 	DUMP($past);
 	

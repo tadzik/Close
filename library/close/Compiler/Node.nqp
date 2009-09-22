@@ -514,22 +514,24 @@ namespace_path target is in a namespace_definition.
 =cut
 
 sub _create_namespace_path(%attributes) {
-	NOTE("Creating namespace_path");
-	my $past := PAST::Var.new();
+	my $past	:= PAST::Var.new();
+	my @parts	:= %attributes<parts>;
 	
-	my @parts := %attributes<parts>;
+	NOTE("Creating namespace_path [ ", Array::join(' ; ', @parts), " ]");
 	
 	unless %attributes<is_rooted> {
+		%attributes<is_rooted>	:= 1;
 		my $outer_nsp := close::Compiler::Scopes::fetch_current_namespace();
 		my @namespace := Array::clone($outer_nsp.namespace());
 		@parts := Array::append(@namespace, @parts);
+		NOTE("Expanded path to [ ", Array::join(' ; ', @parts), " ]");
 	}
-	
-	%attributes<namespace>	:= @parts;
 	
 	unless %attributes<hll> {
 		%attributes<hll> := close::Compiler::Scopes::fetch_current_hll();
 	}
+	
+	%attributes<namespace>	:= @parts;
 	
 	set_attributes($past, %attributes);
 	

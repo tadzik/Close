@@ -56,56 +56,9 @@ this expression.
 
 =cut
 
-our @system_include_paths := Array::new(
-	'include',
-);
-
-our %Include_search_paths;
-%Include_search_paths<system> := @system_include_paths;
-%Include_search_paths<user> := Array::new('.');
-
 method include_file($/) {
 	NOTE("Processing include file: ", ~ $<file>);
-	my $file := $<file>.ast;
-	my $search_path := %Include_search_paths<user>;
-	
-	if $file<type> eq 'system' {
-		$search_path := %Include_search_paths<system>;
-	}
-
-	my $path := File::find_first($file<path>, $search_path);
-	NOTE("Found path: ", $path);
-	my $past := $file;
-	
-	if $path {
-		push_include_file();
-		
-		my $content := File::slurp($path);
-		$file<contents> := $content;
-		DUMP($file);
-
-		close::Compiler::Scopes::push($past);
-		
-		# Don't capture this to $past - the translation_unit rule
-		# knows to store included nodes into the current $past.
-		Q:PIR {
-			.local pmc parser
-			parser = compreg 'close'
-			
-			.local string source
-			$P0 = find_lex '$content'
-			source = $P0
-			%r = parser.'compile'(source, 'target' => 'past')
-		};
-		
-		close::Compiler::Scopes::pop('include_file');
-		pop_include_file();
-	}
-	else {
-		NOTE("Bogus include file - not found");
-		ADD_ERROR($past, "Include file ",
-			$file.name(), " not found.");
-	}
+	my $past := parse_include_file($<file>.ast);
 	
 	NOTE("done");
 	DUMP($past);
@@ -164,8 +117,8 @@ method namespace_definition($/, $key) {
 		close::Compiler::Scopes::push($past);
 	}
 	elsif $key eq 'close' {
-		NOTE("Popping namespace_definition block");
 		my $past := close::Compiler::Scopes::pop('namespace_definition');
+		NOTE("Popped namespace_definition block: ", $past<display_name>);
 
 		for $<declaration_sequence><decl> {
 			$past.push($_.ast);

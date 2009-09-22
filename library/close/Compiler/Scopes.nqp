@@ -179,10 +179,11 @@ sub fetch_current_namespace() {
 	return $block;
 }
 
-sub fetch_current_filename() {
+sub current_file() {
 	my $filename := Q:PIR {
 		%r = find_dynamic_lex '$?FILES'
 	};
+	
 	return $filename;
 }
 
@@ -256,12 +257,6 @@ sub get_stack() {
 		close::Compiler::Types::add_builtins($pervasive);
 		
 		NOTE("Creating (implicit) root namespace_definition block");
-		my $root_path	:= close::Compiler::Node::create('namespace_path',
-			:name(Scalar::undef()),
-			:namespace(Array::empty()),
-			:hll('close'),
-			:is_rooted(1),
-		);
 		my $root_nsp	:= close::Compiler::Node::create('namespace_definition',
 			:path(Array::empty()),
 		);
