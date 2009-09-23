@@ -41,7 +41,7 @@ sub test_name {
 
 __END__
 -
-    NAME: Subs marked :init are called, in order, first.
+    NAME: Subs are generated in declaration order.
     SOURCE: |
             namespace test {
                 void say(pmc what) {
@@ -104,7 +104,7 @@ __END__
         line 2
         line 3
 -
-    NAME: Named parameters
+    NAME: Named parameters work
     SOURCE: |
             namespace test {
                 void say(pmc what) {

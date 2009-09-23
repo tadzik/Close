@@ -186,6 +186,8 @@ sub query_scopes_containing_symbol($qualified_identifier) {
 	
 	for @scopes {
 		NOTE("Looking in scope: '", $_<display_name>, "' (", $_<id>, ")");
+		DUMP($_);
+		
 		if close::Compiler::Scopes::get_symbols($_, $name) > 0 {
 			@candidates.push($_);
 		}

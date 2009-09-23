@@ -16,9 +16,9 @@ rule arg_adverb {
 }
 
 rule arg_expr {
-	[ <argname=short_ident>  <.COLON_SPACE> ]? 
+	[ <argname=IDENTIFIER>  <.COLON_SPACE> ]? 
 	<expression> 
-	[ <arg_adverb> ]*
+	<arg_adverb>*
 	{*}
 }
 

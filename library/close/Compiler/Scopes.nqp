@@ -239,17 +239,9 @@ sub get_stack() {
 	our @scope_stack;
 	our $init_done;
 	
-	unless Scalar::defined($init_done) {
+	unless $init_done {
 		$init_done := 1;
-		# This is bogus. Can I use namespace root instead?
-		
-		my $pervasive := PAST::Block.new(
-			:blocktype('immediate'),
-			:hll('close'),
-			:namespace(Scalar::undef()),
-		);
-		$pervasive<node_type> := 'pervasive scope';
-		close::Compiler::Node::set_name($pervasive, 'pervasive types');
+		my $pervasive := close::Compiler::Types::pervasive_scope();		
 		@scope_stack := Array::new($pervasive);
 		close::Compiler::Types::add_builtins($pervasive);
 	}

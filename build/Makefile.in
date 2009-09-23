@@ -117,7 +117,8 @@ GEN_SOURCES := \
 SOURCES := $(GEN_SOURCES) \
 	close.pir
 
-LANGUAGE_TESTS := \
+LANGUAGE_TESTS := "t/language/*.t"
+XLANGUAGE_TESTS := \
 	t/language/00-sanity.t \
 	t/language/01-literals.t \
 	t/language/02-adverbs.t \
@@ -276,7 +277,7 @@ help:
 test: build test-language
 	#$(PERL) -I$(LIB_DIR)/tools/lib t/harness --bindir=$(BIN_DIR)
 
-test-language:
+test-language: build
 	prove $(LANGUAGE_TESTS)
 
 # basic run for missing libs

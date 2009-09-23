@@ -42,6 +42,13 @@ typedef _builtin	string	:register_class('S');
 typedef _builtin	void	:register_class('v');
 ";
 
+sub add_builtin_type($type) {
+	NOTE("Adding builtin type: ", $type<display_name>);
+	
+	my $scope := close::Compiler::Types::pervasive_scope();
+	close::Compiler::Scopes::add_declarator_to($type, $scope);
+}
+
 sub add_builtins($scope) {
 	NOTE("Adding builtin types");
 	DUMP($Builtins);
@@ -53,22 +60,19 @@ sub add_builtins($scope) {
 		my $end	:= String::find_cclass('WHITESPACE', $Builtins, :offset($index));
 		my $name	:= String::substr($Builtins, $index, $end - $index);
 		
+		$index	:= String::index($Builtins, ":register_class('", :offset($index))
+					+ String::length(":register_class('");
+		my $register_class := String::substr($Builtins, $index, 1);
+		
 		NOTE("Adding builtin type: '", $name, "'");
 
 		my $symbol	:= close::Compiler::Node::create('declarator_name',
-			:block($scope),
 			:is_typedef(1),
 			:parts(Array::new($name)),
 			:pos($pos),
 			:scope('builtin'),
 			:source($Builtins)
 		);
-		
-		$index	:= String::index($Builtins, ":register_class('", :offset($index))
-			+ String::length(":register_class('");
-		my $register_class := String::substr($Builtins, $index, 1);
-
-		NOTE("Type ", $name, " has register class '", $register_class, "'");
 		
 		my $spec	:= close::Compiler::Node::create('type_specifier',
 			:is_builtin(1),
@@ -79,6 +83,7 @@ sub add_builtins($scope) {
 		);
 		
 		add_specifier_to_declarator($spec, $symbol);
+		add_builtin_type($symbol);
 		
 		$index := String::index($Builtins, "typedef", :offset($index));
 		DUMP($symbol);
@@ -204,6 +209,27 @@ sub new_declarator(*%attrs) {
 	return $decl;
 }
 
+sub pervasive_scope() {
+	our $pervasive_scope;
+	
+	unless Scalar::defined($pervasive_scope) {
+		NOTE("Creating pervasive scope block");
+		
+		# This is bogus. Can I use namespace root instead?
+		
+		my $scope := PAST::Block.new(
+			:blocktype('immediate'),
+			:hll('close'),
+			:namespace(Scalar::undef()),
+		);
+		$scope<node_type> := 'pervasive scope';
+		close::Compiler::Node::set_name($scope, 'pervasive types');
+		$pervasive_scope := $scope;
+	}
+	
+	return $pervasive_scope;
+}
+	
 sub pointer() {
 	my $decl := new_declarator(:is_pointer(1), :value('pointer to'));
 	DUMP(:decl($decl));
@@ -259,7 +285,6 @@ sub same_type($type1, $type2) {
 	
 	return 1;
 }
-
 
 sub type_to_string($type) {
 	my $str := '';

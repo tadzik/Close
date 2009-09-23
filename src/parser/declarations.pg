@@ -210,11 +210,14 @@ Matches any of the Close builtin types.
 
 rule tspec_builtin_type {
 	| <token=AUTO>		{*}
-	#| <token=CLASS>		{*} # Really?
+	| <token=CLASS>		{*}
+	| <token=ENUM>		{*}
 	| <token=FLOAT>		{*}
 	| <token=INT>		{*}
 	| <token=PMC>		{*}
 	| <token=STRING>		{*}
+	| <token=STRUCT>		{*}
+	| <token=UNION>		{*}
 	| <token=VOID>		{*}
 }
 
@@ -224,6 +227,7 @@ rule tspec_function_attr {
 }
 
 rule tspec_storage_class {
+	| <token=_BUILTIN>	{*}
 	| <token=DYNAMIC>	{*}
 	| <token=EXTERN>		{*}
 	| <token=LEXICAL>		{*}

@@ -21,11 +21,14 @@ method arg_expr($/) {
 	$past.node($/);
 
 	if $<argname> {
-		$past.named(~$<argname>[0].ast.name());
+		my $name := ~ $<argname>[0].ast.name();
+		NOTE("Setting arg name to: ", $name);
+		$past.named($name);
 	}
 
 	for $<arg_adverb> {
 		my $adverb := $_.ast;
+		NOTE("Got adverb: ", $adverb.name());
 		
 		if $adverb.name() eq 'flat' {
 			$past.flat(1);

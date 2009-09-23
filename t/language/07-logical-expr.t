@@ -215,7 +215,7 @@ __END__
         1
         
         0
-        0
+        1
 -
     NAME: Test logical xor short-circuit
     SOURCE: |

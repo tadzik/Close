@@ -165,6 +165,8 @@ method _assign_scope_qualified_identifier($node) {
 			}
 		}
 		else {
+			NOTE("ERROR: Qualified identifier with not declarator. Assigning package scope.");
+			
 			# No declarator -> error. Should already be tagged as an error.
 			my @messages := close::Compiler::Messages::get_messages($node);
 			

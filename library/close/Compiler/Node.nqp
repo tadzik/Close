@@ -747,10 +747,10 @@ sub set_adverb($node, $adverb) {
 		$node.flat(1);
 	}
 	elsif $name eq 'named' {
-		my $named := $adverb<named>;
+		my $named_what := $adverb<named>;
 		
-		if $named {
-			$node.named($name);
+		if $named_what {
+			$node.named($named_what);
 		}
 	}
 	elsif $name eq 'slurpy' {
@@ -777,8 +777,10 @@ sub copy_adverbs($from, $to) {
 }
 
 sub copy_block($from, $to) {
-	for $from<symtable> {
-		$to<symtable>{$_} := $from<symtable>{$_};
+	for $from<child_sym> {
+		ASSERT( ! Hash::exists($to<child_sym>, $_), 'This works only for initial setups.');
+		
+		$to<child_sym>{$_} := $from<child_sym>{$_};
 	}
 
 	copy_adverbs($from, $to);

@@ -71,21 +71,6 @@ method dclr_array_or_hash($/, $key) {
 
 method dclr_atom($/, $key) { PASSTHRU($/, $key); }
 	
-=method dclr_alias_init($/)
-
-=cut
-
-method dclr_alias_init($/) {
-	my $past := $<declarator>.ast;
-	
-	if $<initializer> {
-		$past<initializer> := $<initializer>[0].ast;
-	}
-	
-	DUMP($past);
-	make $past;
-}
-
 =method dclr_pointer
 
 Creates a token around the '*' in the pointer declarator, and attaches
@@ -230,6 +215,7 @@ method declarator_part($/, $key) {
 		DUMP($initializer);
 		my $past := $<declarator>.ast;
 		$past<initializer> := $initializer;
+		$past.viviself($initializer);
 	}
 	elsif $key eq 'open_block' {
 		NOTE("Opening decl block");
@@ -288,7 +274,9 @@ method param_adverb($/) {
 	my $named;
 	
 	if $<named> {
-		$named := ~ $<named>[0].ast.value();
+		my $param_name := $<named>[0].ast;
+		DUMP($param_name);
+		$named := $param_name.value();
 	}
 	
 	my $past := close::Compiler::Node::create('adverb', 

@@ -243,7 +243,8 @@ The C<RESERVED> token matches any of the reserved words in Close.
 =cut
 
 token RESERVED {
-	[ 'alias'		# Declaration
+	[ '_builtin'		# Declaration
+	| 'alias'		# Declaration
 	| 'and'			# Operator
 	| 'asm'			# In-line assembly expression
 	| 'auto'		# Declaration
@@ -295,6 +296,7 @@ token RESERVED {
 	] >>
 }
 
+token _BUILTIN		{ '_builtin'		>> }
 token ALIAS			{ 'alias'		>> }
 token AND			{ 'and'			>> }
 token ASM			{ 'asm'			>> }
@@ -440,4 +442,3 @@ token	SINGLE_BANG	{ '!'	<!before '='> }
 token	SINGLE_HASH	{ '#'	<!before '#'> }
 
 token	COLON_SPACE	{ ':'	<?before <.WS_ALL>> }
-
