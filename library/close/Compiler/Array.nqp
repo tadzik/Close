@@ -34,6 +34,15 @@ sub append(@dest, @append) {
 	return @dest;
 }
 
+sub delete(@array, $index) {
+	Q:PIR {
+		$P0 = find_lex '@array'
+		$P1 = find_lex '$index'
+		$I0 = $P1
+		delete $P0[$I0]
+	};
+}
+
 sub _get_function($name) {
 	my $sub := Q:PIR {
 		$P0 = find_lex '$name'

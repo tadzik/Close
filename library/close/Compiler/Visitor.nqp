@@ -52,6 +52,9 @@ method already_visited($visitor, $node, $store?) {
 	return $node<visited_by>{$name};
 }
 
+method delete($node) {
+	$node<_DELETE_> := 1;
+}
 
 method fetch_visit_method($visitor, $node) {
 	our %visit_methods;
@@ -143,6 +146,10 @@ method get_caller_namespace() {
 	return $nsp;
 }
 
+method is_deleted($node) {
+	return $node<_DELETE_>;
+}
+
 my @Results_placeholder := Array::empty();
 
 method visit($visitor, $node) {
@@ -173,6 +180,64 @@ method visit($visitor, $node) {
 	}
 
 	#NOTE("done");
+	#DUMP(@results);
+	return @results;
+}
+
+method _visit_array($visitor, @array) {
+	my @results := Array::empty();	
+	my $index := 0;
+	my @delete := Array::empty();
+	
+	for @array {
+		Array::append(@results, $visitor.visit($_));
+
+		if self.is_deleted($_) {
+			# Force a copy of $index
+			@delete.unshift(0 + $index);
+		}
+		
+		$index++;
+	}
+
+	NOTE("Visits over, now deleting");
+	DUMP(@delete);
+	# Note: Using unshift above creates backwards array: 3, 2, 1
+	# Deleting from rear prevents index slippage.
+	for @delete {
+		NOTE("Deleting index ", $_);
+		Array::delete(@array, $_);
+	}
+	
+	return @results;
+}
+
+method visit_children($visitor, $node) {
+	my @results := Array::empty();	
+	
+	if $node {
+		self._visit_array($visitor, @($node));
+	}
+
+	#NOTE("Returning ", +@results, " results");
+	#DUMP(@results);
+	return @results;
+}
+
+method visit_child_syms($visitor, $node) {
+	my @results := Array::empty();	
+	
+	if $node &&  $node<child_sym> {
+		for $node<child_sym> {
+			my @children := close::Compiler::Scopes::get_symbols($node, $_);
+			
+			for @children {
+				Array::append(@results, $visitor.visit($_));
+			}
+		}
+	}
+
+	#NOTE("Returning ", +@results, " results");
 	#DUMP(@results);
 	return @results;
 }
@@ -211,6 +276,10 @@ method visit_node_generic_results($visitor, $node, @child_attrs) {
 	for @child_attrs {
 		if $node{$_} {
 			Array::append(@results, self.visit($visitor, $node{$_}));
+			
+			if self.is_deleted($node{$_}) {
+				Hash::delete($node, $_);
+			}
 		}
 	}
 	
@@ -220,37 +289,5 @@ method visit_node_generic_results($visitor, $node, @child_attrs) {
 		close::Compiler::Scopes::pop(NODE_TYPE($node));
 	}
 	
-	return @results;
-}
-
-method visit_children($visitor, $node) {
-	my @results := Array::empty();	
-	
-	if $node {
-		for @($node) {
-			Array::append(@results, $visitor.visit($_));
-		}
-	}
-
-	#NOTE("Returning ", +@results, " results");
-	#DUMP(@results);
-	return @results;
-}
-
-method visit_child_syms($visitor, $node) {
-	my @results := Array::empty();	
-	
-	if $node &&  $node<child_sym> {
-		for $node<child_sym> {
-			my @children := close::Compiler::Scopes::get_symbols($node, $_);
-			
-			for @children {
-				Array::append(@results, $visitor.visit($_));
-			}
-		}
-	}
-
-	#NOTE("Returning ", +@results, " results");
-	#DUMP(@results);
 	return @results;
 }

@@ -92,7 +92,6 @@ sub _create_bareword(%attributes) {
 	
 }
 
-# Not sure I'll ever use this.
 sub _create_compilation_unit(%attributes) {
 	NOTE("Creating compilation_unit");
 	
@@ -455,16 +454,18 @@ sub _create_initload_sub(%attributes) {
 		close::Compiler::Node::set_adverb($declarator, 
 			close::Compiler::Node::create('adverb', :name($_), :node($for_namespace)));
 	}
-DUMP($declarator);
+
 	my $past := close::Compiler::Node::create('function_definition',
 		:from($declarator),
 	);
 
 	# Weird, but true: package by default.
 	$past.symbol_defaults(:scope('package'));
-	
+
+	%attributes<is_initload_sub> := 1;
 	set_attributes($past, %attributes);
-	
+
+	NOTE("done");
 	DUMP($past);
 	return $past;
 }

@@ -95,33 +95,6 @@ method visit($node) {
 	return @results;
 }
 
-=method visit_children($node)
-
-Delegates to SUPER.visit_children. This method should be copied unchanged into 
-the new code.
-
-=cut
-
-method visit_children($node) {
-	NOTE("Visiting ", +@($node), " children of ", NODE_TYPE($node), " node: ", $node.name());
-	DUMP($node);
-
-	my @results := $SUPER.visit_children(self, $node);
-	
-	DUMP(@results);
-	return @results;
-}
-
-method visit_child_syms($node) {
-	NOTE("Visiting ", +@($node), " child_syms of ", NODE_TYPE($node), " node: ", $node.name());
-	DUMP($node);
-
-	my @results := $SUPER.visit_child_syms(self, $node);
-	
-	DUMP(@results);
-	return @results;
-}
-	
 ################################################################
 
 =method _rewrite_tree_UNKNOWN($node)
@@ -137,27 +110,30 @@ our @Child_attribute_names := (
 	'type',
 );
 
-our $Compilation_unit;
-
 our @Fake_results := Array::empty();
 
 method _rewrite_tree_UNKNOWN($node) {	
 	NOTE("No custom handler exists for '", NODE_TYPE($node), 
 		"' node '", $node.name(), "'. Passing through to children.");
 	DUMP($node);
-	return $SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
+	return $SUPER.visit_node_generic_results(self, $node, @Child_attribute_names);
 }
 
-# method _rewrite_tree_function_definition($node) {
-	# NOTE("Visiting function_definition node: ", $node<display_name>);
+method _rewrite_tree_initload_sub($node) {
+	NOTE("Visiting initload_sub node: ", $node<display_name>);
 
-	# $SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
+	my @results := $SUPER.visit_node_generic_results(self, $node, @Child_attribute_names);
+
+	# For automatically generated subs, delete if empty.
+	if +@($node) == 1 {
+		NOTE("Deleting empty initload sub");
+		$SUPER.delete($node);
+	}
 	
-	# $Compilation_unit.push($node);
-	
-	# NOTE("done");
-	# return @Fake_results;	
-# }
+	NOTE("done");
+	DUMP(@results);
+	return @results;	
+ }
 
 ################################################################
 	
@@ -186,10 +162,8 @@ sub rewrite_tree($past) {
 		NOTE("Created visitor");
 		DUMP($visitor);
 		
-		#$Compilation_unit := close::Compiler::Node::create('compilation_unit');
 		$visitor.visit($past);
 		
-		#$result := $Compilation_unit;
 		NOTE("done");
 		DUMP($result);
 	}
