@@ -63,6 +63,7 @@ sub add_builtins($scope) {
 		$index	:= String::index($Builtins, ":register_class('", :offset($index))
 					+ String::length(":register_class('");
 		my $register_class := String::substr($Builtins, $index, 1);
+		$index := String::index($Builtins, "typedef", :offset($index));
 		
 		NOTE("Adding builtin type: '", $name, "'");
 
@@ -85,7 +86,6 @@ sub add_builtins($scope) {
 		add_specifier_to_declarator($spec, $symbol);
 		add_builtin_type($symbol);
 		
-		$index := String::index($Builtins, "typedef", :offset($index));
 		DUMP($symbol);
 	}
 	
@@ -177,11 +177,11 @@ sub merge_specifiers($error_sink, $merge_into, $merge_from) {
 	for $Merge_specifier_fields {
 		if $merge_from{$_} {
 			if $merge_into{$_} {
-				say("Merge specifier conflict: field ", $_, " already has a value");
+				NOTE("Merge specifier conflict: field ", $_, " already has a value");
 				# conflict - already set.
 			}
 			else {
-				say("Setting ", $_, " to ", $merge_from{$_});
+				NOTE("Setting ", $_, " to ", $merge_from{$_});
 				$merge_into{$_} := $merge_from{$_};
 			}
 		}

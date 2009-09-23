@@ -239,8 +239,8 @@ method postfix_index($/) {
 
 
 our %prefix_opcode;
-%prefix_opcode{'++'} := 'inc';
-%prefix_opcode{'--'} := 'dec';
+%prefix_opcode{'++'} := 'inc 0*';
+%prefix_opcode{'--'} := 'dec 0*';
 %prefix_opcode{'-'} := 'neg';
 %prefix_opcode{'!'} := 'not';
 %prefix_opcode{'not'} := 'not';

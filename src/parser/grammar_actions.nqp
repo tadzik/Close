@@ -135,17 +135,18 @@ method translation_unit($/, $key) {
 
 sub faketree() {
 	my $sub := PAST::Block.new(:blocktype('declaration'), :name('compilation_unit'));
-	$sub.lexical(0);
-	$sub :=PAST::Stmts.new();
-	$sub<id> := "compilation_unit";
-	
-	my $sub2 := PAST::Block.new(:blocktype('declaration'), :name('foo'));
-	$sub2.lexical(0);
-	$sub.push($sub2);
-	
-	$sub2 := PAST::Block.new(:blocktype('declaration'), :name('bar'));
-	$sub2.lexical(0);
-	$sub.push($sub2);
-
+	$sub.push(
+		PAST::Op.new(:pasttype('call'),
+			PAST::Var.new(:name('say'), :scope('package')),
+			PAST::Op.new(
+				:lvalue(1),
+				:name('prefix:++'),
+				:pasttype('pirop'), 
+				:pirop('inc 0*'), 
+				PAST::Var.new(:scope('lexical'), :name('x')),
+			),
+		),
+	);
+		
 	return $sub;
 }

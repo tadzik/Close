@@ -123,7 +123,8 @@ but currently ignores them.
 =cut 
 
 token INTEGER_LIT {
-	[ 0	[ 'b' <[01]>+		[ _ <[01]>+ ]*
+	$<value>=[
+	   0	[ 'b' <[01]>+		[ _ <[01]>+ ]*
 		| 'o' <[0..7]>+		[ _ <[0..7]>+ ]*
 		| 'd' \d+		[ _ \d+ ]*
 		| 'x' <xdigit>+	[ _ <xdigit>+ ]*
@@ -132,8 +133,8 @@ token INTEGER_LIT {
 	| \d+				[ _ \d+ ]*	# Plain old number.
 	]
 	$<lu_part>=[ <[Uu]> [ <[Ll]> <[Ll]>? ]?
-	| <[Ll]> <[Ll]>? <[Uu]>?
-	]?
+			| <[Ll]> <[Ll]>? <[Uu]>?
+			]?
 	{*}
 }
 

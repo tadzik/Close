@@ -65,7 +65,7 @@ method INTEGER_LIT($/) {
 	my $past := close::Compiler::Node::create('integer_literal',
 		:name(~ $/),
 		:node($/),
-		:value(~ $/),
+		:value(~ $<value>),
 	);
 	
 	if $<bad_octal> {
@@ -76,14 +76,8 @@ method INTEGER_LIT($/) {
 	}
 	
 	if $<lu_part> {
-		my $token := $past.value();
-		
 		ADD_WARNING($past,
-			"Integer literals like '", $past.value(),
-			"' accept the U (unsigned) and L (long) suffixes ",
-			" from C, but they are presently ignored.");
-		
-		$past.value(String::substr($token, 0, String::length($token) - String::length(~$<lu_part>)));
+			"Integer suffix '",  ~$<lu_part>, "' ignored");
 	}
 	
 	DUMP($past);

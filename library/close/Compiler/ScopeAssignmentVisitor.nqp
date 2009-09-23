@@ -176,7 +176,7 @@ method _assign_scope_qualified_identifier($node) {
 			$scope := 'package';
 		}
 			
-		NOTE("Setting scope to '$scope'");
+		NOTE("Setting scope to '", $scope, "'");
 		$node.scope($scope);
 	}
 	

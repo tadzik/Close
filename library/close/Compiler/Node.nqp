@@ -189,27 +189,28 @@ sub _create_decl_varlist(%attributes) {
 sub _create_declarator_name(%attributes) {
 	NOTE("Creating declarator_name");
 
-	# Calling create_symbol will call set_attributes, so 
-	# get everything stored first.
-	%attributes<isdecl> := 1;
-	
 	my @parts := Array::clone(%attributes<parts>);
 	# If this fails, it's because dcl_name matches namespaces, but I can't 
 	# think of when I'd use that.
 	ASSERT(+@parts, 'A declarator_name has at least one part');
 	
+	%attributes<isdecl> := 1;	
 	%attributes<name> := @parts.pop();
-
+	NOTE("Name will be: ", %attributes<name>);
+	
 	if %attributes<is_rooted> {
+		NOTE("Rooted: using namespace: ", Array::join("::", @parts));
 		# Use exactly what we have left.
 		%attributes<namespace> := @parts;
 	}
 	elsif +@parts {
-		# Figure out "full" namespace.
-		my $outer_nsp := close::Compiler::Scopes::fetch_current_namespace();
-		my @namespace := Array::clone($outer_nsp.namespace());
-		@parts := Array::append(@namespace, @parts);
+		#my $outer_nsp := close::Compiler::Scopes::fetch_current_namespace();
+		#NOTE("Not rooted: base on current namespace: ", $outer_nsp<display_name>);
+		
+		#my @namespace := Array::clone($outer_nsp.namespace());
+		#@parts := Array::append(@namespace, @parts);
 		%attributes<namespace> := @parts;
+		#%attributes<is_rooted> := 1;
 	}
 
 	my $past := _create_symbol(%attributes);

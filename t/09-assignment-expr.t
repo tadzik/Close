@@ -60,6 +60,26 @@ __END__
     # none
     OUTPUT: |
         100
+-
+    NAME: Test assignment =
+    SOURCE: |
+            namespace test {
+                void say(pmc what) {
+                    asm(what) {{ say %0 }};
+                }
+                
+                void test() :main {
+		int x;
+		x = 100;
+		int y;
+		y = x;
+		say(y);
+                }
+            }
+    MESSAGES: |
+    # none
+    OUTPUT: |
+        100
     EXTRA_STUFF: |        
 
 			int a = 100;

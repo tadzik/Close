@@ -107,6 +107,7 @@ sub assemble_qualified_path($node_type, $/) {
 	my $is_rooted := 0;
 	
 	if $<root> {
+		NOTE("This name is rooted");
 		$is_rooted := 1;
 	}
 	

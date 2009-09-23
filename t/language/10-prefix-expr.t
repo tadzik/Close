@@ -7,7 +7,7 @@ use lib qw(lib t . /usr/local/lib/parrot/1.6.0-devel/tools/lib);
 
 use Close::Test;
 use Data::Dumper;
-use Parrot::Test tests => 1 * 5;
+use Parrot::Test tests => 5 * 5;
 use YAML;
 
 our $Test_name = 'prefix expressions';
@@ -101,6 +101,7 @@ __END__
 		x = 10 - +2;
 		say(x);
 		x = +(7 + 10);
+		say(x);
                 }
             }
     MESSAGES: |
@@ -127,12 +128,13 @@ __END__
 		x = 10 - -2;
 		say(x);
 		x = 10 - -(3 + 1);
+		say(x);
                 }
             }
     MESSAGES: |
     # none
     OUTPUT: |
-        7
+        -2
         3
         12
         14
