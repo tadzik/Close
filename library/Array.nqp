@@ -205,13 +205,7 @@ sub join($_delim, @parts) {
 }
 
 sub new(*@elements) {
-	my @array := empty();
-	
-	for @elements {
-		@array.push($_);
-	}
-	
-	return @array;
+	return @elements;
 }
 
 sub reverse(@original) {

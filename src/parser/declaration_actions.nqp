@@ -28,6 +28,9 @@ method dclr_adverb($/) {
 		$signature := ~ $<signature>;
 		NOTE("Got signature: ", $signature);
 	}
+	elsif $<register_class> {
+		$signature := $<register_class>.ast.value();
+	}
 	
 	my $past := close::Compiler::Node::create('adverb', 
 		:node($/), 
@@ -79,12 +82,13 @@ any qualifiers as children of the node.
 =cut
 
 method dclr_pointer($/) {
-	my $past := new_dclr_pointer();
-	$past.node($/);
-	close::Compiler::Node::set_name($past, ~$/);
+	my $past := close::Compiler::Types::pointer_to(
+		:name(~ $/),
+		:node($/), 
+	);
 	
 	for $<cv_qualifier> {
-		$past := close::Compiler::Types::merge_specifiers($past, $past, $_.ast);
+		$past := close::Compiler::Types::merge_specifiers($past, $_.ast);
 	}
 
 	DUMP($past);
@@ -337,24 +341,24 @@ parameter scope.
 
 method parameter_list($/, $key) {
 	if $key eq 'open' {
-		my $past := close::Compiler::Node::create('decl_function_returning',
-			:node($/));		
+		NOTE("Creating new parameter list");
+		my $past := close::Compiler::Types::function_returning(:node($/));
 		close::Compiler::Scopes::push($past);
-		NOTE("Pushed new decl_function_returning scope on stack: ", $past.name());
+		
+		NOTE("Pushed new scope on stack: ", $past.name());
 		DUMP($past);
 	}
 	elsif $key eq 'close' {
-		my $past := close::Compiler::Scopes::pop('decl_function_returning');
-		NOTE("Popped scope from stack: ", $past.name());
-
-		my $params := $past<parameters>;
-		my $slurpy := 0;
+		NOTE("Popping parameter list from stack");
+		my $past	:= close::Compiler::Scopes::pop('declarator');
+		my $params	:= $past<parameters>;
+		my $slurpy	:= 0;
 		
-		for $<param_list> {
-			$params.push($_.ast);
-			close::Compiler::Scopes::add_declarator_to($_.ast, $past);
+		for ast_array($<param_list>) {
+			$params.push($_);
+			close::Compiler::Scopes::add_declarator_to($_, $past);
 			
-			if $_.ast<adverbs><slurpy> {
+			if $_<adverbs><slurpy> {
 				$slurpy := 1;
 			}
 		}
@@ -376,14 +380,13 @@ method specifier($/, $key) { PASSTHRU($/, $key); }
 
 method specifier_list($/) {
 	NOTE("Assembling specifier list");
-	my $past := $<specifier>[0].ast;
 	
-	for $<specifier> {
-		my $spec := $_.ast;
-		
-		unless $spec =:= $past {
-			$past := close::Compiler::Types::merge_specifiers($past, $past, $spec);
-		}
+	my @specs := ast_array($<specifier>);
+	ASSERT(+@specs, 'Specifier list requires at least one item');
+	my $past := @specs.shift();
+
+	for @specs {
+		$past := close::Compiler::Types::merge_specifiers($past, $_);
 	}
 	
 	NOTE("done");
@@ -403,7 +406,6 @@ method tspec_builtin_type($/) {
 	
 	my $type_name := close::Compiler::Node::create('qualified_identifier', 
 		:parts(Array::new($name)),
-		:display_name($name),
 		:node($/),
 	);
 
@@ -411,7 +413,7 @@ method tspec_builtin_type($/) {
 	my @matches := close::Compiler::Lookups::query_matching_types($type_name);
 	DUMP(@matches);
 	ASSERT(+@matches == 1, 
-		'query_matching_types should always be able to find exactly one matching  builtin type');
+		'query_matching_types should always be able to find exactly one matching builtin type');
 		
 	$type_name<apparent_type>  := @matches.shift();
 	my $past := close::Compiler::Node::create('type_specifier',
@@ -446,8 +448,8 @@ Creates a token around the keyword.
 method tspec_storage_class($/) {
 	my $name := ~ $<token>;
 	NOTE("Creating new storage class specifier: ", $name);
-	my $past := close::Compiler::Node::create('type_specifier',
-		:storage_class($name));
+
+	my $past := close::Compiler::Types::specifier(:name($name), :node($/));
 		
 	DUMP($past);
 	make $past;

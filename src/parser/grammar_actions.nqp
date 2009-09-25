@@ -6,7 +6,7 @@ class close::Grammar::Actions;
 method TOP($/, $key) { 
 	my $past := $/{$key}.ast;
 		
-	unless in_include_file() {
+	unless close::Compiler::IncludeFile::in_include_file() {
 		DUMP($past);
 
 		if get_config('Compiler', 'PrettyPrint') {
@@ -92,13 +92,11 @@ method namespace_definition($/, $key) {
 
 method translation_unit($/, $key) {
 	if $key eq 'open' {
-		# If we're in an include file, there's nothing to do. 
-		
-		# Otherwise ...
-		unless in_include_file() {
+		unless close::Compiler::IncludeFile::in_include_file() {
+			# Calling NOTE, etc., won't work before the config file is read.
 			close::Compiler::Config::read('close.cfg');
-			
-			# Calling this forces the init code to run. I'm not sure that matters.
+			NOTE("Finished reading config file.");
+
 			my $root_nsp := close::Compiler::Namespaces::fetch(Array::new('close'));
 			close::Compiler::Scopes::push($root_nsp);
 			DUMP($root_nsp);
@@ -107,7 +105,7 @@ method translation_unit($/, $key) {
 	elsif $key eq 'close' {
 		my $past;
 		
-		if in_include_file() {
+		if close::Compiler::IncludeFile::in_include_file() {
 			# NB: Don't pop, because this might be a #include
 			NOTE("Not popping - this is a #include");
 			$past := close::Compiler::Scopes::current();

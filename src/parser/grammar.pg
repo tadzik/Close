@@ -27,7 +27,7 @@ convenience target for namespace and translation unit definitions.
 =cut
 
 rule declaration_sequence {
-	<decl=declarative_statement>*
+	<.ws> <decl=declarative_statement>*
 }
 
 =rule declarative_statement
@@ -90,6 +90,8 @@ variables, classes, or functions.
 rule translation_unit {
 	{*} #= open
 	<declaration_sequence>
-	[ $ || <panic: 'Syntax error. Parsing terminated before end of input.'> ]
+	{{ say "!declaration sequence!" }}
+
+	[ $ || {{ _dumper(match) }} <panic: 'Syntax error. Parsing terminated before end of input.'> ]
 	{*} #= close
 }

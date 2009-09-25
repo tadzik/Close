@@ -11,6 +11,7 @@ resulting PAST::Var is not resolved.
 method declarator_name($/) {
 	my $past := assemble_qualified_path('declarator_name', $/);
 	NOTE("Created declarator_name for ", $past<display_name>);
+	NOTE("name = ", $past.name());
 	DUMP($past);
 	make $past;
 }

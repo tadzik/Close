@@ -158,7 +158,7 @@ sub info() {
 
 sub get_config($class, $sub) {	
 	my @keys := Array::new('Dump', $class, $sub);
-	my $result := close::Compiler::Config::query(@keys);
+	my $result := close::Compiler::Config::query_array(@keys);
 	return $result;
 }
 

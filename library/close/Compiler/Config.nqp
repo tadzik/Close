@@ -32,7 +32,7 @@ our %Config_data;
 # Bootstrap values, fed to Dumper before we parse the real config file.
 %Config_data<Dump><Config><_list_configs>		:= 1;
 %Config_data<Dump><Config><_parse_config>	:= 0;
-%Config_data<Dump><Config><read>			:= 0;
+%Config_data<Dump><Config><read>			:= 7;
 %Config_data<Dump><Config><value>			:= 0;
 %Config_data<Dump><Config><write>			:= 1;
 
@@ -135,19 +135,22 @@ sub query(*@keys) {
 	return $_Config.value(@keys);
 }
 
+sub query_array(@keys) {
+	return $_Config.value(@keys);
+}
+
 sub read($filename) {
 	#NOTE("Reading filename: ", $filename);
-	if %Config_data<> ne '$filename' {
+	say("Reading filename: ", $filename);
+	if %Config_data<> ne $filename {
 		%Config_data<>	:= $filename;
 		my $data		:= File::slurp($filename);
 		_parse_config(	$data);
-		#DUMP(%Config_data);
 	}
 }
 
 method value(@path, *@what) {
 	#NOTE("key = ", Array::join('::', @path));
-	
 	my $last := @path.pop();
 	my %config := _fetch_container(@path);
 	

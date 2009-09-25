@@ -7,7 +7,6 @@ method BAREWORD($/) {
 	my $past := close::Compiler::Node::create('bareword',
 		:node($/),
 		:name(~ $/),
-		:value(~ $/),
 	);
 	
 	DUMP($past);

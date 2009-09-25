@@ -49,25 +49,20 @@ Insert a single declarator-name into the symbol table for a block.
 =cut
 
 sub add_declarator_to($past, $scope) {
-	NOTE("Adding name '", $past.name(), "' to ", NODE_TYPE($scope), " scope '", $scope<display_name>, "'");
+	NOTE("Adding name '", $past.name(), "' to ", NODE_TYPE($scope), " block '", $scope<display_name>, "'");
 	my $name := $past.name();
 	my @already := get_symbols($scope, $name);
+
+	my $duplicate;
 	
-	if +@already {
-		# This is not a problem if declaring two multi- functions.
-		my $all_multi := 1;
-		
-		for @already {
-			unless Hash::exists($_<adverbs>, 'multi') {
-				$all_multi := 0;
-			}
+	for @already {
+		if !$duplicate && close::Compiler::Types::same_type($past<type>, @already[0]<type>) {
+			$duplicate := $_;
 		}
-		
-		# FIXME: Need to check for redeclaration of same (compatible) 
-		# symbol, too. extern int x; and int x = 1; for example.
-		# Don't know how to do that yet. See Types.pm.
-		
-		unless $all_multi {
+	}
+	
+	if $duplicate {
+		if $duplicate<etype><scope> eq 'package'
 			NOTE("Adding conflicting declaration error");
 			ADD_ERROR($past,
 				"Conflicting declaration of symbol '",
@@ -241,9 +236,8 @@ sub get_stack() {
 	
 	unless $init_done {
 		$init_done := 1;
-		my $pervasive := close::Compiler::Types::pervasive_scope();		
-		@scope_stack := Array::new($pervasive);
-		close::Compiler::Types::add_builtins($pervasive);
+		@scope_stack := Array::empty();
+		close::Compiler::Types::pervasive_scope();		
 	}
 
 	DUMP(@scope_stack);

@@ -24,6 +24,7 @@ rule dclr_adverb {
 	| <token=ADV_LOAD>	{*}
 	| <token=ADV_MAIN>	{*}
 	| <token=ADV_MULTI> '(' ~ ')' <signature=string_literal: ')'> {*}
+	| <token=ADV_REG_CLASS> '(' ~ ')' <register_class=QUOTED_LIT> {*}
 	# | <token=ADV_METHOD> (handled by 'method' keyword?)
 	| <token=ADV_VTABLE>	{*}
 }

@@ -89,13 +89,15 @@ C<hll> set (or not) appropriately.
 =cut
 
 sub assemble_qualified_path($node_type, $/) {
+	NOTE("Assembling qualified path for ", $node_type);
 	my @parts	:= Array::empty();
-	
+
+	# Don't use ast_array because of .value()
 	for $<path> {
-		@parts.push($_.ast.value());
+		@parts.push($_.ast.name());
 	}
 
-	NOTE("Parts: [ ", Array::join(' ; ', @parts), " ]");
+	NOTE("Parts: [ '", Array::join("' ; '", @parts), "' ]");
 	
 	my $hll;
 	
@@ -122,6 +124,24 @@ sub assemble_qualified_path($node_type, $/) {
 	return ($past);
 }
 
+=sub ast_array($capture)
+
+Returns an array of the ast nodes associated with the elements of an array
+capture. (As with a <subrule>* or <subrule>+ match.)
+
+=cut
+
+sub ast_array($capture) {
+	my @results := Array::empty();
+	
+	for $capture {
+		@results.push($_.ast);
+	}
+	
+	return @results;
+}
+
+		
 =sub void clean_up_heredoc($past, @lines)
 
 Chops off leading whitespace, as determined by the final line. Concatenates all
@@ -178,12 +198,6 @@ sub get_config(*@keys) {
 	return $result;
 }
 
-our @File_stack := Array::empty();
-
-sub in_include_file() {
-	return +@File_stack > 0;
-}
-
 =sub PAST::Val make_token($capture)
 
 Given a capture -- that is, the $<subrule> match from some regex -- creates a
@@ -202,67 +216,5 @@ sub make_token($capture) {
 		
 	DUMP($token);
 	return $token;
-}
-
-our %Include_search_paths;
-%Include_search_paths<system> := Array::new(
-	'include',
-);
-
-%Include_search_paths<user> := Array::new('.');
-
-sub include_search_path($file) {
-	return %Include_search_paths{$file<include_type>};
-}
-
-sub parse_include_file($file) {
-	my @search_path := include_search_path($file);
-	my $path := File::find_first($file<path>, @search_path);
-	
-	NOTE("Found path: ", $path);
-	my $file := $file;
-	
-	if $path {
-		push_include_file();
-		
-		my $content := File::slurp($path);
-		$file<contents> := $content;
-		DUMP($file);
-
-		close::Compiler::Scopes::push($file);
-		
-		# Don't capture this to $file - the translation_unit rule
-		# knows to store included nodes into the current $file.
-		Q:PIR {
-			.local pmc parser
-			parser = compreg 'close'
-			
-			.local string source
-			$P0 = find_lex '$content'
-			source = $P0
-			%r = parser.'compile'(source, 'target' => 'past')
-		};
-		
-		close::Compiler::Scopes::pop('include_file');
-		pop_include_file();
-	}
-	else {
-		NOTE("Bogus include file - not found");
-		ADD_ERROR($file, "Include file ",
-			$file.name(), " not found.");
-	}
-	
-	return $file;
-}
-
-sub pop_include_file() {
-	NOTE("Popping include file stack");
-	return @File_stack.pop();
-}
-
-sub push_include_file() {
-	my $current_file := close::Compiler::Scopes::current_file();
-	NOTE("Pushing '", $current_file, "' on file stack");
-	@File_stack.push($current_file);
 }
 

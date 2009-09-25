@@ -120,10 +120,114 @@ sub get_specifier($node) {
 	return $spec;
 }
 
-sub hash() {
-	my $decl := new_declarator(:is_hash(1), :value('hash of'));
-	DUMP(:decl($decl));
-	return $decl;
+sub array_of(*%attributes) {
+	my $elements := %attributes<elements>;
+	NOTE("Creating declarator node for array of ", $elements);
+	
+	my $kind := 'array of';
+	
+	if Scalar::defined($elements) {
+		$kind := $kind ~ ' ' ~ $elements;
+	}
+	
+	my $declarator := create_declarator($kind, %attributes);
+
+	NOTE("done");
+	DUMP($declarator);
+	return $declarator;
+}
+
+sub create_declarator($kind, %outer_attrs, *%attributes) {
+	NOTE("Creating declarator node for '", $kind, "'");
+	
+	Hash::merge(%attributes, %outer_attrs);
+	
+	my $decl_type := String::split(' ', $kind).shift();
+	
+	%attributes{ 'is_' ~ $decl_type }	:= 1;
+	%attributes<is_declarator>		:= 1;
+	%attributes<declarator_type>	:= $kind;
+	
+	my $declarator := close::Compiler::Node::create_from_hash('declarator', %attributes);
+	
+	NOTE("done");
+	DUMP($declarator);
+	return $declarator;
+}
+
+sub function_returning(*%attributes) {
+	NOTE("Creating declarator node for function returning");
+	
+	my $params := close::Compiler::Node::create('decl_varlist',
+		:name('parameter list'),
+	);
+	
+	%attributes<parameters>		:= $params;
+
+	my $declarator := create_declarator('function returning', %attributes,
+		:blocktype('immediate'),
+		:default_scope('parameter'),
+		:past_type(PAST::Block),		# Need block for parameters
+	);
+
+	$declarator.push($params);
+	
+	NOTE("done");
+	DUMP($declarator);
+	return $declarator;
+}
+
+sub hash_of(*%attributes) {
+	NOTE("Creating declarator node for hash");
+	
+	my $declarator := create_declarator('hash of', %attributes);
+
+	NOTE("done");
+	DUMP($declarator);
+	return $declarator;
+}
+
+sub pointer_to(*%attributes) {
+	NOTE("Creating declarator node for hash");
+	
+	my $declarator := create_declarator('pointer to', %attributes);
+
+	NOTE("done");
+	DUMP($declarator);
+	return $declarator;
+}
+
+our %Storage_class;
+%Storage_class<dynamic>	:= 'lexical';
+%Storage_class<extern>	:= 'package';
+%Storage_class<lexical>	:= 'lexical';
+%Storage_class<register>	:= 'register';
+%Storage_class<static>	:= 'package';
+%Storage_class<typedef>	:= 'typedef';
+
+sub specifier(*%attributes) {
+	my $name := %attributes<name>;
+	ASSERT($name, 'Every specifier must have a name');
+	NOTE("Creating type specifier for ", $name);
+	
+	my $flag := 'is_' ~ $name;
+	
+	if $name eq '_builtin' {
+		$flag := 'is_builtin';
+	}
+	
+	%attributes{$flag} := 1;	# Set 'is_foo' flag
+	
+	if %Storage_class{$name} {
+		%attributes<storage_class> := $name;
+		%attributes<scope> := %Storage_class{$name};
+	}
+	
+	my $specifier := close::Compiler::Node::create_from_hash('type_specifier', %attributes);
+	
+	NOTE("done");
+	DUMP($specifier);
+	return $specifier;
 }
 
 our @Type_attributes := (
@@ -135,6 +239,13 @@ our @Type_attributes := (
 	'is_enum'
 );
 
+sub is_pointer_type($type) {
+	my $result := $type<is_pointer> || $type<is_array>;
+
+	NOTE("Returning: ", $result);
+	return $result;
+}
+
 sub is_type($object) {
 	NOTE("Checking if ", NODE_TYPE($object), " is a type");
 	DUMP($object);
@@ -144,7 +255,7 @@ sub is_type($object) {
 	
 	for @Type_attributes {
 		NOTE("Checking type-attribute: ", $_, " (", $object{$_}, ")");
-		$result := $result || $object{$_};
+		$result := $result || $object<type>{$_};
 	}
 	
 	NOTE("Returning: ", $result);
@@ -152,7 +263,7 @@ sub is_type($object) {
 }
 
 
-our $Merge_specifier_fields := (
+our $Merge_specifier_flags := (
 	'is_builtin',
 	'is_const',
 	'is_inline', 
@@ -163,27 +274,68 @@ our $Merge_specifier_fields := (
 	'storage_class', 
 );
 
-sub merge_specifiers($error_sink, $merge_into, $merge_from) {
-	ASSERT(close::Compiler::Node::type($merge_from) eq 'type_specifier',
+sub merge_specifiers($merge_into, $merge_from) {
+	ASSERT(NODE_TYPE($merge_from) eq 'type_specifier',
 		'Merge_from argument must be a type specifier.');
+	ASSERT(NODE_TYPE($merge_into) eq 'type_specifier',
+		'Merge_into argument must be a type specifier.');
 		
-	unless $merge_into {
-		return $merge_from;
-	}
-	
-	ASSERT(close::Compiler::Node::type($merge_into) eq 'type_specifier',
-		'Merge_into argument must be a type specifier, if given.');
-		
-	for $Merge_specifier_fields {
+	for $Merge_specifier_flags {
 		if $merge_from{$_} {
 			if $merge_into{$_} {
-				NOTE("Merge specifier conflict: field ", $_, " already has a value");
-				# conflict - already set.
+				NOTE("Adding redundant-specifier warning.");
+				ADD_WARNING($merge_into, 
+					"Redundant storage class specifier '", 
+					$merge_from.name(),
+					"'");
 			}
 			else {
 				NOTE("Setting ", $_, " to ", $merge_from{$_});
 				$merge_into{$_} := $merge_from{$_};
 			}
+		}
+	}
+
+	my $new_sc := $merge_from<storage_class>;
+	if $new_sc {
+		my $old_sc := $merge_into<storage_class>;
+		if $old_sc {
+			if $old_sc eq $new_sc {
+				NOTE("Adding redundant-storage class warning.");
+				ADD_WARNING($merge_into, 
+					"Redundant storage class specifier '",
+					$merge_from.name(),
+					"'");
+			}
+			elsif $old_sc eq 'extern' && $new_sc eq 'lexical' {
+				NOTE("extern+lexical is okay");
+				$merge_into<storage_class> := $merge_from<storage_class>;
+				$merge_into<scope> := $merge_from<scope>;
+			}
+			elsif $old_sc eq 'lexical' && $new_sc eq 'extern' {
+				NOTE("lexical+extern is okay, but don't overwrite lexical");
+			}
+			else {
+				NOTE("Adding conflicting storage class error.");
+				ADD_ERROR($merge_into,
+					"Conflicting storage class specifiers '",
+					$old_sc, "' and '", $new_sc, "'");
+			}
+		}
+		else {
+			$merge_into<storage_class> := $merge_from<storage_class>;
+			$merge_into<scope> := $merge_from<scope>;
+		}
+	}
+	
+	if $merge_from<noun> {
+		if $merge_into<noun> {
+			NOTE("Adding conflicting type error.");
+			ADD_ERROR($merge_into,
+				"Only one type name is allowed ",
+				"(consider removing '",
+				$merge_from<noun>.name(),
+				"')");
 		}
 	}
 	
@@ -196,91 +348,117 @@ sub new_dclr_alias($alias) {
 	return $alias;
 }
 
-sub new_declarator(*%attrs) {
-	my $decl := PAST::Val.new();
-	
-	$decl<is_declarator> := 1;
-	
-	for %attrs {
-		$decl{$_} := %attrs{$_};
-	}
-	
-	DUMP(:decl($decl));
-	return $decl;
-}
-
 sub pervasive_scope() {
-	our $pervasive_scope;
+	our $scope;
 	
-	unless Scalar::defined($pervasive_scope) {
+	unless Scalar::defined($scope) {
 		NOTE("Creating pervasive scope block");
 		
-		# This is bogus. Can I use namespace root instead?
-		
-		my $scope := PAST::Block.new(
+		$scope := PAST::Block.new(
 			:blocktype('immediate'),
-			:hll('close'),
 			:namespace(Scalar::undef()),
 		);
+		
 		$scope<node_type> := 'pervasive scope';
 		close::Compiler::Node::set_name($scope, 'pervasive types');
-		$pervasive_scope := $scope;
+		
+		# Attach types to scope
+		close::Compiler::Scopes::push($scope);
+		close::Compiler::IncludeFile::parse_internal_file('internal/types');
+		
+		for @($scope) {
+			ASSERT($_.isa(PAST::VarList), 
+				'There should be nothing in this block but the declarations we just built');
+			my $varlist := $_;
+			for @($varlist) {
+				close::Compiler::Scopes::add_declarator_to($_, $scope);
+			}
+		}
 	}
 	
-	return $pervasive_scope;
-}
-	
-sub pointer() {
-	my $decl := new_declarator(:is_pointer(1), :value('pointer to'));
-	DUMP(:decl($decl));
-	return $decl;
+	return $scope;
 }
 
-sub same_type($type1, $type2) {
+sub same_type($type1, $type2, *%options) {
+	if %options<relaxed> && is_pointer_type($type1) && is_pointer_type($type2) {
+		$type1 := $type1<type>;
+		$type2 := $type2<type>;
+	}
+	
+	if %options<allow_multi> 
+		&& $type1<is_function> && $type1<adverbs><multi>
+		&& $type2<is_function> && $type2<adverbs><multi> {
+		return 1;
+	}
+	
 	while $type1 && $type2 {
 		if $type1 =:= $type2 {
 			return 1;
 		}
-		elsif $type1<is_declarator> && $type2<is_declarator> {
-			if $type1<is_array> && $type2<is_array> {
-				if $type1<num_elements> != $type2<num_elements> {
+		
+		if NODE_TYPE($type1) ne NODE_TYPE($type2) {
+			return 0;
+		}
+		
+		if $type1<is_declarator> {
+			if $type1<declarator_type> ne $type2<declarator_type> {
+				return 0;
+			}
+			
+			if $type1<is_array> && $type1<elements> != $type2<elements> {
+				return 0;
+			}
+			
+			if $type1<is_function> {
+				if $type1<is_method> != $type2<is_method> {
 					return 0;
 				}
-			}
-			elsif $type1<is_function> && $type2<is_function> {
-				# FIXME: Compare args, somehow.
-				my $param := 0;
 				
-				while $type1<parameters>[$param] {
-					unless $type2<parameters>[$param] {
+				# FIXME: This does not allow for named params in different order
+				my $index := 0;
+				
+				while $type1<parameters>[$index] {
+					unless $type2<parameters>[index] {
 						return 0;
 					}
 					
-					unless same_type($type1<parameters>[$param]<type>,
-						$type2<parameters>[$param]<type>) {
+					unless same_type($type1<parameters>[index], 
+						$type2<parameters>[index], :relaxed(1)) {
 						return 0;
 					}
+					
+					$index++;
 				}
 			}
-			elsif $type1<is_hash> && $type2<is_hash> {
-				# I got nothin', here.
+			
+			if $type1<is_hash> {
+				# I got nothing, here.
 			}
-			elsif $type1<is_pointer> && $type2<is_pointer> {
+			
+			if $type1<is_pointer> {
 				if $type1<is_const> != $type2<is_const>
 					|| $type1<is_volatile> != $type2<is_volatile> {
 					return 0;
 				}
 			}
 		}
-		elsif $type1<is_specifier> && $type2<is_specifier> {
-			if $type1<noun> ne $type2<noun> {
+		elsif $type1<is_specifier> {
+			if $type1<noun>.name() ne  $type2<noun>.name() {
 				return 0;
 			}
-			elsif $type1<is_const> != $type2<is_const>
+			
+			if $type1<is_const> != $type2<is_const>
 				|| $type1<is_volatile> != $type2<is_volatile> {
 				return 0;
 			}
 		}
+		else {
+			DUMP($type1, $type2);
+			ASSERT(0, 'Not reached unless types are horribly misconfigured');
+		}
+		
+		$type1 := $type1<next>;
+		$type2 := $type2<next>;
 	}
 	
 	return 1;

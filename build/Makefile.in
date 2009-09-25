@@ -68,6 +68,7 @@ COMPILER_LIBS_PIR := \
 	library/String.pir	\
 	library/close/Compiler/Config.pir			\
 	library/close/Compiler/DeclarationCollectionVisitor.pir	\
+	library/close/Compiler/IncludeFile.pir		\
 	library/close/Compiler/Lookups.pir		\
 	library/close/Compiler/Messages.pir		\
 	library/close/Compiler/MessageVisitor.pir	\
@@ -81,7 +82,6 @@ COMPILER_LIBS_PIR := \
 	library/close/Compiler/Symbols.pir		\
 	library/close/Compiler/TreeRewriteVisitor.pir	\
 	library/close/Compiler/TypeResolutionVisitor.pir\
-	library/close/Compiler/Types.pir			\
 	library/close/Compiler/Types.pir			\
 	library/close/Compiler/Visitor.pir
 

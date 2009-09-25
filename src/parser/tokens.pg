@@ -19,14 +19,14 @@ This improves performance in the case where two tokens are repeatedly evaluated.
 =cut 
 
 token ws {
-	| <?{{	## Cache ws results.
+	| <?{{	## Remember end of last ws, in case rule is called 2x
 		$P0 = get_global '$!ws'
 		if null $P0 goto noshort
 		$P1 = $P0.'to'()
 		$P2 = match.'to'()
 		if $P1 != $P2 goto noshort
 		.return(1)
-	  noshort:
+	noshort:
 		set_global '$!ws', match
 		.return(0)
 	}}>
@@ -406,6 +406,7 @@ token	ADV_OPTIONAL	{ [ ':optional'	>>
 				| '?'		] }
 token	ADV_OPT_FLAG	{ ':opt_flag'	>> }
 token	ADV_PHYLUM	{ ':phylum'	>> }
+token	ADV_REG_CLASS	{ ':register_class' >> }
 token	ADV_SLURPY 	{ [ ':slurpy'	>> 
 				| '...'		] }
 token	ADV_VTABLE	{ ':vtable'	>> }

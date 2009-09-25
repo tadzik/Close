@@ -1,0 +1,11 @@
+// $Id: $
+//
+// Declaration of builtin types for Compiler. The compiler reads this file to 
+// create symbols for builtin types. Don't screw it up!
+// 
+typedef _builtin	'auto'		;
+typedef _builtin	'float'		:register_class('N');
+typedef _builtin	'int'		:register_class('I');
+typedef _builtin	'pmc'		:register_class('P');
+typedef _builtin	'string'	:register_class('S');
+typedef _builtin	'void'		:register_class('v');
