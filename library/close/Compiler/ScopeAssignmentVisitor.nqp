@@ -9,7 +9,7 @@ Sets identifier scopes in PAST.
 class close::Compiler::ScopeAssignmentVisitor;
 
 sub ASSERT($condition, *@message) {
-	close::Dumper::ASSERT(close::Dumper::info(), $condition, @message);
+	Dumper::ASSERT(Dumper::info(), $condition, @message);
 }
 
 sub BACKTRACE() {
@@ -19,15 +19,15 @@ sub BACKTRACE() {
 }
 
 sub DIE(*@msg) {
-	close::Dumper::DIE(close::Dumper::info(), @msg);
+	Dumper::DIE(Dumper::info(), @msg);
 }
 
 sub DUMP(*@pos, *%what) {
-	close::Dumper::DUMP(close::Dumper::info(), @pos, %what);
+	Dumper::DUMP(Dumper::info(), @pos, %what);
 }
 
 sub NOTE(*@parts) {
-	close::Dumper::NOTE(close::Dumper::info(), @parts);
+	Dumper::NOTE(Dumper::info(), @parts);
 }
 
 ################################################################

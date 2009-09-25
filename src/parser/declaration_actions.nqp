@@ -215,7 +215,6 @@ method declarator_part($/, $key) {
 		DUMP($initializer);
 		my $past := $<declarator>.ast;
 		$past<initializer> := $initializer;
-		$past.viviself($initializer);
 	}
 	elsif $key eq 'open_block' {
 		NOTE("Opening decl block");

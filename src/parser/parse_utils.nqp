@@ -24,7 +24,7 @@ pod section of the grammar.
 class close::Grammar::Actions;
 
 sub ASSERT($condition, *@message) {
-	close::Dumper::ASSERT(close::Dumper::info(), $condition, @message);
+	Dumper::ASSERT(Dumper::info(), $condition, @message);
 }
 
 sub BACKTRACE() {
@@ -34,15 +34,15 @@ sub BACKTRACE() {
 }
 
 sub DIE(*@msg) {
-	close::Dumper::DIE(close::Dumper::info(), @msg);
+	Dumper::DIE(Dumper::info(), @msg);
 }
 
 sub DUMP(*@pos, *%what) {
-	close::Dumper::DUMP(close::Dumper::info(), @pos, %what);
+	Dumper::DUMP(Dumper::info(), @pos, %what);
 }
 
 sub NOTE(*@parts) {
-	close::Dumper::NOTE(close::Dumper::info(), @parts);
+	Dumper::NOTE(Dumper::info(), @parts);
 }
 
 ################################################################
@@ -68,7 +68,7 @@ sub PASSTHRU($/, $key) {
 	my $past := $/{$key}.ast;
 	my %named;
 	%named{$key} := $past;
-	close::Dumper::DUMP(close::Dumper::info(), undef, %named);
+	Dumper::DUMP(Dumper::info(), undef, %named);
 	make $past;
 }
 

@@ -96,10 +96,8 @@ method translation_unit($/, $key) {
 		
 		# Otherwise ...
 		unless in_include_file() {
-			my $config := close::Compiler::Config.new();
-			$config.read('close.cfg');
-			NOTE("Read config file");
-		
+			close::Compiler::Config::read('close.cfg');
+			
 			# Calling this forces the init code to run. I'm not sure that matters.
 			my $root_nsp := close::Compiler::Namespaces::fetch(Array::new('close'));
 			close::Compiler::Scopes::push($root_nsp);

@@ -1,13 +1,12 @@
 # $Id$
 
-class close::Dumper;
+class Dumper;
 
 our %Bits;
 %Bits<NOTE>	:= 1;	
 %Bits<DUMP>	:= 2;
 %Bits<ASSERT>	:= 4;
 
-our $Config := close::Compiler::Config.new();
 our $Prefix;
 
 our %Already_in;
@@ -159,7 +158,7 @@ sub info() {
 
 sub get_config($class, $sub) {	
 	my @keys := Array::new('Dump', $class, $sub);
-	my $result := $Config.value(@keys);
+	my $result := close::Compiler::Config::query(@keys);
 	return $result;
 }
 

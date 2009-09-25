@@ -58,23 +58,23 @@ BUILTINS_PIR := \
 	src/builtins/strings.pir
 
 COMPILER_LIBS_PIR := \
+	library/Array.pir	\
 	library/Config.pir	\
+	library/Dumper.pir	\
+	library/File.pir	\
+	library/Hash.pir	\
+	library/OS.pir	\
+	library/Scalar.pir 	\
 	library/String.pir	\
-	library/close/Compiler/Array.pir			\
 	library/close/Compiler/Config.pir			\
 	library/close/Compiler/DeclarationCollectionVisitor.pir	\
-	library/close/Compiler/Dumper.pir		\
-	library/close/Compiler/File.pir			\
-	library/close/Compiler/Hash.pir			\
 	library/close/Compiler/Lookups.pir		\
 	library/close/Compiler/Messages.pir		\
 	library/close/Compiler/MessageVisitor.pir	\
 	library/close/Compiler/Namespaces.pir		\
 	library/close/Compiler/Node.pir			\
-	library/close/Compiler/OS.pir			\
 	library/close/Compiler/PastCleanupVisitor.pir	\
 	library/close/Compiler/PrettyPrintVisitor.pir	\
-	library/close/Compiler/Scalar.pir 			\
 	library/close/Compiler/ScopeAssignmentVisitor.pir	\
 	library/close/Compiler/Scopes.pir			\
 	library/close/Compiler/SymbolResolutionVisitor.pir	\

@@ -3,7 +3,7 @@
 class close::Compiler::Config;
 
 sub ASSERT($condition, *@message) {
-	close::Dumper::ASSERT(close::Dumper::info(), $condition, @message);
+	Dumper::ASSERT(Dumper::info(), $condition, @message);
 }
 
 sub BACKTRACE() {
@@ -13,17 +13,17 @@ sub BACKTRACE() {
 }
 
 sub DIE(*@msg) {
-	close::Dumper::DIE(close::Dumper::info(), @msg);
+	Dumper::DIE(Dumper::info(), @msg);
 }
 
 sub DUMP(*@pos, *%what) {
-	my @info := close::Dumper::info();
-	@info[0] and close::Dumper::DUMP(@info, @pos, %what);
+	my @info := Dumper::info();
+	@info[0] and Dumper::DUMP(@info, @pos, %what);
 }
 
 sub NOTE(*@parts) {
-	my @info := close::Dumper::info();
-	@info[0] and close::Dumper::NOTE(@info, @parts);
+	my @info := Dumper::info();
+	@info[0] and Dumper::NOTE(@info, @parts);
 }
 
 ################################################################
@@ -135,7 +135,7 @@ sub query(*@keys) {
 	return $_Config.value(@keys);
 }
 
-method read($filename) {
+sub read($filename) {
 	#NOTE("Reading filename: ", $filename);
 	if %Config_data<> ne '$filename' {
 		%Config_data<>	:= $filename;
