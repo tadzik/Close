@@ -35,7 +35,7 @@ another platform - for Parrot."
             "build"    : ["perl5", "make"],
             "test"     : "make",
             "install"  : "make",
-            "runtime"  : "",
+            "runtime"  : ""
         }
     },
     "resources"            : {
