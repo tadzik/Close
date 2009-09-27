@@ -66,22 +66,21 @@ sub _yes() {
 	return 1;
 }
 
-sub merge(*@hashes, *%adverbs) {
-	my %results;
-
-	if %adverbs<into> {
-		%results := %adverbs<into>;
-	}
-	elsif +@hashes {
-		%results := @hashes.shift();
-	}
-	else {
-		%results := Hash::new();
-	}
-
-	my %stored := %results;
+sub merge(%first, *@hashes, :%into?, :$use_last?) {
 	
-	if %adverbs<use_last> {
+	@hashes.unshift(%first);	# Ensure at least one element.
+
+	unless Scalar::defined(%into) {
+		%into := @hashes.shift();
+		
+		unless Scalar::defined(%into) {
+			%into := Hash::new();
+		}
+	}
+	
+	my %stored := %into;
+	
+	if $use_last {
 		@hashes := Array::reverse(@hashes);
 		%stored := Hash::new();
 	}
@@ -90,14 +89,46 @@ sub merge(*@hashes, *%adverbs) {
 		my $hash := $_;
 		for $hash {
 			unless Hash::exists(%stored, $_) {
-				# Order matters, %stored may alias %results.
-				%stored{$_} := _yes;
-				%results{$_} := $hash{$_};
+				# Order matters, %stored may alias %into
+				%into{$_} := 
+				%stored{$_} := $hash{$_};
 			}
 		}
 	}
 	
-	return %results;
+	return %into;
+}
+
+sub merge_keys(%first, *@hashes, :@keys!, :%into?, :$use_last?) {
+	@hashes.unshift(%first);
+	
+	unless Scalar::defined(%into) {
+		%into := @hashes.shift();
+		
+		unless Scalar::defined(%into) {
+			%into := Hash::new();
+		}
+	}
+	
+	my %stored := %into;
+	
+	if $use_last {
+		@hashes := Array::reverse(@hashes);
+		%stored := Hash::new();
+	}
+	
+	for @hashes {
+		my $hash := $_;
+		
+		for @keys {
+			if ! Hash::exists(%stored, $_) && Hash::exists($hash, $_) {
+				%into{$_} := 
+				%stored{$_} := $hash{$_};
+			}
+		}
+	}
+	
+	return %into;
 }
 
 sub new(*%pairs) {
