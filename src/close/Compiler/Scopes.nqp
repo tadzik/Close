@@ -57,9 +57,9 @@ sub add_declarator_to($past, $scope) {
 	my $severity;
 	
 	for @already {
-		if !$duplicate && close::Compiler::Types::same_type($past<type>, $_<type>) {
+		if !$duplicate && close::Compiler::Type::same_type($past<type>, $_<type>) {
 			$duplicate := $_;
-			$severity := close::Compiler::Types::update_redefined_symbol(
+			$severity := close::Compiler::Type::update_redefined_symbol(
 				:original($_), :redefinition($duplicate));
 		}
 	}
@@ -243,7 +243,7 @@ sub get_stack() {
 		@scope_stack := Array::empty();
 		NOTE("Stack exists. Now pushing pervasive scope.");
 		@scope_stack.push(
-			close::Compiler::Types::pervasive_scope()
+			close::Compiler::Type::pervasive_scope()
 		);
 	}
 

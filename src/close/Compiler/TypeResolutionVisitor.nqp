@@ -255,7 +255,7 @@ method _type_resolve_type_specifier($node) {
 		my $local_scope := close::Compiler::Scopes::current();
 
 		for close::Compiler::Scopes::get_symbols($local_scope, $node<noun>.name()) {
-			if close::Compiler::Types::is_type($_) {
+			if close::Compiler::Type::is_type($_) {
 				$resolved := $_;
 			}
 		}

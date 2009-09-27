@@ -231,7 +231,7 @@ sub query_matching_types($node) {
 	my @results := Array::empty();
 	
 	for @candidates {
-		if close::Compiler::Types::is_type($_) {
+		if close::Compiler::Type::is_type($_) {
 			@results.push($_);
 		}
 	}

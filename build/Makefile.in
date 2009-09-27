@@ -58,32 +58,32 @@ BUILTINS_PIR := \
 	src/builtins/strings.pir
 
 COMPILER_LIBS_PIR := \
-	library/Array.pir	\
-	library/Config.pir	\
-	library/Dumper.pir	\
-	library/File.pir	\
-	library/Hash.pir	\
-	library/OS.pir	\
-	library/Scalar.pir 	\
-	library/String.pir	\
-	library/close/Compiler/Config.pir			\
-	library/close/Compiler/DeclarationCollectionVisitor.pir	\
-	library/close/Compiler/IncludeFile.pir		\
-	library/close/Compiler/Lookups.pir		\
-	library/close/Compiler/Messages.pir		\
-	library/close/Compiler/MessageVisitor.pir	\
-	library/close/Compiler/Namespaces.pir		\
-	library/close/Compiler/Node.pir			\
-	library/close/Compiler/PastCleanupVisitor.pir	\
-	library/close/Compiler/PrettyPrintVisitor.pir	\
-	library/close/Compiler/ScopeAssignmentVisitor.pir	\
-	library/close/Compiler/Scopes.pir			\
-	library/close/Compiler/SymbolResolutionVisitor.pir	\
-	library/close/Compiler/Symbols.pir		\
-	library/close/Compiler/TreeRewriteVisitor.pir	\
-	library/close/Compiler/TypeResolutionVisitor.pir\
-	library/close/Compiler/Types.pir			\
-	library/close/Compiler/Visitor.pir
+	src/Array.pir		\
+	src/Config.pir	\
+	src/Dumper.pir	\
+	src/File.pir		\
+	src/Hash.pir		\
+	src/OS.pir		\
+	src/Scalar.pir 	\
+	src/String.pir		\
+	src/close/Compiler/Config.pir			\
+	src/close/Compiler/DeclarationCollectionVisitor.pir	\
+	src/close/Compiler/IncludeFile.pir			\
+	src/close/Compiler/Lookups.pir			\
+	src/close/Compiler/Messages.pir			\
+	src/close/Compiler/MessageVisitor.pir		\
+	src/close/Compiler/Namespaces.pir		\
+	src/close/Compiler/Node.pir			\
+	src/close/Compiler/PastCleanupVisitor.pir	\
+	src/close/Compiler/PrettyPrintVisitor.pir		\
+	src/close/Compiler/ScopeAssignmentVisitor.pir	\
+	src/close/Compiler/Scopes.pir			\
+	src/close/Compiler/SymbolResolutionVisitor.pir	\
+	src/close/Compiler/Symbols.pir			\
+	src/close/Compiler/Type.pir			\
+	src/close/Compiler/TreeRewriteVisitor.pir	\
+	src/close/Compiler/TypeResolutionVisitor.pir	\
+	src/close/Compiler/Visitor.pir
 
 DOCS := README
 

@@ -52,7 +52,7 @@ sub declarator_name(%attributes) {
 	%attributes<isdecl> := 1;
 	my $symbol := symbol_from_parts('qualified_identifier', %attributes, :parts(@parts));
 	
-	# FIXME: This belongs in ::Types
+	# FIXME: This belongs in ::Type
 	my $etype := $symbol;
 	
 	while $etype<type> {
@@ -158,6 +158,6 @@ sub print_symbol($sym) {
 			" ",
 			$sym<block>, 
 			" ",
-			close::Compiler::Types::type_to_string($sym<type>));
+			close::Compiler::Type::type_to_string($sym<type>));
 	}
 }

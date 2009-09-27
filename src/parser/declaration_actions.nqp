@@ -50,7 +50,7 @@ Just another kind of declarator.
 =cut
 
 method dclr_alias($/) {
-	my $past := close::Compiler::Types::new_dclr_alias($<alias>.ast);
+	my $past := close::Compiler::Type::new_dclr_alias($<alias>.ast);
 	DUMP($past);
 	make $past;
 }
@@ -82,13 +82,13 @@ any qualifiers as children of the node.
 =cut
 
 method dclr_pointer($/) {
-	my $past := close::Compiler::Types::pointer_to(
+	my $past := close::Compiler::Type::pointer_to(
 		:name(~ $/),
 		:node($/), 
 	);
 	
 	for $<cv_qualifier> {
-		$past := close::Compiler::Types::merge_specifiers($past, $_.ast);
+		$past := close::Compiler::Type::merge_specifiers($past, $_.ast);
 	}
 
 	DUMP($past);
@@ -120,7 +120,7 @@ method declaration($/) {
 
 		NOTE("Merging specifier with declarator '", $declarator.name(), "'");
 		$declarator := 
-			close::Compiler::Types::add_specifier_to_declarator($specs, $declarator);
+			close::Compiler::Type::add_specifier_to_declarator($specs, $declarator);
 			
 		# FIXME: Is this needed? Should this be a separate pass?
 		#NOTE("Adding declarator to its scope");
@@ -331,7 +331,7 @@ method parameter_declaration($/) {
 	);
 	
 	my $specs	:= $<specifier_list>.ast;
-	close::Compiler::Types::add_specifier_to_declarator($specs, $past);
+	close::Compiler::Type::add_specifier_to_declarator($specs, $past);
 	
 	for $<adverbs> {
 		NOTE("Adding adverb '", $_.ast.name(), "'");
@@ -360,7 +360,7 @@ parameter scope.
 method parameter_list($/, $key) {
 	if $key eq 'open' {
 		NOTE("Creating new parameter list");
-		my $past := close::Compiler::Types::function_returning(:node($/));
+		my $past := close::Compiler::Type::function_returning(:node($/));
 		close::Compiler::Scopes::push($past);
 		
 		NOTE("Pushed new scope on stack: ", $past.name());
@@ -404,7 +404,7 @@ method specifier_list($/) {
 	my $past := @specs.shift();
 
 	for @specs {
-		$past := close::Compiler::Types::merge_specifiers($past, $_);
+		$past := close::Compiler::Type::merge_specifiers($past, $_);
 	}
 	
 	NOTE("done");
@@ -467,7 +467,7 @@ method tspec_storage_class($/) {
 	my $name := ~ $<token>;
 	NOTE("Creating new storage class specifier: ", $name);
 
-	my $past := close::Compiler::Types::specifier(:name($name), :node($/));
+	my $past := close::Compiler::Type::specifier(:name($name), :node($/));
 		
 	DUMP($past);
 	make $past;

@@ -1,6 +1,6 @@
 # $Id$
 
-module close::Compiler::Types;
+module close::Compiler::Type;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -50,7 +50,10 @@ sub _onload() {
 		%r = new 'P6metaclass'
 	};
 
-	my $base := $meta.new_class('close::Compiler::Type', :parent('PCT::Node'));
+	my $base := $meta.new_class('close::Compiler::Type', 
+		:attr('$nominal'),
+		:parent('PCT::Node'),
+	);
 	$meta.new_class('close::Compiler::Type::Specifier', :parent($base));
 	$meta.new_class('close::Compiler::Type::Declarator', :parent($base));
 }
@@ -319,7 +322,7 @@ sub new() {
 		Q:PIR {
 			.local pmc meta
 			meta = new 'P6metaclass'
-			meta.'new_class'('close::Compiler::Types', 'parent' => 'parrot::Hash')
+			meta.'new_class'('close::Compiler::Type', 'parent' => 'parrot::Hash')
 		};
 	}
 	
