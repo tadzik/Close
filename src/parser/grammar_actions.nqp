@@ -78,7 +78,9 @@ method namespace_definition($/, $key) {
 		NOTE("Popped namespace_definition block: ", $past<display_name>);
 
 		for $<declaration_sequence><decl> {
-			$past.push($_.ast);
+			my $decl := $_.ast;
+			NOTE("Adding ", NODE_TYPE($decl)," node: ", $decl<display_name>);
+			$past.push($decl);
 		}
 		
 		NOTE("done");
@@ -90,42 +92,54 @@ method namespace_definition($/, $key) {
 	}
 }
 
-method translation_unit($/, $key) {
-	if $key eq 'open' {
-		unless close::Compiler::IncludeFile::in_include_file() {
-			# Calling NOTE, etc., won't work before the config file is read.
-			close::Compiler::Config::read('close.cfg');
-			NOTE("Finished reading config file.");
-
-			my $root_nsp := close::Compiler::Namespaces::fetch(Array::new('close'));
-			close::Compiler::Scopes::push($root_nsp);
-			DUMP($root_nsp);
-		}
-	}
-	elsif $key eq 'close' {
-		my $past;
-		
-		if close::Compiler::IncludeFile::in_include_file() {
-			# NB: Don't pop, because this might be a #include
-			NOTE("Not popping - this is a #include");
-			$past := close::Compiler::Scopes::current();
-		}
-		else {
-			NOTE("Popping namespace_definition block");
-			$past := close::Compiler::Scopes::pop('namespace_definition');
-		}
-		
-		NOTE("Adding declarations to translation unit context scope.");
-		for $<declaration_sequence><decl> {
-			$past.push($_.ast);
-		}
-		
-		NOTE("done");
-		DUMP($past);
-		make $past;		
+method _translation_unit_close($/) {
+	my $past;
+	
+	if close::Compiler::IncludeFile::in_include_file() {
+		# NB: Don't pop, because this might be a #include
+		NOTE("Not popping - this is a #include");
+		$past := close::Compiler::Scopes::current();
 	}
 	else {
-		$/.panic("Unexpected value '", $key, "' for $key parameter");
+		NOTE("Popping namespace_definition block");
+		$past := close::Compiler::Scopes::pop('namespace_definition');
+	}
+	
+	DUMP($past);
+	
+	NOTE("Adding declarations to translation unit context scope.");
+	for $<declaration_sequence><decl> {
+		$past.push($_.ast);
+	}
+	
+	NOTE("done");
+	DUMP($past);
+	make $past;		
+}
+
+method _translation_unit_open($/) {
+	unless close::Compiler::IncludeFile::in_include_file() {
+		# Calling NOTE, etc., won't work before the config file is read.
+		close::Compiler::Config::read('close.cfg');
+		NOTE("Finished reading config file.");
+
+		my $root_nsp := close::Compiler::Namespaces::fetch(Array::new('close'));
+		close::Compiler::Scopes::push($root_nsp);
+		DUMP($root_nsp);
+	}
+}
+
+# NQP currently generates get_hll_global for functions. So qualify them all.
+our %_translation_unit;
+%_translation_unit<close>		:= close::Grammar::Actions::_translation_unit_close;
+%_translation_unit<open>		:= close::Grammar::Actions::_translation_unit_open;
+
+method translation_unit($/, $key) {
+	if %_translation_unit{$key} {
+		%_translation_unit{$key}(self, $/);
+	}
+	else {
+		$/.panic("Invalid $key '", $key, "' passed to translation_unit()");
 	}
 }
 

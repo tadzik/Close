@@ -1,5 +1,7 @@
 # $Id$
 
+#grammar close::Grammar is PGE::Grammar;
+
 =rule cv_qualifier
 
 One of the access qualifiers C<const> or C<volatile>. This rule is used in both
@@ -203,25 +205,6 @@ rule specifier_list {
 	<specifier>+ {*}
 }
 
-=rule tspec_builtin_type
-
-Matches any of the Close builtin types.
-
-=cut
-
-rule tspec_builtin_type {
-	| <token=AUTO>		{*}
-	| <token=CLASS>		{*}
-	| <token=ENUM>		{*}
-	| <token=FLOAT>		{*}
-	| <token=INT>		{*}
-	| <token=PMC>		{*}
-	| <token=STRING>		{*}
-	| <token=STRUCT>		{*}
-	| <token=UNION>		{*}
-	| <token=VOID>		{*}
-}
-
 rule tspec_function_attr {
 	| <token=INLINE>		{*}
 	| <token=METHOD>	{*}
@@ -242,7 +225,7 @@ rule tspec_type_name {
 }
 
 rule tspec_type_specifier {
-	| <tspec_builtin_type>	{*} #= tspec_builtin_type
+#	| <tspec_builtin_type>	{*} #= tspec_builtin_type
 #	| <class_specifier>			{*} #= class_specifier
 	| <cv_qualifier>		{*} #= cv_qualifier
 #	| <enum_specifier>			{*} #= enum_specifier
@@ -253,7 +236,8 @@ rule tspec_type_specifier {
 }
 
 rule using_namespace_directive {
-	<.USING> <.NAMESPACE> <namespace=namespace_path>
+	<.USING> {{ say "Using namespace directive?" }}
+<.NAMESPACE> <namespace=namespace_path>
 	{*}
 }
 

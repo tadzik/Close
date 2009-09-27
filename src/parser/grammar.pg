@@ -90,8 +90,6 @@ variables, classes, or functions.
 rule translation_unit {
 	{*} #= open
 	<declaration_sequence>
-	{{ say "!declaration sequence!" }}
-
 	[ $ || {{ _dumper(match) }} <panic: 'Syntax error. Parsing terminated before end of input.'> ]
 	{*} #= close
 }

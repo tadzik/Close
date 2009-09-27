@@ -30,8 +30,7 @@ token ws {
 		set_global '$!ws', match
 		.return(0)
 	}}>
-	| <!ww> <.WS_ALL>+
-	| <.WS_ALL>*
+	| <!ww> <.WS_ALL>*
 }
 
 =token WS_ALL

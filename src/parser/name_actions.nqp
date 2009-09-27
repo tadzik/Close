@@ -9,9 +9,9 @@ resulting PAST::Var is not resolved.
 =cut
 
 method declarator_name($/) {
-	my $past := assemble_qualified_path('declarator_name', $/);
+	my %attrs := assemble_qualified_path($/);
+	my $past := close::Compiler::Symbols::declarator_name(%attrs);
 	NOTE("Created declarator_name for ", $past<display_name>);
-	NOTE("name = ", $past.name());
 	DUMP($past);
 	make $past;
 }
@@ -42,7 +42,8 @@ method new_alias_name($/) {
 }
 
 method qualified_identifier($/) {
-	my $past := assemble_qualified_path('qualified_identifier', $/);
+	my %attrs := assemble_qualified_path($/);
+	my $past := close::Compiler::Symbols::qualified_identifier(%attrs);
 	NOTE("Created qualified_identifier for ", $past<display_name>);
 	
 	DUMP($past);
@@ -56,31 +57,33 @@ method simple_identifier($/) {
 	make $past;
 }
 
-our $Is_valid_type_name := 0;
+method type_name($/, $key) { PASSTHRU($/, $key); }
 
-method type_name($/) {
-	my $past := $<qualified_identifier>.ast;
-	NOTE("Checking for typename '", $past<display_name>, "'");
+# our $Is_valid_type_name := 0;
+
+# method type_name($/) {
+	# my $past := $<qualified_identifier>.ast;
+	# NOTE("Checking for typename '", $past<display_name>, "'");
 	
-	$Is_valid_type_name := 0;
-	my @matches := close::Compiler::Lookups::query_matching_types($past);
+	# $Is_valid_type_name := 0;
+	# my @matches := close::Compiler::Lookups::query_matching_types($past);
 	
-	if +@matches {
-		NOTE("Found valid matching typename");
-		$Is_valid_type_name := 1;
-		$past<apparent_type> := @matches[0];
+	# if +@matches {
+		# NOTE("Found valid matching typename");
+		# $Is_valid_type_name := 1;
+		# $past<apparent_type> := @matches[0];
 		
-		if +@matches > 1 {
-			ADD_ERROR($past,
-				"Ambiguous type specification: '",
-				$past<display_name>,
-				"' matches more than one type.");
-		}
-	}
-	else {
-		NOTE("No valid matching typename");
-	}
+		# if +@matches > 1 {
+			# ADD_ERROR($past,
+				# "Ambiguous type specification: '",
+				# $past<display_name>,
+				# "' matches more than one type.");
+		# }
+	# }
+	# else {
+		# NOTE("No valid matching typename");
+	# }
 		
-	DUMP($past);
-	make $past;
-}
+	# DUMP($past);
+	# make $past;
+# }

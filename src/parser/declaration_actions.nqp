@@ -112,6 +112,7 @@ method declaration($/) {
 	for $<symbol> {
 		my $declarator := $_.ast;
 		
+		# For functions. I don't know if this affects anything else.
 		if $declarator<definition> {
 			NOTE("Replacing declarator with definition");
 			$declarator := $declarator<definition>;
@@ -176,8 +177,7 @@ method declarator($/) {
 	make $past;
 }
 
-method declarator_part($/, $key) {
-	if $key eq 'close_block' {
+method _declarator_part_close_block($/) {
 		# Now there is a block.
 		Q:PIR {{
 			$P0 = box 1
@@ -190,62 +190,80 @@ method declarator_part($/, $key) {
 		# Merge the <body> block with $past
 		close::Compiler::Node::copy_block($<body>[0].ast, $past);
 		$past<using_namespaces> := $<body>[0].ast<using_namespaces>;
-	}
-	elsif $key eq 'declarator' {
-		my $past := $<declarator>.ast;
-		NOTE("Assembling declarator ", $past.name());
-		
-		# int '$x' alias x; say(x);
-		# $x is the pirname, x is the alias, x is the name
-		if $<dclr_alias> {
-			$past<alias> := $<dclr_alias>[0].ast;
-			$past<pirname> := $past.name();
-			close::Compiler::Node::set_name($past, $past<alias>.name());
-		}
-		
-		for $<adverbs> {
-			close::Compiler::Node::set_adverb($past, $_.ast);
-		}
+}
 
-		# So far, there is no block.
-		Q:PIR {{
-			$P0 = box 0
-			set_hll_global ['close';'Grammar'], '$!Decl_block', $P0
-		}};
+method _declarator_part_declarator($/) {
+	my $past := $<declarator>.ast;
+	NOTE("Assembling declarator ", $past.name());
+	
+	# int '$x' alias x; say(x);
+	# $x is the pirname, x is the alias, x is the name
+	if $<dclr_alias> {
+		$past<alias> := $<dclr_alias>[0].ast;
+		$past<pirname> := $past.name();
+		close::Compiler::Node::set_name($past, $past<alias>.name());
 	}
-	elsif $key eq 'initializer' {
-		my $initializer := $<initializer>[0].ast;
-		NOTE("Adding initializer");
-		DUMP($initializer);
-		my $past := $<declarator>.ast;
-		$past<initializer> := $initializer;
+	
+	for $<adverbs> {
+		close::Compiler::Node::set_adverb($past, $_.ast);
 	}
-	elsif $key eq 'open_block' {
-		NOTE("Opening decl block");
-		# Push the params block on stack
-		my $declarator := $<declarator>.ast;
-		# This won't be true when struct's get added.
-		ASSERT(NODE_TYPE($declarator<type>) eq 'decl_function_returning',
-			'Open block should only happen for functions');
+
+	# So far, there is no block.
+	Q:PIR {{
+		$P0 = box 0
+		set_hll_global ['close';'Grammar'], '$!Decl_block', $P0
+	}};
+}
+
+method _declarator_part_done($/) {
+	my $past := $<declarator>.ast;
+	NOTE("done");
+	DUMP($past);
+	make $past;
+}
+
+method _declarator_part_initializer($/) {
+	my $initializer := $<initializer>[0].ast;
+	NOTE("Adding initializer");
+	DUMP($initializer);
+	my $past := $<declarator>.ast;
+	$past<initializer> := $initializer;
+}
+
+method _declarator_part_open_block($/) {
+	NOTE("Opening decl block");
+	# Push the params block on stack
+	my $declarator := $<declarator>.ast;
+	
+	# NB: This won't be true when struct's get added.
+	ASSERT($declarator<type><is_function>,
+		'Open block should only happen for functions');
+	
+	if $declarator<type><is_function> {
+		NOTE("Block is function definition. Pushing new block on stack.");
 		
-		if $declarator<type><is_function> {
-			NOTE("Block is function definition. Pushing new block on stack.");
-			
-			my $definition := close::Compiler::Node::create('function_definition',
-				:from($declarator),
-			);
-			$declarator<definition> := $definition;
-			close::Compiler::Scopes::push($definition);
-		}
-		else {
-			DIE("NOT REACHED"); # Struct, class, etc.
-		}
-	} 
-	elsif $key eq 'done' {
-		my $past := $<declarator>.ast;
-		NOTE("done");
-		DUMP($past);
-		make $past;
+		my $definition := close::Compiler::Node::create('function_definition',
+			:from($declarator),
+		);
+		$declarator<definition> := $definition;
+		close::Compiler::Scopes::push($definition);
+	}
+	else {
+		DIE("NOT REACHED"); # Struct, class, etc.
+	}
+}
+	
+# NQP currently generates get_hll_global for functions. So qualify them all.
+our %_declarator_part;
+%_declarator_part<close_block>	:= close::Grammar::Actions::_declarator_part_close_block;
+%_declarator_part<declarator>	:= close::Grammar::Actions::_declarator_part_declarator;
+%_declarator_part<done>		:= close::Grammar::Actions::_declarator_part_done;
+%_declarator_part<initializer>	:= close::Grammar::Actions::_declarator_part_initializer;
+%_declarator_part<open_block>	:= close::Grammar::Actions::_declarator_part_open_block;
+
+method declarator_part($/, $key) {
+	if %_declarator_part{$key} {
+		%_declarator_part{$key}(self, $/);
 	}
 	else {
 		$/.panic("Invalid $key '", $key, "' passed to declarator_part()");
@@ -364,7 +382,7 @@ method parameter_list($/, $key) {
 		}
 		
 		unless $slurpy {
-			$past.arity(+@($params));
+			$past.arity(+$params);
 		}
 		
 		NOTE('End function parameter list: ', +@($past), ' parameters');

@@ -63,7 +63,6 @@ sub NODE_TYPE($node) {
 
 ################################################################
 
-
 sub PASSTHRU($/, $key) {
 	my $past := $/{$key}.ast;
 	my %named;
@@ -88,40 +87,26 @@ C<hll> set (or not) appropriately.
 
 =cut
 
-sub assemble_qualified_path($node_type, $/) {
-	NOTE("Assembling qualified path for ", $node_type);
-	my @parts	:= Array::empty();
-
-	# Don't use ast_array because of .value()
-	for $<path> {
-		@parts.push($_.ast.name());
-	}
-
-	NOTE("Parts: [ '", Array::join("' ; '", @parts), "' ]");
+sub assemble_qualified_path($/) {
+	NOTE("Assembling qualified path");
 	
-	my $hll;
+	my %attributes := Hash::new(:node($/),
+		:parts(ast_array($<path>)));
+		
+	NOTE("Got ", +%attributes<parts>, " parts");
 	
 	if $<hll_name> {
-		$hll := ~ $<hll_name>[0];
-		NOTE("HLL: ", $hll);
+		%attributes<hll> := ~ $<hll_name>[0];
+		NOTE("HLL: ", %attributes<hll>);
 	}
 
-	my $is_rooted := 0;
-	
 	if $<root> {
-		NOTE("This name is rooted");
-		$is_rooted := 1;
+		NOTE("This name is rooted.");
+		%attributes<is_root> := 1;
 	}
 	
-	my $past := close::Compiler::Node::create($node_type,
-		:hll($hll),
-		:is_rooted($is_rooted),
-		:node($/),
-		:parts(@parts),
-	);
-	
-	DUMP($past);
-	return ($past);
+	DUMP(%attributes);
+	return %attributes;
 }
 
 =sub ast_array($capture)
