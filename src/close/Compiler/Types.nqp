@@ -1,6 +1,6 @@
 # $Id$
 
-class close::Compiler::Types;
+module close::Compiler::Types;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -41,6 +41,19 @@ sub NODE_TYPE($node) {
 }
 
 ################################################################
+
+# Runs at init time
+_onload();
+
+sub _onload() {
+	my $meta := Q:PIR {
+		%r = new 'P6metaclass'
+	};
+
+	my $base := $meta.new_class('close::Compiler::Type', :parent('PCT::Node'));
+	$meta.new_class('close::Compiler::Type::Specifier', :parent($base));
+	$meta.new_class('close::Compiler::Type::Declarator', :parent($base));
+}
 
 sub add_specifier_to_declarator($specifier, $declarator) {
 	$declarator<etype><type> := $specifier;
