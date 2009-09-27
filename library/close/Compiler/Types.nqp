@@ -26,72 +26,21 @@ sub NOTE(*@parts) {
 
 ################################################################
 
+sub ADD_ERROR($node, *@msg) {
+	close::Compiler::Messages::add_error($node,
+		Array::join('', @msg));
+}
+
+sub ADD_WARNING($node, *@msg) {
+	close::Compiler::Messages::add_warning($node,
+		Array::join('', @msg));
+}
+
 sub NODE_TYPE($node) {
-	close::Compiler::Node::type($node);
+	return close::Compiler::Node::type($node);
 }
 
 ################################################################
-
-our $Builtins := "
-# Declaration of builtin types
-typedef _builtin	auto	:register_class('X');
-typedef _builtin	float	:register_class('N');
-typedef _builtin	int	:register_class('I');
-typedef _builtin	pmc	:register_class('P');
-typedef _builtin	string	:register_class('S');
-typedef _builtin	void	:register_class('v');
-";
-
-sub add_builtin_type($type) {
-	NOTE("Adding builtin type: ", $type<display_name>);
-	
-	my $scope := close::Compiler::Types::pervasive_scope();
-	close::Compiler::Scopes::add_declarator_to($type, $scope);
-}
-
-sub add_builtins($scope) {
-	NOTE("Adding builtin types");
-	DUMP($Builtins);
-	my $index := String::index($Builtins, "typedef", :offset(0));
-	
-	while $index != -1 {
-		$index	:= $index + String::length("typedef _builtin\t");
-		my $pos	:= $index;
-		my $end	:= String::find_cclass('WHITESPACE', $Builtins, :offset($index));
-		my $name	:= String::substr($Builtins, $index, $end - $index);
-		
-		$index	:= String::index($Builtins, ":register_class('", :offset($index))
-					+ String::length(":register_class('");
-		my $register_class := String::substr($Builtins, $index, 1);
-		$index := String::index($Builtins, "typedef", :offset($index));
-		
-		NOTE("Adding builtin type: '", $name, "'");
-
-		my $symbol	:= close::Compiler::Node::create('declarator_name',
-			:is_typedef(1),
-			:parts(Array::new($name)),
-			:pos($pos),
-			:scope('builtin'),
-			:source($Builtins)
-		);
-		
-		my $spec	:= close::Compiler::Node::create('type_specifier',
-			:is_builtin(1),
-			:name($name),
-			:pir_name('specifier for builtin type: ' ~ $name), 
-			:register_class($register_class),
-			:noun($symbol),
-		);
-		
-		add_specifier_to_declarator($spec, $symbol);
-		add_builtin_type($symbol);
-		
-		DUMP($symbol);
-	}
-	
-	NOTE("Dumping item info:");
-	DUMP($scope);
-}
 
 sub add_specifier_to_declarator($specifier, $declarator) {
 	$declarator<etype><type> := $specifier;
@@ -197,13 +146,23 @@ sub pointer_to(*%attributes) {
 	return $declarator;
 }
 
-our %Storage_class;
-%Storage_class<dynamic>	:= 'lexical';
-%Storage_class<extern>	:= 'package';
-%Storage_class<lexical>	:= 'lexical';
-%Storage_class<register>	:= 'register';
-%Storage_class<static>	:= 'package';
-%Storage_class<typedef>	:= 'typedef';
+sub scope_for_storage_class($class) {
+	our %scopes;
+	
+	unless %scopes {
+		%scopes := Hash::new(
+			:dynamic(	'lexical'),
+			:extern(	'package'),
+			:lexical(	'lexical'),
+			:parameter(	'lexical'),
+			:register(	'register'),
+			:static(	'package'),
+			:typedef(	'typedef'),
+		);
+	}
+	
+	return %scopes{$class};
+}
 
 sub specifier(*%attributes) {
 	my $name := %attributes<name>;
@@ -218,9 +177,8 @@ sub specifier(*%attributes) {
 	
 	%attributes{$flag} := 1;	# Set 'is_foo' flag
 	
-	if %Storage_class{$name} {
+	if scope_for_storage_class($name) {
 		%attributes<storage_class> := $name;
-		%attributes<scope> := %Storage_class{$name};
 	}
 	
 	my $specifier := close::Compiler::Node::create_from_hash('type_specifier', %attributes);
@@ -228,6 +186,13 @@ sub specifier(*%attributes) {
 	NOTE("done");
 	DUMP($specifier);
 	return $specifier;
+}
+
+sub is_pointer_type($type) {
+	my $result := $type<is_pointer> || $type<is_array>;
+
+	NOTE("Returning: ", $result);
+	return $result;
 }
 
 our @Type_attributes := (
@@ -239,15 +204,8 @@ our @Type_attributes := (
 	'is_enum'
 );
 
-sub is_pointer_type($type) {
-	my $result := $type<is_pointer> || $type<is_array>;
-
-	NOTE("Returning: ", $result);
-	return $result;
-}
-
 sub is_type($object) {
-	NOTE("Checking if ", NODE_TYPE($object), " is a type");
+	NOTE("Checking if ", NODE_TYPE($object), " '", $object<display_name>, "' is a type");
 	DUMP($object);
 	ASSERT($object.isa(PAST::Var), 'Object must be a PAST::Var');
 		
@@ -261,7 +219,6 @@ sub is_type($object) {
 	NOTE("Returning: ", $result);
 	return $result;
 }
-
 
 our $Merge_specifier_flags := (
 	'is_builtin',
@@ -310,7 +267,6 @@ sub merge_specifiers($merge_into, $merge_from) {
 			elsif $old_sc eq 'extern' && $new_sc eq 'lexical' {
 				NOTE("extern+lexical is okay");
 				$merge_into<storage_class> := $merge_from<storage_class>;
-				$merge_into<scope> := $merge_from<scope>;
 			}
 			elsif $old_sc eq 'lexical' && $new_sc eq 'extern' {
 				NOTE("lexical+extern is okay, but don't overwrite lexical");
@@ -324,7 +280,6 @@ sub merge_specifiers($merge_into, $merge_from) {
 		}
 		else {
 			$merge_into<storage_class> := $merge_from<storage_class>;
-			$merge_into<scope> := $merge_from<scope>;
 		}
 	}
 	
@@ -341,6 +296,24 @@ sub merge_specifiers($merge_into, $merge_from) {
 	
 	DUMP($merge_into);
 	return $merge_into;
+}
+
+sub new() {
+	our $init;
+	unless $init {
+		$init := 1;
+		# Fixme: Is base class a hash, or a node?
+		Q:PIR {
+			.local pmc meta
+			meta = new 'P6metaclass'
+			meta.'new_class'('close::Compiler::Types', 'parent' => 'parrot::Hash')
+		};
+	}
+	
+	my %type;
+	%type<type> := Scalar::undef();
+	%type<etype> := %type;
+	return %type;
 }
 
 sub new_dclr_alias($alias) {
@@ -361,11 +334,16 @@ sub pervasive_scope() {
 		
 		$scope<node_type> := 'pervasive scope';
 		close::Compiler::Node::set_name($scope, 'pervasive types');
-		
+
+		NOTE("Parsing internal types");
 		# Attach types to scope
 		close::Compiler::Scopes::push($scope);
-		close::Compiler::IncludeFile::parse_internal_file('internal/types');
+		close::Compiler::Scopes::dump_stack();
 		
+		close::Compiler::IncludeFile::parse_internal_file('internal/types');
+		close::Compiler::Scopes::pop(NODE_TYPE($scope));
+		
+		NOTE("Adding types to block");
 		for @($scope) {
 			ASSERT($_.isa(PAST::VarList), 
 				'There should be nothing in this block but the declarations we just built');
@@ -374,10 +352,31 @@ sub pervasive_scope() {
 				close::Compiler::Scopes::add_declarator_to($_, $scope);
 			}
 		}
+		
 	}
 	
 	return $scope;
 }
+
+=sub same_type($type1, $type2, :relaxed(1)?, :allow_multi(1)?)
+
+Compares C<$type1> and C<$type2> to determine if they are the same (or compatible,
+if C<:relaxed(1)> is specified). The comparison checks I<types> only, and does
+not check storage class. 
+
+If C<:relaxed(1)> is given, the first level of the types are checked for pointer
+compatibility, rather than exact equality. So an array of X is considered the 
+same as a pointer to X, and different array element counts are ignored. All 
+other levels of the type chain must still match exactly, and non-pointer types
+at the top level must match exactly.
+
+If C<:allow_multi(1)> is given, the first level of the types are checked for 
+functions with :multi adverbs. If found, the parameters and return type are 
+ignored and the comparison is considered a match. So a function:multi
+is always the same as another function:multi, but not the same as another
+function not :multi, and not the same as a variable.
+
+=cut
 
 sub same_type($type1, $type2, *%options) {
 	if %options<relaxed> && is_pointer_type($type1) && is_pointer_type($type2) {
@@ -411,6 +410,10 @@ sub same_type($type1, $type2, *%options) {
 			
 			if $type1<is_function> {
 				if $type1<is_method> != $type2<is_method> {
+					return 0;
+				}
+				
+				if $type1<adverbs><multi> != $type2<adverbs><multi> {
 					return 0;
 				}
 				
@@ -509,4 +512,122 @@ sub type_to_string($type) {
 	}
 	
 	return ($str);
+}
+
+=sub update_redefined_symbol(:original($sym), :redefinition($sym))
+
+Returns the severity of the redefinition: 'error', 'harmless', or 'same'.
+
+=cut
+
+sub update_redefined_symbol(*%args) {
+	my $original	:= %args<original>;
+	my $update	:= %args<redefinition>;
+	ASSERT($original && $update, ':original() and :redefinition() parameters are required.');
+	ASSERT(same_type($original, $update), 'PRECONDITION');
+	
+	my $severity := 'ignore';
+	
+	my $orig_spec := $original<etype>;
+	ASSERT($orig_spec<is_specifier>, 'Symbol etype must link to type specifier');
+	my $upd_spec := $update<etype>;
+	ASSERT($upd_spec<is_specifier>, 'Symbol etype must link to type specifier');
+
+	# Check initializers
+	my $init := $update<initializer>;
+	if $init {
+		if $original<initializer> {
+			# FIXME: In theory if these both say 'int x = 3;' 
+			# it would be okay, but I can't test that yet.
+			ADD_ERROR($update,
+				'A symbol may only have one initializer.');
+			$severity := 'error';
+		}
+		else {
+			$original<initializer> := $init;
+		}
+	}
+	
+	# Check storage classes.	
+	if $original<is_typedef> != $update<is_typedef> {
+		ADD_ERROR($update,
+			'A typedef may not have the same name as a variable.');
+		$severity := 'error';
+	}
+
+	my $sc1 := $orig_spec<storage_class>;
+	ASSERT($sc1, 'Storage class should always be set on original.');
+	my $sc2 := $upd_spec<storage_class>;
+	ASSERT($sc2, 'Storage class should always be set on update.');
+	
+	if $sc1 ne $sc2 {
+		my $add_generic_error := 0;
+		
+		# Sort them, to simplify checks
+		if $sc2 lt $sc1 {
+			my $temp := $sc1;
+			$sc1 := $sc2;
+			$sc2 := $temp;
+		}
+		
+		if $sc1 eq 'extern' || $sc2 eq 'extern' {
+			if $sc2 eq 'lexical' {
+				if $original<initializer> || $update<initializer> {
+					ADD_ERROR($update,
+						"Extern-lexical symbol '", $update.name(), 
+						"' may not use an initializer.");
+				}
+				else {
+					ADD_WARNING($update,
+						"Extern-lexical declarations for '",
+						$update.name(),
+						"' should be merged.");
+				}
+			}
+			elsif $sc2 eq 'static' {
+				# Gotcha: In C, order matters and extern, then static is illegal.
+				ADD_WARNING($update,
+					"Symbol '", $update.name(), "' declared static and extern.");
+				$severity := 'harmless';
+			}
+			else {
+				$add_generic_error++;
+			}
+		}
+		elsif $sc1 eq 'parameter' || $sc2 eq 'parameter' {
+			if $sc2 eq 'register' {
+				ADD_ERROR($update,
+					"Redeclaration of parameter '",
+					$update.name(),
+					"' is prohibited. You may use the 'register' keyword on the parameter ",
+					" declaration to mark it as register-based.");
+			}
+			else {
+				ADD_ERROR($update,
+					"Redeclaration of parameter '",
+					$update.name(),
+					"' is prohibited.");
+			}
+		}
+		else {
+			$add_generic_error++;
+		}
+		
+		if $add_generic_error {
+			ADD_ERROR($update,
+				"Redeclaration of '", $update.name(),
+				"' with storage class '", $upd_spec<storage_class>,
+				"' conflicts with prior declaration ",
+				" with storage class '", $orig_spec<storage_class>,
+				"'");
+		}
+	}
+	else {
+		if $sc1 eq 'parameter' {
+			# No redeclaration of parameters!
+			ADD_ERROR($update,
+				"Duplicate parameter(s) '", $update.name(), "'");
+			$severity := 'error';
+		}
+	}
 }

@@ -42,7 +42,7 @@ sub NODE_TYPE($node) {
 
 ################################################################
 
-=sub add_declarator_to_scope($scope, $declaration)
+=sub add_declarator_to($declaration, $scope)
 
 Insert a single declarator-name into the symbol table for a block.
 
@@ -54,15 +54,18 @@ sub add_declarator_to($past, $scope) {
 	my @already := get_symbols($scope, $name);
 
 	my $duplicate;
+	my $severity;
 	
 	for @already {
-		if !$duplicate && close::Compiler::Types::same_type($past<type>, @already[0]<type>) {
+		if !$duplicate && close::Compiler::Types::same_type($past<type>, $_<type>) {
 			$duplicate := $_;
+			$severity := close::Compiler::Types::update_redefined_symbol(
+				:original($_), :redefinition($duplicate));
 		}
 	}
 	
 	if $duplicate {
-		if $duplicate<etype><scope> eq 'package'
+		if $duplicate<etype><scope> eq 'package' {
 			NOTE("Adding conflicting declaration error");
 			ADD_ERROR($past,
 				"Conflicting declaration of symbol '",
@@ -235,11 +238,16 @@ sub get_stack() {
 	our $init_done;
 	
 	unless $init_done {
+		NOTE("Creating scope stack");
 		$init_done := 1;
 		@scope_stack := Array::empty();
-		close::Compiler::Types::pervasive_scope();		
+		NOTE("Stack exists. Now pushing pervasive scope.");
+		@scope_stack.push(
+			close::Compiler::Types::pervasive_scope()
+		);
 	}
 
+	NOTE("Scope stack has ", +@scope_stack, " elements");
 	DUMP(@scope_stack);
 	return @scope_stack;
 }
@@ -286,7 +294,7 @@ sub push($scope) {
 	ASSERT($scope.isa(PAST::Block), "Can't push a non-Block onto the lexical scope stack");
 
 	get_stack().unshift($scope);
-	NOTE("Open ", NODE_TYPE($scope), " scope: ", $scope<display_name>,
+	NOTE("Open ", NODE_TYPE($scope), " block: ", $scope<display_name>,
 		" Now ", +(get_stack()), " on stack.");
 	DUMP($scope);
 }

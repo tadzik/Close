@@ -189,16 +189,21 @@ sub show_messages($past) {
 	NOTE("Dumping messages from  PAST tree");
 	DUMP($past);
 
-	$SUPER := close::Compiler::Visitor.new();
-	NOTE("Created SUPER-visitor");
-	DUMP($SUPER);
-	
-	my $visitor	:= close::Compiler::MessageVisitor.new();
-	NOTE("Created visitor");
-	DUMP($visitor);
-	
-	$visitor.visit($past);
+	if close::Compiler::Config::query('Compiler', name(0), 'disabled') {
+		NOTE("Configured off - skipping");
+	}
+	else {
+		NOTE("Showing messages");
+		$SUPER := close::Compiler::Visitor.new();
+		NOTE("Created SUPER-visitor");
+		DUMP($SUPER);
+		
+		my $visitor	:= close::Compiler::MessageVisitor.new();
+		NOTE("Created visitor");
+		DUMP($visitor);
+
+		$visitor.visit($past);
+	}
 	
 	NOTE("done");
-	return $past;
 }

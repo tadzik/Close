@@ -63,6 +63,20 @@ to the close compiler.
 .include 'src/parser/token_actions.pir'
 .include 'src/gen_library.pir'
 
+=item onload
+
+Create classes for them that needs it.
+
+=cut
+
+.sub 'onload' :anon :init :load
+	.local meta
+	
+	meta = new 'P6metaclass'
+	meta.'new_class'('close::Compiler::Type', 'parent' => 'Hash')
+.end
+
+
 =back
 
 =cut

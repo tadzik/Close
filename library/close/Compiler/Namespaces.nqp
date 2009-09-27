@@ -26,6 +26,22 @@ sub NOTE(*@parts) {
 
 ################################################################
 
+sub ADD_ERROR($node, *@msg) {
+	close::Compiler::Messages::add_error($node,
+		Array::join('', @msg));
+}
+
+sub ADD_WARNING($node, *@msg) {
+	close::Compiler::Messages::add_warning($node,
+		Array::join('', @msg));
+}
+
+sub NODE_TYPE($node) {
+	return close::Compiler::Node::type($node);
+}
+
+################################################################
+
 =sub fetch(@path)
 
 Looks up the PAST block used to store namespace information for the C<@path> 
@@ -48,6 +64,15 @@ sub fetch(@path) {
 		unless $child {
 			$child := close::Compiler::Node::create('namespace_definition', :path(@current));
 			close::Compiler::Scopes::set_namespace($block, $_, $child);
+			
+			NOTE("Creating initload sub");
+			close::Compiler::Scopes::push($child);
+			my $initload := close::Compiler::Node::create('initload_sub', 
+				:for($child),
+			);
+			close::Compiler::Scopes::pop(NODE_TYPE($child));
+			$child<initload>:= $initload;
+			$child.push($initload);
 		}
 		
 		$block := $child;

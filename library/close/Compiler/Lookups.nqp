@@ -209,7 +209,7 @@ sub query_symbols_matching($qualified_identifier) {
 	my @candidates	:= Array::empty();
 	
 	for @scopes {
-		NOTE("Looking in scope: '", $_.name(), "'");
+		NOTE("Looking in scope: '", $_<display_name>, "'");
 		Array::append(@candidates, close::Compiler::Scopes::get_symbols($_, $name));
 	}
 	

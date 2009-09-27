@@ -63,31 +63,6 @@ sub _create_adverb($node, %attributes) {
 	%attributes<value> := $value;
 }
 
-sub _create_declarator_name($node, %attributes) {		
-	my @parts := Array::clone(%attributes<parts>);
-	
-	# If this fails, it's because dcl_name matches namespaces, but I can't 
-	# think of when I'd use that.
-	ASSERT(+@parts, 'A declarator_name has at least one part');
-	
-	%attributes<isdecl> := 1;	
-	%attributes<name> := @parts.pop();
-	NOTE("Name will be: ", %attributes<name>);
-	
-	if %attributes<is_rooted> {
-		NOTE("Rooted: using namespace: ", Array::join("::", @parts));
-		# Use exactly what we have left.
-		%attributes<namespace> := @parts;
-	}
-	elsif +@parts {
-		NOTE("NOT rooted, but with partial namespace: ", Array::join("::", @parts));
-		%attributes<namespace> := @parts;
-	}
-
-	_create_symbol($node, %attributes);
-	DUMP(%attributes);
-}
-
 our %binary_pastops;
 %binary_pastops{'&&'}	:= "if";
 %binary_pastops{'and'}	:= "if";
@@ -181,29 +156,20 @@ sub _create_function_definition($node, %attributes) {
 	);
 	
 	NOTE("Creating new function_definition");
-	ASSERT(%attributes<from> && %attributes<from><type><is_function>,
+	my $from := %attributes<from>;
+	ASSERT($from && $from<type><is_function>,
 		'Function definition must be created :from() a function declarator');
 	
-	my $from := %attributes<from>;
 	DUMP($from);
 	
-	%attributes<blocktype> := 'declaration';
-	%attributes<lexical> := 0;
+	%attributes<blocktype>	:= 'declaration';
+	%attributes<default_storage_class> := $from<type><default_storage_class>;
+	%attributes<is_rooted>	:= 1;
+	%attributes<lexical>	:= 0;	
+	%attributes<scope>		:= 'package';
 
 	copy_adverbs($from, $node);
-	for @copy_attrs {
-		NOTE("Looking attr: ", $_);
-		Hash::merge(%attributes, $from);
-		if Scalar::defined($from{$_}) && !Hash::exists(%attributes, $_) {
-			NOTE("Copying attr: ", $_);
-			%attributes{$_} := $from{$_};
-		}
-	}
-	
-	$from := $from<type>;
-	%attributes<default_scope> := $from<default_scope>;
-	%attributes<is_rooted>	:= 1;
-	%attributes<scope>		:= 'package';		# All functions are package scope symbols
+	Hash::merge_keys(%attributes, $from, :keys(@copy_attrs), :use_last(1));
 	
 	unless Scalar::defined(%attributes<hll>) {
 		%attributes<hll> := close::Compiler::Scopes::fetch_current_hll();
@@ -214,7 +180,7 @@ sub _create_function_definition($node, %attributes) {
 		%attributes<namespace> := Array::clone($nsp.namespace());
 	}
 	
-	copy_block($from, $node);
+	copy_block($from<type>, $node);
 	
 	# Add every function, in order of creation, to the compilation_unit
 	close::Grammar::Actions::get_compilation_unit().push($node);
@@ -245,53 +211,13 @@ sub _create_initload_sub($node, %attributes) {
 	my $for_namespace := %attributes<for>;
 	Hash::delete(%attributes, 'for');
 
-	my $nsp_init := "void _nsp_init() :init :load { }";
-	
 	close::Compiler::Scopes::push($for_namespace);
 	
+	my $nsp_init := "void _nsp_init() :init :load { }";
 	close::Compiler::IncludeFile::parse_internal_string($nsp_init,
 		'namespace init function');
-	
+		
 	close::Compiler::Scopes::pop(NODE_TYPE($for_namespace));
-	
-	# Declare a function like:    void _nsp_init() :init :load {...}
-	# my @parts := Array::clone($for_namespace.namespace());
-	# @parts.push('_nsp_init');
-
-	# my $declarator := close::Compiler::Node::create('declarator_name', 
-		# :hll($for_namespace.hll()),
-		# :is_rooted(1),
-		# :node($for_namespace),
-		# :parts(@parts),
-	# );
-
-	# $declarator<type> := close::Compiler::Node::create('decl_function_returning', :node($for_namespace));
-	# $declarator<etype> := $declarator<type>;
-
-	# my $void := PAST::Var.new();
-	# $void<node_type> := 'qualified_identifier';
-	# set_name($void, 'void');
-	# $void<apparent_type> := close::Compiler::Lookups::query_matching_types($void).shift();
-	# $void := close::Compiler::Node::create('type_specifier', :node($for_namespace), :noun($void));
-	# $declarator := close::Compiler::Types::add_specifier_to_declarator($void, $declarator);
-	# my @adverbs := ( ':init', ':load');
-	
-	# for @adverbs {
-		# close::Compiler::Node::set_adverb($declarator, 
-			# close::Compiler::Node::create('adverb', :name($_), :node($for_namespace)));
-	# }
-
-	# my $node := close::Compiler::Node::create('function_definition',
-		# :from($declarator),
-	# );
-
-	# %attributes<default_scope> := 'package';
-	# %attributes<is_initload_sub> := 1;
-	# set_attributes($node, %attributes);
-
-	# NOTE("done");
-	# DUMP($node);
-	# return $node;
 }
 
 sub _create_label_name($node, %attributes) {
@@ -316,13 +242,6 @@ sub _create_namespace_definition($node, %attributes) {
 	%attributes<is_rooted>	:= 1;
 	%attributes<lexical>	:= 0;
 	%attributes<namespace>	:= @namespace;
-
-	NOTE("Creating initload sub");
-	
-	%attributes<initload> := close::Compiler::Node::create('initload_sub', 
-		:for($node),
-		:lexical(0),
-	);
 }
 
 =sub _create_namespace_path
@@ -355,43 +274,11 @@ sub _create_namespace_path($node, %attributes) {
 sub _create_parameter_declaration($node, %attributes) {
 	ASSERT(%attributes<from>, 'Parameter declaration must be created :from() a declarator.');
 	
-	%attributes<node>	:= %attributes<from>;
+	%attributes<created_node>	:= %attributes<from>;
 	%attributes<scope>	:= 'parameter';
 	%attributes<isdecl>	:= 1;
 	
 	Hash::delete(%attributes, 'from');
-}
-
-sub _create_qualified_identifier($node, %attributes) {
-	my @parts := Array::clone(%attributes<parts>);
-	ASSERT(+@parts, 'A qualified_identifier has at least one part');
-	
-	%attributes<name> := @parts.pop();
-	
-	if +@parts || %attributes<is_rooted> {
-		%attributes<namespace> := @parts;
-	}
-}
-
-sub _create_symbol($node, %attributes) {
-	unless %attributes<pir_name> {
-		%attributes<pir_name> := %attributes<name>;
-	}
-	
-	if %attributes<type> {
-		my $etype	:= %attributes<type>;
-		
-		while $etype<type> {
-			$etype	:= $etype<type>;
-		}
-
-		%attributes<etype> := $etype;
-	}
-	else {
-		%attributes<etype> := $node;
-	}
-	
-	DUMP(%attributes);
 }
 
 sub _create_translation_unit($node, %attributes) {
@@ -438,10 +325,10 @@ sub create_from_hash($type, %attributes) {
 	
 	if &code {
 		NOTE("Running helper sub: ", &code);
-		%attributes<node> := $node;
+		%attributes<created_node> := $node;
 		&code($node, %attributes);
-		$node := %attributes<node>;
-		Hash::delete(%attributes, 'node');
+		$node := %attributes<created_node>;
+		Hash::delete(%attributes, 'created_node');
 	}
 	
 	set_attributes($node, %attributes);
@@ -618,23 +505,6 @@ sub make_id($type) {
 	return $id;
 }
 	
-# Make a symbol reference from a declarator.
-sub make_reference_to($node) {
-	my @parts := Array::clone($node.namespace());
-	@parts.push($node.name());
-	
-	my $past := close::Compiler::Node::create('qualified_identifier', 
-		:declarator($node),
-		:hll($node<hll>),
-		:is_rooted($node<is_rooted>),
-		:parts(@parts),
-		:node($node),
-		:scope($node.scope()),
-	);
-
-	return $past;
-}
-
 sub set_adverb($node, $adverb) {
 	my $name := $adverb.name();
 	NOTE("Setting adverb '", $name, "' on ", NODE_TYPE($node), " node ", $node.name());
