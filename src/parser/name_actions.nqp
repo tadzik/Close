@@ -10,7 +10,7 @@ resulting PAST::Var is not resolved.
 
 method declarator_name($/) {
 	my %attrs := assemble_qualified_path($/);
-	my $past := close::Compiler::Symbols::declarator_name(%attrs);
+	my $past := Slam::Symbols::declarator_name(%attrs);
 	NOTE("Created declarator_name for ", $past<display_name>);
 	DUMP($past);
 	make $past;
@@ -18,7 +18,7 @@ method declarator_name($/) {
 
 method label_name($/) {
 	NOTE("Creating new label_name: ", ~ $<label>);
-	my $past := close::Compiler::Node::create('label_name', 
+	my $past := Slam::Node::create('label_name', 
 		:name(~ $<label>), 
 		:node($/));
 	
@@ -43,7 +43,7 @@ method new_alias_name($/) {
 
 method qualified_identifier($/) {
 	my %attrs := assemble_qualified_path($/);
-	my $past := close::Compiler::Symbols::qualified_identifier(%attrs);
+	my $past := Slam::Symbols::qualified_identifier(%attrs);
 	NOTE("Created qualified_identifier for ", $past<display_name>);
 	
 	DUMP($past);
@@ -66,7 +66,7 @@ method type_name($/, $key) { PASSTHRU($/, $key); }
 	# NOTE("Checking for typename '", $past<display_name>, "'");
 	
 	# $Is_valid_type_name := 0;
-	# my @matches := close::Compiler::Lookups::query_matching_types($past);
+	# my @matches := Slam::Lookups::query_matching_types($past);
 	
 	# if +@matches {
 		# NOTE("Found valid matching typename");

@@ -6,37 +6,37 @@ class close::Grammar::Actions;
 method TOP($/, $key) { 
 	my $past := $/{$key}.ast;
 		
-	unless close::Compiler::IncludeFile::in_include_file() {
+	unless Slam::IncludeFile::in_include_file() {
 		DUMP($past);
 
 		if get_config('Compiler', 'PrettyPrint') {
 			NOTE("Pretty-printing input");
-			my $prettified := close::Compiler::PrettyPrintVisitor::print($past);
+			my $prettified := Slam::PrettyPrintVisitor::print($past);
 			NOTE("Pretty print done\n", $prettified);
 		}
 
 		NOTE("Collecting declarations");
-		close::Compiler::DeclarationCollectionVisitor::collect_declarations($past);
+		Slam::DeclarationCollectionVisitor::collect_declarations($past);
 		
 		NOTE("Resolving types");
-		close::Compiler::TypeResolutionVisitor::resolve_types($past);
+		Slam::TypeResolutionVisitor::resolve_types($past);
 			
 		NOTE("Resolving symbols");
-		close::Compiler::SymbolResolutionVisitor::resolve_symbols($past);
+		Slam::SymbolResolutionVisitor::resolve_symbols($past);
 
 		NOTE("Setting scopes");
-		close::Compiler::ScopeAssignmentVisitor::assign_scopes($past);
+		Slam::ScopeAssignmentVisitor::assign_scopes($past);
 
 		NOTE("Displaying messages");
-		close::Compiler::MessageVisitor::show_messages($past);
+		Slam::MessageVisitor::show_messages($past);
 
 		$past := get_compilation_unit();
 		
 		NOTE("Rewriting tree for POSTing");
-		$past := close::Compiler::TreeRewriteVisitor::rewrite_tree($past);
+		$past := Slam::TreeRewriteVisitor::rewrite_tree($past);
 			
 		NOTE("Cleaning up tree for POSTing");
-		close::Compiler::PastCleanupVisitor::cleanup_past($past);
+		Slam::PastCleanupVisitor::cleanup_past($past);
 
 		DUMP($past);
 	}	
@@ -69,12 +69,12 @@ method include_directive($/) {
 
 method namespace_definition($/, $key) {
 	if $key eq 'open' {
-		my $past := close::Compiler::Namespaces::fetch_namespace_of($<namespace_path>.ast);
-		close::Compiler::Scopes::push($past);
+		my $past := Slam::Namespaces::fetch_namespace_of($<namespace_path>.ast);
+		Slam::Scopes::push($past);
 		NOTE("Pushed ", NODE_TYPE($past), " block for ", $past<display_name>);
 	}
 	elsif $key eq 'close' {
-		my $past := close::Compiler::Scopes::pop('namespace_definition');
+		my $past := Slam::Scopes::pop('namespace_definition');
 		NOTE("Popped namespace_definition block: ", $past<display_name>);
 
 		for $<declaration_sequence><decl> {
@@ -95,14 +95,14 @@ method namespace_definition($/, $key) {
 method _translation_unit_close($/) {
 	my $past;
 	
-	if close::Compiler::IncludeFile::in_include_file() {
+	if Slam::IncludeFile::in_include_file() {
 		# NB: Don't pop, because this might be a #include
 		NOTE("Not popping - this is a #include");
-		$past := close::Compiler::Scopes::current();
+		$past := Slam::Scopes::current();
 	}
 	else {
 		NOTE("Popping namespace_definition block");
-		$past := close::Compiler::Scopes::pop('namespace_definition');
+		$past := Slam::Scopes::pop('namespace_definition');
 	}
 	
 	DUMP($past);
@@ -118,13 +118,13 @@ method _translation_unit_close($/) {
 }
 
 method _translation_unit_open($/) {
-	unless close::Compiler::IncludeFile::in_include_file() {
+	unless Slam::IncludeFile::in_include_file() {
 		# Calling NOTE, etc., won't work before the config file is read.
-		close::Compiler::Config::read('close.cfg');
+		Slam::Config::read('close.cfg');
 		NOTE("Finished reading config file.");
 
-		my $root_nsp := close::Compiler::Namespaces::fetch(Array::new('close'));
-		close::Compiler::Scopes::push($root_nsp);
+		my $root_nsp := Slam::Namespaces::fetch(Array::new('close'));
+		Slam::Scopes::push($root_nsp);
 		DUMP($root_nsp);
 	}
 }

@@ -6,7 +6,7 @@ Visit nodes in the tree, dumping any attached messages.
 
 =cut
 
-class close::Compiler::MessageVisitor;
+class Slam::MessageVisitor;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -33,17 +33,17 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
-	close::Compiler::Messages::add_error($node,
+	Slam::Messages::add_error($node,
 		Array::join('', @msg));
 }
 
 sub ADD_WARNING($node, *@msg) {
-	close::Compiler::Messages::add_warning($node,
+	Slam::Messages::add_warning($node,
 		Array::join('', @msg));
 }
 
 sub NODE_TYPE($node) {
-	return close::Compiler::Node::type($node);
+	return Slam::Node::type($node);
 }
 
 ################################################################
@@ -65,11 +65,11 @@ method name() {
 sub print_messages($node) {
 	NOTE("Printing messages for '", NODE_TYPE($node), "' node");
 	
-	my @messages := close::Compiler::Messages::get_messages($node);
+	my @messages := Slam::Messages::get_messages($node);
 	DUMP(@messages);
 	
 	for @messages {
-		say(close::Compiler::Messages::format_node_message($node, $_));
+		say(Slam::Messages::format_node_message($node, $_));
 	}
 }
 
@@ -150,7 +150,7 @@ method _show_messages_UNKNOWN($node) {
 	if $node.isa(PAST::Block) {
 		# Should I keep a list of push-able block types?
 		NOTE("Pushing this Block onto the scope stack");
-		close::Compiler::Scopes::push($node);
+		Slam::Scopes::push($node);
 		
 		NOTE("Visiting child_sym entries");
 		self.visit_child_syms($node);
@@ -167,7 +167,7 @@ method _show_messages_UNKNOWN($node) {
 	self.visit_children($node);
 	
 	if $node.isa(PAST::Block) {
-		close::Compiler::Scopes::pop(NODE_TYPE($node));
+		Slam::Scopes::pop(NODE_TYPE($node));
 	}
 	
 	my @results := Array::new($node);
@@ -189,16 +189,16 @@ sub show_messages($past) {
 	NOTE("Dumping messages from  PAST tree");
 	DUMP($past);
 
-	if close::Compiler::Config::query('Compiler', name(0), 'disabled') {
+	if Slam::Config::query('Compiler', name(0), 'disabled') {
 		NOTE("Configured off - skipping");
 	}
 	else {
 		NOTE("Showing messages");
-		$SUPER := close::Compiler::Visitor.new();
+		$SUPER := Slam::Visitor.new();
 		NOTE("Created SUPER-visitor");
 		DUMP($SUPER);
 		
-		my $visitor	:= close::Compiler::MessageVisitor.new();
+		my $visitor	:= Slam::MessageVisitor.new();
 		NOTE("Created visitor");
 		DUMP($visitor);
 

@@ -15,7 +15,7 @@ itself to the child results.
 
 =cut
 
-class close::Compiler::PastCleanupVisitor;
+class Slam::PastCleanupVisitor;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -42,17 +42,17 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
-	close::Compiler::Messages::add_error($node,
+	Slam::Messages::add_error($node,
 		Array::join('', @msg));
 }
 
 sub ADD_WARNING($node, *@msg) {
-	close::Compiler::Messages::add_warning($node,
+	Slam::Messages::add_warning($node,
 		Array::join('', @msg));
 }
 
 sub NODE_TYPE($node) {
-	return close::Compiler::Node::type($node);
+	return Slam::Node::type($node);
 }
 
 ################################################################
@@ -181,7 +181,7 @@ method _cleanup_past_UNKNOWN($node) {
 	if $node.isa(PAST::Block) {
 		# Should I keep a list of push-able block types?
 		NOTE("Pushing this block onto the scope stack");
-		close::Compiler::Scopes::push($node);
+		Slam::Scopes::push($node);
 	
 		NOTE("Visiting child_sym entries");
 		self.visit_child_syms($node);
@@ -199,7 +199,7 @@ method _cleanup_past_UNKNOWN($node) {
 	
 	if $node.isa(PAST::Block) {
 		NOTE("Popping this block off the scope stack");
-		close::Compiler::Scopes::pop(NODE_TYPE($node));
+		Slam::Scopes::pop(NODE_TYPE($node));
 	}
 
 	cleanup_node($node);
@@ -222,15 +222,15 @@ sub cleanup_past($past) {
 	NOTE("Cleaning up PAST tree");
 	DUMP($past);
 
-	if close::Compiler::Config::query('Compiler', name(0), 'disabled') {
+	if Slam::Config::query('Compiler', name(0), 'disabled') {
 		NOTE("Configured off - skipping");
 	}
 	else {
-		$SUPER := close::Compiler::Visitor.new();
+		$SUPER := Slam::Visitor.new();
 		NOTE("Created SUPER-visitor");
 		DUMP($SUPER);
 	
-		my $visitor	:= close::Compiler::PastCleanupVisitor.new();
+		my $visitor	:= Slam::PastCleanupVisitor.new();
 		NOTE("Created visitor");
 		DUMP($visitor);
 	

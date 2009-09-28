@@ -15,7 +15,7 @@ itself to the child results.
 
 =cut
 
-class close::Compiler::TreeRewriteVisitor;
+class Slam::TreeRewriteVisitor;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -42,17 +42,17 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
-	close::Compiler::Messages::add_error($node,
+	Slam::Messages::add_error($node,
 		Array::join('', @msg));
 }
 
 sub ADD_WARNING($node, *@msg) {
-	close::Compiler::Messages::add_warning($node,
+	Slam::Messages::add_warning($node,
 		Array::join('', @msg));
 }
 
 sub NODE_TYPE($node) {
-	return close::Compiler::Node::type($node);
+	return Slam::Node::type($node);
 }
 
 ################################################################
@@ -150,15 +150,15 @@ sub rewrite_tree($past) {
 
 	my $result := $past;
 	
-	if close::Compiler::Config::query('Compiler', name(0), 'disabled') {
+	if Slam::Config::query('Compiler', name(0), 'disabled') {
 		NOTE("Configured off - skipping");
 	}
 	else {
-		$SUPER := close::Compiler::Visitor.new();
+		$SUPER := Slam::Visitor.new();
 		NOTE("Created SUPER-visitor");
 		DUMP($SUPER);
 	
-		my $visitor	:= close::Compiler::TreeRewriteVisitor.new();
+		my $visitor	:= Slam::TreeRewriteVisitor.new();
 		NOTE("Created visitor");
 		DUMP($visitor);
 		

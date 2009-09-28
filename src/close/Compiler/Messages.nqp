@@ -1,6 +1,6 @@
 # $Id$
 
-class close::Compiler::Messages;
+class Slam::Messages;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -48,7 +48,7 @@ sub format_node_message($node, $message) {
 	my $from_line := String::line_number_of($node<source>, :offset($node<pos>));
 	my $from_char := String::character_offset_of($node<source>, :line($from_line), :offset($node<pos>));
 
-	my $result := '' ~ close::Compiler::Scopes::current_file()
+	my $result := '' ~ Slam::Scopes::current_file()
 		~ ':' ~ $from_line
 		~ ':' ~ $from_char
 		~ ', ' ~ $message<kind>

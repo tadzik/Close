@@ -1,6 +1,6 @@
 # $Id$
 
-class close::Compiler::PrettyPrintVisitor;
+class Slam::PrettyPrintVisitor;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -27,17 +27,17 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
-	close::Compiler::Messages::add_error($node,
+	Slam::Messages::add_error($node,
 		Array::join('', @msg));
 }
 
 sub ADD_WARNING($node, *@msg) {
-	close::Compiler::Messages::add_warning($node,
+	Slam::Messages::add_warning($node,
 		Array::join('', @msg));
 }
 
 sub NODE_TYPE($node) {
-	return close::Compiler::Node::type($node);
+	return Slam::Node::type($node);
 }
 
 ################################################################
@@ -111,7 +111,7 @@ method _prettyprint_UNKNOWN($node) {
 	if $node.isa(PAST::Block) {
 		# Should I keep a list of push-able block types?
 		NOTE("Pushing this block onto the scope stack");
-		close::Compiler::Scopes::push($node);
+		Slam::Scopes::push($node);
 	
 		$indent := "\t"; 
 		# FIXME: I don't think we want to prettyprint anything in the symbol table.
@@ -140,7 +140,7 @@ method _prettyprint_UNKNOWN($node) {
 	
 	if $node.isa(PAST::Block) {
 		NOTE("Popping this block off the scope stack");
-		close::Compiler::Scopes::pop(NODE_TYPE($node));
+		Slam::Scopes::pop(NODE_TYPE($node));
 	}
 	
 	NOTE("Done with unknown node");
@@ -497,7 +497,7 @@ method _prettyprint_translation_unit($node) {
 	NOTE("Visiting translation unit");
 	DUMP($node);
 	
-	close::Compiler::Scopes::push($node);
+	Slam::Scopes::push($node);
 	
 	my $file_name := $node<file_name>;
 	unless $file_name {
@@ -617,11 +617,11 @@ sub print($past) {
 	NOTE("Pretty-printing");
 	DUMP($past);
 
-	$SUPER	:= close::Compiler::Visitor.new();
+	$SUPER	:= Slam::Visitor.new();
 	NOTE("Created SUPER-visitor");
 	DUMP($SUPER);
 	
-	my $visitor	:= close::Compiler::PrettyPrintVisitor.new();
+	my $visitor	:= Slam::PrettyPrintVisitor.new();
 	NOTE("Created visitor");
 	DUMP($visitor);
 	

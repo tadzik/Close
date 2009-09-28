@@ -1,6 +1,6 @@
 # $Id: Scopes.nqp 155 2009-09-25 04:42:21Z austin_hastings@yahoo.com $
 
-class close::Compiler::IncludeFile;
+class Slam::IncludeFile;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -27,17 +27,17 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
-	close::Compiler::Messages::add_error($node,
+	Slam::Messages::add_error($node,
 		Array::join('', @msg));
 }
 
 sub ADD_WARNING($node, *@msg) {
-	close::Compiler::Messages::add_warning($node,
+	Slam::Messages::add_warning($node,
 		Array::join('', @msg));
 }
 
 sub NODE_TYPE($node) {
-	return close::Compiler::Node::type($node);
+	return Slam::Node::type($node);
 }
 
 ################################################################
@@ -143,13 +143,13 @@ sub parse_include_file($node) {
 
 	if Scalar::defined($contents) {
 		push($node.name());
-		close::Compiler::Scopes::push($node);
+		Slam::Scopes::push($node);
 		
 		# Don't worry about the result of this. The grammar 
 		# updates the current scope, etc.
 		parse_text($contents);
 		
-		close::Compiler::Scopes::pop('include_file');
+		Slam::Scopes::pop('include_file');
 		pop_include_file();
 	}
 	

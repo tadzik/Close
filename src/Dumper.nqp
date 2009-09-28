@@ -158,7 +158,7 @@ sub info() {
 
 sub get_config($class, $sub) {	
 	my @keys := Array::new('Dump', $class, $sub);
-	my $result := close::Compiler::Config::query_array(@keys);
+	my $result := Slam::Config::query_array(@keys);
 	return $result;
 }
 
@@ -181,7 +181,7 @@ sub stack_depth() {
 		$Stack_root_offset := 0 + get_config('Stack', 'Root_offset');
 		
 		unless $Stack_root {
-			$Stack_root := 'parrot::close::Compiler::main';
+			$Stack_root := 'parrot::Slam::main';
 			$Stack_root_offset := 6; # 6 PCT subs on stack when parsing.
 		}
 		
@@ -234,7 +234,7 @@ sub stack_depth() {
 				
 		unless $S0 == nsp_name goto while_not_root
 		
-		# Done: depth indicates depth from "parrot::close::Compiler::main" to present.
+		# Done: depth indicates depth from "parrot::Slam::main" to present.
 		%r = box show_depth
 	};
 	

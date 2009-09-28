@@ -1,6 +1,6 @@
 # $Id$
 
-class close::Compiler::Config;
+class Slam::Config;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -129,7 +129,7 @@ sub _parse_config($data) {
 	DUMP(%Config_data);
 }
 
-our $_Config := close::Compiler::Config.new();
+our $_Config := Slam::Config.new();
 
 sub query(*@keys) {
 	return $_Config.value(@keys);

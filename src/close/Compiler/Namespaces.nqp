@@ -1,6 +1,6 @@
 # $Id$
 
-class close::Compiler::Namespaces;
+class Slam::Namespaces;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -27,17 +27,17 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
-	close::Compiler::Messages::add_error($node,
+	Slam::Messages::add_error($node,
 		Array::join('', @msg));
 }
 
 sub ADD_WARNING($node, *@msg) {
-	close::Compiler::Messages::add_warning($node,
+	Slam::Messages::add_warning($node,
 		Array::join('', @msg));
 }
 
 sub NODE_TYPE($node) {
-	return close::Compiler::Node::type($node);
+	return Slam::Node::type($node);
 }
 
 ################################################################
@@ -59,18 +59,18 @@ sub fetch(@path) {
 	for @path {
 		@current.push($_);
 		
-		my $child := close::Compiler::Scopes::get_namespace($block, $_);
+		my $child := Slam::Scopes::get_namespace($block, $_);
 		
 		unless $child {
-			$child := close::Compiler::Node::create('namespace_definition', :path(@current));
-			close::Compiler::Scopes::set_namespace($block, $_, $child);
+			$child := Slam::Node::create('namespace_definition', :path(@current));
+			Slam::Scopes::set_namespace($block, $_, $child);
 			
 			NOTE("Creating initload sub");
-			close::Compiler::Scopes::push($child);
-			my $initload := close::Compiler::Node::create('initload_sub', 
+			Slam::Scopes::push($child);
+			my $initload := Slam::Node::create('initload_sub', 
 				:for($child),
 			);
-			close::Compiler::Scopes::pop(NODE_TYPE($child));
+			Slam::Scopes::pop(NODE_TYPE($child));
 			$child<initload>:= $initload;
 			$child.push($initload);
 		}
@@ -99,7 +99,7 @@ sub fetch_root() {
 	unless $root {
 		NOTE("Creating root namespace block");
 		
-		$root := close::Compiler::Node::create('namespace_definition',
+		$root := Slam::Node::create('namespace_definition',
 			:initload('no sub for this block'),
 			:name('namespace root block'),
 			:path(Array::empty()));
@@ -131,7 +131,7 @@ sub fetch_namespace_of($node) {
 		NOTE("Fetching absolute path");
 	}
 	else {
-		my $nsp := close::Compiler::Scopes::fetch_current_namespace();
+		my $nsp := Slam::Scopes::fetch_current_namespace();
 		NOTE("Fetching relative to current namespace: ", $nsp<display_name>);
 		@path := Array::concat($nsp<path>, @path);
 	}
@@ -197,7 +197,7 @@ sub query_relative($origin, @target) {
 	for @target {
 		@path.push($_);		
 		NOTE("Retrieving (sub) namespace: ", ~$_);
-		my $child := close::Compiler::Scopes::get_namespace($block, $_);
+		my $child := Slam::Scopes::get_namespace($block, $_);
 		
 		unless $child {
 			NOTE("Query failed on element: ", $_);

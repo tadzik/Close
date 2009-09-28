@@ -2,14 +2,14 @@
 
 #grammar close::Grammar is PGE::Grammar;
 
-=rule cv_qualifier
+=rule access_qualifier
 
 One of the access qualifiers C<const> or C<volatile>. This rule is used in both
 L<#type_specifier> and L<#declarator> matching.
 
 =cut
 
-rule cv_qualifier {
+rule access_qualifier {
 	| <token=CONST>		{*}
 	| <token=VOLATILE>	{*}
 }
@@ -83,12 +83,12 @@ rule dclr_atom {
 =rule dclr_pointer
 
 Matches a star ('*') -- the Close "pointer to something" indicator -- optionally 
-followed by C<cv_qualifier>s.
+followed by C<access_qualifier>s.
 
 =cut
 
 rule dclr_pointer {
-	$<token>='*' <cv_qualifier>*	{*}
+	$<token>='*' <access_qualifier>*	{*}
 }
 
 =rule dclr_postfix
@@ -185,24 +185,15 @@ rule parameter_list {
 	{*} #= close
 }
 
-
-=rule specifier
-
-Matches any form of type specifier. Storage class specifiers (keywords),
-type specifiers (builtins, or user defined types), and function specifiers
-(more keywords). Matches only one specifier -- the rule must be used in a
-qualified context with '*' or '+'.
-
-=cut
-
-rule specifier {
-	| <tspec_function_attr>	{*} #= tspec_function_attr
-	| <tspec_storage_class>	{*} #= tspec_storage_class
-	| <tspec_type_specifier>	{*} #= tspec_type_specifier
+rule specifier_list {
+	<specs=tspec_not_type>*
+	<specs=tspec_type_specifier>
+	<specs=tspec_not_type>*
+	{*}
 }
 
-rule specifier_list {
-	<specifier>+ {*}
+rule tspec_builtin {
+	| <token=_BUILTIN>	{*}
 }
 
 rule tspec_function_attr {
@@ -210,8 +201,13 @@ rule tspec_function_attr {
 	| <token=METHOD>	{*}
 }
 
+rule tspec_not_type {
+	| <access_qualifier>		{*} #= access_qualifier
+	| <tspec_function_attr>	{*} #= tspec_function_attr
+	| <tspec_storage_class>	{*} #= tspec_storage_class
+}
+
 rule tspec_storage_class {
-	| <token=_BUILTIN>	{*}
 	| <token=DYNAMIC>	{*}
 	| <token=EXTERN>		{*}
 	| <token=LEXICAL>		{*}
@@ -225,9 +221,8 @@ rule tspec_type_name {
 }
 
 rule tspec_type_specifier {
-#	| <tspec_builtin_type>	{*} #= tspec_builtin_type
+	| <tspec_builtin>		{*} #= tspec_builtin
 #	| <class_specifier>			{*} #= class_specifier
-	| <cv_qualifier>		{*} #= cv_qualifier
 #	| <enum_specifier>			{*} #= enum_specifier
 #	| <elaborated_type_specifier>	{*} #= elaborated_type_specifier
 #	| <typename_specifier>		{*} #= typename_specifier
@@ -236,8 +231,7 @@ rule tspec_type_specifier {
 }
 
 rule using_namespace_directive {
-	<.USING> {{ say "Using namespace directive?" }}
-<.NAMESPACE> <namespace=namespace_path>
+	<.USING> <.NAMESPACE> <namespace=namespace_path>
 	{*}
 }
 

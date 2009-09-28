@@ -1,6 +1,6 @@
 # $Id$
 
-class close::Compiler::Lookups;
+class Slam::Lookups;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -27,7 +27,7 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub NODE_TYPE($node) {
-	close::Compiler::Node::type($node);
+	Slam::Node::type($node);
 }
 
 ################################################################
@@ -52,10 +52,10 @@ sub get_search_list_of($qualified_identifier) {
 	my @search_list;
 	
 	if $qualified_identifier<is_rooted> {
-		@search_list := Array::new(close::Compiler::Namespaces::fetch_root());
+		@search_list := Array::new(Slam::Namespaces::fetch_root());
 	}
 	else {
-		@search_list := close::Compiler::Scopes::get_search_list();
+		@search_list := Slam::Scopes::get_search_list();
 	}
 	
 	return @search_list;
@@ -94,7 +94,7 @@ sub query_relative_scopes_matching_path($root, @path) {
 			NOTE("Looking at", $scope.name());
 			
 			if $scope.isa(PAST::Block) {
-				my $cand := close::Compiler::Scopes::get_namespace($scope, $id_part);
+				my $cand := Slam::Scopes::get_namespace($scope, $id_part);
 				
 				if $cand {
 					NOTE("Found matching namespace: ", $cand.name());
@@ -102,7 +102,7 @@ sub query_relative_scopes_matching_path($root, @path) {
 				}
 				
 				# Add any child symbols we find, too.
-				Array::append(@candidate_q, close::Compiler::Scopes::get_symbols($scope, $id_part));
+				Array::append(@candidate_q, Slam::Scopes::get_symbols($scope, $id_part));
 			}
 			else {
 				NOTE("Dead end. This candidate is not a scope.");
@@ -164,8 +164,8 @@ sub query_scopes_containing($qualified_identifier) {
 	
 	for @scopes {
 		NOTE("Looking in scope: '", $_<display_name>, "'");
-		if close::Compiler::Scopes::get_symbols($_, $name) > 0
-			|| close::Compiler::get_namespace($_, $name) {
+		if Slam::Scopes::get_symbols($_, $name) > 0
+			|| Slam::get_namespace($_, $name) {
 			@candidates.push($_);
 		}
 	}
@@ -188,7 +188,7 @@ sub query_scopes_containing_symbol($qualified_identifier) {
 		NOTE("Looking in scope: '", $_<display_name>, "' (", $_<id>, ")");
 		DUMP($_);
 		
-		if close::Compiler::Scopes::get_symbols($_, $name) > 0 {
+		if Slam::Scopes::get_symbols($_, $name) > 0 {
 			@candidates.push($_);
 		}
 	}
@@ -210,7 +210,7 @@ sub query_symbols_matching($qualified_identifier) {
 	
 	for @scopes {
 		NOTE("Looking in scope: '", $_<display_name>, "'");
-		Array::append(@candidates, close::Compiler::Scopes::get_symbols($_, $name));
+		Array::append(@candidates, Slam::Scopes::get_symbols($_, $name));
 	}
 	
 	NOTE("done. Found ", +@candidates, " matching symbols.");
@@ -231,7 +231,7 @@ sub query_matching_types($node) {
 	my @results := Array::empty();
 	
 	for @candidates {
-		if close::Compiler::Type::is_type($_) {
+		if Slam::Type::is_type($_) {
 			@results.push($_);
 		}
 	}

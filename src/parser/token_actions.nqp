@@ -4,7 +4,7 @@ class close::Grammar::Actions;
 method BAREWORD($/) {
 	NOTE("Parsed BAREWORD");
 	
-	my $past := close::Compiler::Node::create('bareword',
+	my $past := Slam::Node::create('bareword',
 		:node($/),
 		:name(~ $/),
 		:value(~ $/),
@@ -17,7 +17,7 @@ method BAREWORD($/) {
 method FLOAT_LIT($/) {
 	NOTE("Parsed FLOAT_LIT");
 	
-	my $past := close::Compiler::Node::create('float_literal',
+	my $past := Slam::Node::create('float_literal',
 		:name(~ $/),
 		:node($/),
 		:value(~ $/),
@@ -62,7 +62,7 @@ method IDENTIFIER($/, $key) { PASSTHRU($/, $key); }
 method INTEGER_LIT($/) {
 	NOTE("Parsed INTEGER_LIT");
 	
-	my $past := close::Compiler::Node::create('integer_literal',
+	my $past := Slam::Node::create('integer_literal',
 		:name(~ $/),
 		:node($/),
 		:value(~ $<value>),
@@ -87,7 +87,7 @@ method INTEGER_LIT($/) {
 method QUOTED_LIT($/, $key) {
 	NOTE("Parsed QUOTED_LIT");
 	
-	my $past := close::Compiler::Node::create('quoted_literal',
+	my $past := Slam::Node::create('quoted_literal',
 		:name(~ $/),
 		:node($/),
 		:quote($key),
@@ -103,7 +103,7 @@ method STRING_LIT($/, $key) { PASSTHRU($/, $key); }
 method SYSTEM_HEADER($/) {
 	NOTE("Parsed system include file token");
 	
-	my $past := close::Compiler::Node::create('include_file',
+	my $past := Slam::Node::create('include_file',
 		:name(~ $/),
 		:node($/),
 		:quote('angle'),
@@ -118,7 +118,7 @@ method SYSTEM_HEADER($/) {
 method USER_HEADER($/) {
 	NOTE("Parsed user include file token");
 	
-	my $past := close::Compiler::Node::create('include_file',
+	my $past := Slam::Node::create('include_file',
 		:name(~ $/),
 		:node($/),
 		:quote('double'),

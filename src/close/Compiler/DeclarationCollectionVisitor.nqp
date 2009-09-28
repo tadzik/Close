@@ -1,6 +1,6 @@
 # $Id$
 
-class close::Compiler::DeclarationCollectionVisitor;
+class Slam::DeclarationCollectionVisitor;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -27,17 +27,17 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
-	close::Compiler::Messages::add_error($node,
+	Slam::Messages::add_error($node,
 		Array::join('', @msg));
 }
 
 sub ADD_WARNING($node, *@msg) {
-	close::Compiler::Messages::add_warning($node,
+	Slam::Messages::add_warning($node,
 		Array::join('', @msg));
 }
 
 sub NODE_TYPE($node) {
-	return close::Compiler::Node::type($node);
+	return Slam::Node::type($node);
 }
 
 ################################################################
@@ -95,7 +95,7 @@ method _collect_declarations_declarator_name($node) {
 	NOTE("Visiting declarator_name node: ", $node<display_name>);
 	
 	$SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
-	close::Compiler::Scopes::add_declarator($node);
+	Slam::Scopes::add_declarator($node);
 	
 	NOTE("done");
 	return @Results;	
@@ -105,7 +105,7 @@ method _collect_declarations_function_definition($node) {
 	NOTE("Visiting function_definition node: ", $node<display_name>);
 
 	$SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
-	close::Compiler::Scopes::add_declarator($node);
+	Slam::Scopes::add_declarator($node);
 	
 	NOTE("done");
 	return @Results;	
@@ -123,15 +123,15 @@ sub collect_declarations($past) {
 	NOTE("Collecting declarations in PAST tree");
 	DUMP($past);
 
-	if close::Compiler::Config::query('Compiler', name(0), 'disabled') {
+	if Slam::Config::query('Compiler', name(0), 'disabled') {
 		NOTE("Configured off - skipping");
 	}
 	else {
-		$SUPER := close::Compiler::Visitor.new();
+		$SUPER := Slam::Visitor.new();
 		NOTE("Created SUPER-visitor");
 		DUMP($SUPER);
 		
-		my $visitor := close::Compiler::DeclarationCollectionVisitor.new();
+		my $visitor := Slam::DeclarationCollectionVisitor.new();
 		NOTE("Created visitor");
 		DUMP($visitor);
 

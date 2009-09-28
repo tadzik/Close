@@ -109,7 +109,7 @@ method builtin_isa($/) {
 		$nsp.unshift($<class>.ast<hll>);
 	} 
 	else {
-		$nsp.unshift(close::Compiler::Scopes::fetch_current_hll());
+		$nsp.unshift(Slam::Scopes::fetch_current_hll());
 	}
 		
 	my $class_key := Array::join('::', $nsp);
@@ -164,7 +164,7 @@ method builtin_issame($/) {
 # Given a past symbol, return the symbol hash.
 sub get_global_symbol_info($sym) {
 	my @path := namespace_path_of_var($sym);
-	my $block := close::Compiler::Namespaces::fetch(@path);
+	my $block := Slam::Namespaces::fetch(@path);
 
 	#say("Found block: ", $block.name());
 	my $name := $sym.name();

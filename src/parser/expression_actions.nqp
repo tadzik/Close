@@ -6,7 +6,7 @@ method additive_expr($/) { binary_expr_l2r($/); }
 method arg_adverb($/) {
 	NOTE("Creating parameter adverb from: ", $/);
 	
-	my $past := close::Compiler::Node::create('adverb', 
+	my $past := Slam::Node::create('adverb', 
 		:node($/), 
 		:name(~$<token>),
 		:value(~$<token>),
@@ -44,7 +44,7 @@ method arg_expr($/) {
 
 method arg_list($/) {
 	NOTE("Assembling arg_list");
-	my $past := close::Compiler::Node::create('expr_call', :node($/));
+	my $past := Slam::Node::create('expr_call', :node($/));
 
 	for $<arg> {
 		$past.push($_.ast);
@@ -85,7 +85,7 @@ method asm_contents($/) {
 
 method asm_expr($/) {
 	NOTE("Got asm_expr");
-	my $past := close::Compiler::Node::create('expr_asm', 
+	my $past := Slam::Node::create('expr_asm', 
 		:inline($<asm>.ast.value()),
 	);
 
@@ -106,7 +106,7 @@ sub binary_expr_l2r($/) {
 	my $past := $<term>.shift().ast;
 
 	for $<op> {
-		$past := close::Compiler::Node::create('expr_binary', 
+		$past := Slam::Node::create('expr_binary', 
 			:operator(~$_),
 			:left($past),
 			:right($<term>.shift().ast),
@@ -162,7 +162,7 @@ sub postfixup($past) {
 			# Rewrite a.b() into (callmethod 'b', a, args)
 			if $func.scope() eq 'attribute' {
 				$past.pasttype('callmethod');
-				close::Compiler::Node::set_name($past, $func.name());
+				Slam::Node::set_name($past, $func.name());
 				$past.shift();
 				$past.unshift($func[0]);
 			}
@@ -174,7 +174,7 @@ sub postfixup($past) {
 
 				ASSERT(0, "Sub is_local_function has been deleted.");
 				if is_local_function($func) {
-					close::Compiler::Node::set_name($past, $func.name());
+					Slam::Node::set_name($past, $func.name());
 					$past.shift();
 				}
 				# TODO: Need to fix up aliases, etc. here. For now, leave it be.

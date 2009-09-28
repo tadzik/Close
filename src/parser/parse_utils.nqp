@@ -48,17 +48,17 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
-	close::Compiler::Messages::add_error($node,
+	Slam::Messages::add_error($node,
 		Array::join('', @msg));
 }
 
 sub ADD_WARNING($node, *@msg) {
-	close::Compiler::Messages::add_warning($node,
+	Slam::Messages::add_warning($node,
 		Array::join('', @msg));
 }
 
 sub NODE_TYPE($node) {
-	return close::Compiler::Node::type($node);
+	return Slam::Node::type($node);
 }
 
 ################################################################
@@ -162,7 +162,7 @@ sub get_compilation_unit() {
 	our $compilation_unit;
 	
 	unless $compilation_unit {
-		$compilation_unit := close::Compiler::Node::create('compilation_unit');
+		$compilation_unit := Slam::Node::create('compilation_unit');
 	}
 	
 	return $compilation_unit;
@@ -174,7 +174,7 @@ sub get_config(*@keys) {
 	NOTE("Get config setting: ", Array::join('::', @keys));
 
 	unless Scalar::defined($Config) {
-		$Config := close::Compiler::Config.new();
+		$Config := Slam::Config.new();
 	}
 	
 	my $result := $Config.value(@keys);
@@ -182,24 +182,3 @@ sub get_config(*@keys) {
 	DUMP($result);
 	return $result;
 }
-
-=sub PAST::Val make_token($capture)
-
-Given a capture -- that is, the $<subrule> match from some regex -- creates a
-new PAST::Val from the location data with the text of the capture as the value,
-and 'String' as the return type.
-
-=cut
-
-sub make_token($capture) {
-	NOTE("Making token from: ", ~$capture);
-	
-	my $token := PAST::Val.new(
-		:node($capture), 
-		:returns('String'), 
-		:value(~$capture));
-		
-	DUMP($token);
-	return $token;
-}
-

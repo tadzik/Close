@@ -1,6 +1,6 @@
 # $Id$
 
-class close::Compiler::TypeResolutionVisitor;
+class Slam::TypeResolutionVisitor;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -27,17 +27,17 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
-	close::Compiler::Messages::add_error($node,
+	Slam::Messages::add_error($node,
 		Array::join('', @msg));
 }
 
 sub ADD_WARNING($node, *@msg) {
-	close::Compiler::Messages::add_warning($node,
+	Slam::Messages::add_warning($node,
 		Array::join('', @msg));
 }
 
 sub NODE_TYPE($node) {
-	return close::Compiler::Node::type($node);
+	return Slam::Node::type($node);
 }
 
 ################################################################
@@ -123,7 +123,7 @@ method _type_resolve_UNKNOWN($node) {
 	if $node.isa(PAST::Block) {
 		# Should I keep a list of push-able block types?
 		NOTE("Pushing this block onto the scope stack");
-		close::Compiler::Scopes::push($node);
+		Slam::Scopes::push($node);
 	
 		NOTE("Visiting child_sym entries");
 		self.visit_child_syms($node);
@@ -141,7 +141,7 @@ method _type_resolve_UNKNOWN($node) {
 	
 	if $node.isa(PAST::Block) {
 		NOTE("Popping this block off the scope stack");
-		close::Compiler::Scopes::pop(NODE_TYPE($node));
+		Slam::Scopes::pop(NODE_TYPE($node));
 	}
 
 	# We need to return an array of something.
@@ -236,7 +236,7 @@ method _type_resolve_type_specifier($node) {
 	
 	NOTE("Resolving type specifier: ", $type_name);
 
-	my @types := close::Compiler::Lookups::query_matching_types($node<noun>);
+	my @types := Slam::Lookups::query_matching_types($node<noun>);
 	NOTE("Found ", +@types , " candidates for typename resolution");
 	DUMP(@types);
 	
@@ -252,10 +252,10 @@ method _type_resolve_type_specifier($node) {
 	elsif !$node<is_rooted> && !$node.namespace() {
 		# Unqualified name: prefer local candidate (rule 2a, above).
 		
-		my $local_scope := close::Compiler::Scopes::current();
+		my $local_scope := Slam::Scopes::current();
 
-		for close::Compiler::Scopes::get_symbols($local_scope, $node<noun>.name()) {
-			if close::Compiler::Type::is_type($_) {
+		for Slam::Scopes::get_symbols($local_scope, $node<noun>.name()) {
+			if Slam::Type::is_type($_) {
 				$resolved := $_;
 			}
 		}
@@ -318,16 +318,16 @@ sub resolve_types($past) {
 
 	my @result;
 	
-	if close::Compiler::Config::query('Compiler', name(0), 'disabled') {
+	if Slam::Config::query('Compiler', name(0), 'disabled') {
 		NOTE("Configured off - skipping");
 	}
 	else {
 		NOTE("Resolving types");
-		$SUPER := close::Compiler::Visitor.new();
+		$SUPER := Slam::Visitor.new();
 		NOTE("Created SUPER-visitor");
 		DUMP($SUPER);
 		
-		my $visitor := close::Compiler::TypeResolutionVisitor.new();
+		my $visitor := Slam::TypeResolutionVisitor.new();
 		NOTE("Created visitor");
 		DUMP($visitor);
 

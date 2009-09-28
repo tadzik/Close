@@ -14,12 +14,12 @@ method null_statement($/) {
 method compound_statement($/, $key) {
 	if $key eq 'open' {
 		NOTE("Creating new compound_statement, pushing on scope stack");
-		my $past := close::Compiler::Node::create('compound_statement');
-		close::Compiler::Scopes::push($past);
+		my $past := Slam::Node::create('compound_statement');
+		Slam::Scopes::push($past);
 		DUMP($past);
 	}
 	elsif $key eq 'close' {
-		my $past := close::Compiler::Scopes::pop('compound_statement');
+		my $past := Slam::Scopes::pop('compound_statement');
 		NOTE("Popped compound_statement from scope stack");
 		
 		for $<statements> {
@@ -75,14 +75,14 @@ method foreach_statement($/, $key) {
 	if $key eq 'open' {
 		NOTE('Begin foreach statement');
 		
-		my $past := close::Compiler::Node::create('foreach_statement', :node($/));
-		close::Compiler::Scopes::push($past);
+		my $past := Slam::Node::create('foreach_statement', :node($/));
+		Slam::Scopes::push($past);
 		
 		NOTE("Pushed foreach_statement on stack");
 		DUMP($past)
 	}
 	elsif $key eq 'close' {
-		my $past := close::Compiler::Scopes::pop('foreach_statement');
+		my $past := Slam::Scopes::pop('foreach_statement');
 		
 		NOTE("Popped scope from stack: ", $past.name());
 
@@ -109,7 +109,7 @@ method foreach_statement($/, $key) {
 }
 
 method goto_statement($/) {
-	my $past := close::Compiler::Node::create('goto_statement', 
+	my $past := Slam::Node::create('goto_statement', 
 		:node($/),
 		:label(~ $<label>));
 		
@@ -200,7 +200,7 @@ method labeled_statement($/, $key) {
 method local_statement($/, $key) { PASSTHRU($/, $key); }
 
 method return_statement($/) {
-	my $past := close::Compiler::Node::create('return_statement',
+	my $past := Slam::Node::create('return_statement',
 		:node($/));
 	
 	if $<value> {

@@ -21,7 +21,7 @@ another platform - for Parrot."
     },
     "instructions" : {
         "type"     : "custom",
-        "fetch"    : "#SVN# checkout #REPOSITORY#",
+        "fetch"    : "#SVN# checkout --quiet --ignore-externals #REPOSITORY#",
         "configure": "#PERL# Configure.pl",
         "build"    : "#MAKE#",
         "test"     : "#MAKE# test",

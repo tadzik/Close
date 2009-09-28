@@ -2,30 +2,6 @@
 
 class Hash;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
-}
-
-sub BACKTRACE() {
-	Q:PIR {{
-		backtrace
-	}};
-}
-
-sub DIE(*@msg) {
-	Dumper::DIE(Dumper::info(), @msg);
-}
-
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
-}
-
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
-}
-
-################################################################
-
 sub delete(%hash, $key) {
 	Q:PIR {{
 		$P0 = find_lex '%hash'
@@ -42,6 +18,11 @@ sub elements(%hash) {
 	}};
 	
 	return %results;
+}
+
+sub empty() {
+	my %empty;
+	return %empty;
 }
 
 sub exists(%hash, $key) {
@@ -62,10 +43,6 @@ sub exists(%hash, $key) {
 	return %results;	
 }
 
-sub _yes() {
-	return 1;
-}
-
 sub merge(%first, *@hashes, :%into?, :$use_last?) {
 	
 	@hashes.unshift(%first);	# Ensure at least one element.
@@ -82,7 +59,7 @@ sub merge(%first, *@hashes, :%into?, :$use_last?) {
 	
 	if $use_last {
 		@hashes := Array::reverse(@hashes);
-		%stored := Hash::new();
+		%stored := Hash::empty();
 	}
 
 	for @hashes {
@@ -114,7 +91,7 @@ sub merge_keys(%first, *@hashes, :@keys!, :%into?, :$use_last?) {
 	
 	if $use_last {
 		@hashes := Array::reverse(@hashes);
-		%stored := Hash::new();
+		%stored := Hash::empty();
 	}
 	
 	for @hashes {

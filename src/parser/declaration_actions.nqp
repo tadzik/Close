@@ -2,19 +2,18 @@
 
 class close::Grammar::Actions;
 
-=method cv_qualifier
+=method access_qualifier
 
-Creates a type-specifier entry, with "is_<?>" set to 1. Type-specifier is used 
-because a cv_qualifier is a valid type specifier by itself.
+Creates a type-specifier entry, to be attached to a declarator or specifier.
 
 =cut
 
-method cv_qualifier($/) {
+method access_qualifier($/) {
 	my $name := ~ $<token>;
 	NOTE("Creating new cv qualifier: ", $name);
-	my $past := close::Compiler::Node::create('type_specifier');
-	$past{'is_' ~ $name} := 1;
-
+	my $past := Slam::Type::Specifier::access_qualifier($/,
+		:name($name),
+	);
 	DUMP($past);
 	make $past;
 }
@@ -32,7 +31,7 @@ method dclr_adverb($/) {
 		$signature := $<register_class>.ast.value();
 	}
 	
-	my $past := close::Compiler::Node::create('adverb', 
+	my $past := Slam::Node::create('adverb', 
 		:node($/), 
 		:name(~$<token>),
 		:signature($signature),
@@ -50,7 +49,7 @@ Just another kind of declarator.
 =cut
 
 method dclr_alias($/) {
-	my $past := close::Compiler::Type::new_dclr_alias($<alias>.ast);
+	my $past := Slam::Type::new_dclr_alias($<alias>.ast);
 	DUMP($past);
 	make $past;
 }
@@ -62,7 +61,7 @@ and attaches any attributes required (array #elements).
 =cut
 
 method dclr_array_or_hash($/, $key) {
-	my $past := close::Compiler::Node::create($key, :node($/));
+	my $past := Slam::Node::create($key, :node($/));
 	
 	if $<size> {
 		$past<elements> := $<size>.ast;
@@ -82,15 +81,13 @@ any qualifiers as children of the node.
 =cut
 
 method dclr_pointer($/) {
-	my $past := close::Compiler::Type::pointer_to(
+	NOTE("Creating pointer declarator");
+	my $past := Slam::Type::Declarator::pointer_to(
+		:node($/),
+		:qualifiers(ast_array($<access_qualifier>)),
 		:name(~ $/),
-		:node($/), 
 	);
 	
-	for $<cv_qualifier> {
-		$past := close::Compiler::Type::merge_specifiers($past, $_.ast);
-	}
-
 	DUMP($past);
 	make $past;
 }
@@ -104,7 +101,7 @@ Passes through the array, hash, or function declarator.
 method dclr_postfix($/, $key) { PASSTHRU($/, $key); }
 
 method declaration($/) {
-	my $past	:= close::Compiler::Node::create('decl_varlist');
+	my $past	:= Slam::Node::create('decl_varlist');
 	my $specs	:= $<specifier_list>.ast;
 	
 	NOTE("Processing declarators");
@@ -119,12 +116,12 @@ method declaration($/) {
 		}
 
 		NOTE("Merging specifier with declarator '", $declarator.name(), "'");
-		$declarator := 
-			close::Compiler::Type::add_specifier_to_declarator($specs, $declarator);
+		$declarator<etype><type> := $specs;
+		$declarator<etype> := $specs;
 			
 		# FIXME: Is this needed? Should this be a separate pass?
 		#NOTE("Adding declarator to its scope");
-		#close::Compiler::Scopes::add_declarator($declarator);
+		#Slam::Scopes::add_declarator($declarator);
 		
 		NOTE("Adding declarator to decl-varlist");
 		$past.push($declarator);
@@ -185,10 +182,10 @@ method _declarator_part_close_block($/) {
 		}};
 		
 		NOTE("Closing decl block");
-		my $past := close::Compiler::Scopes::pop('function_definition');
+		my $past := Slam::Scopes::pop('function_definition');
 		
 		# Merge the <body> block with $past
-		close::Compiler::Node::copy_block($<body>[0].ast, $past);
+		Slam::Node::copy_block($<body>[0].ast, $past);
 		$past<using_namespaces> := $<body>[0].ast<using_namespaces>;
 }
 
@@ -201,11 +198,11 @@ method _declarator_part_declarator($/) {
 	if $<dclr_alias> {
 		$past<alias> := $<dclr_alias>[0].ast;
 		$past<pirname> := $past.name();
-		close::Compiler::Node::set_name($past, $past<alias>.name());
+		Slam::Node::set_name($past, $past<alias>.name());
 	}
 	
 	for $<adverbs> {
-		close::Compiler::Node::set_adverb($past, $_.ast);
+		Slam::Node::set_adverb($past, $_.ast);
 	}
 
 	# So far, there is no block.
@@ -213,6 +210,8 @@ method _declarator_part_declarator($/) {
 		$P0 = box 0
 		set_hll_global ['close';'Grammar'], '$!Decl_block', $P0
 	}};
+	
+	DUMP($past);
 }
 
 method _declarator_part_done($/) {
@@ -242,11 +241,11 @@ method _declarator_part_open_block($/) {
 	if $declarator<type><is_function> {
 		NOTE("Block is function definition. Pushing new block on stack.");
 		
-		my $definition := close::Compiler::Node::create('function_definition',
+		my $definition := Slam::Node::create('function_definition',
 			:from($declarator),
 		);
 		$declarator<definition> := $definition;
-		close::Compiler::Scopes::push($definition);
+		Slam::Scopes::push($definition);
 	}
 	else {
 		DIE("NOT REACHED"); # Struct, class, etc.
@@ -300,7 +299,7 @@ method param_adverb($/) {
 		$named := $param_name.value();
 	}
 	
-	my $past := close::Compiler::Node::create('adverb', 
+	my $past := Slam::Node::create('adverb', 
 		:node($/), 
 		:name(~$<token>),
 		:named($named),
@@ -326,16 +325,16 @@ and C<optional>.
 
 method parameter_declaration($/) {
 	NOTE("Assembling parameter_declaration");
-	my $past := close::Compiler::Node::create('parameter_declaration', 
+	my $past := Slam::Node::create('parameter_declaration', 
 		:from($<parameter>.ast),
 	);
 	
 	my $specs	:= $<specifier_list>.ast;
-	close::Compiler::Type::add_specifier_to_declarator($specs, $past);
+	Slam::Type::add_specifier_to_declarator($specs, $past);
 	
 	for $<adverbs> {
 		NOTE("Adding adverb '", $_.ast.name(), "'");
-		close::Compiler::Node::set_adverb($past, $_.ast);
+		Slam::Node::set_adverb($past, $_.ast);
 	}
 	
 	if $<default> {
@@ -360,21 +359,21 @@ parameter scope.
 method parameter_list($/, $key) {
 	if $key eq 'open' {
 		NOTE("Creating new parameter list");
-		my $past := close::Compiler::Type::function_returning(:node($/));
-		close::Compiler::Scopes::push($past);
+		my $past := Slam::Type::function_returning(:node($/));
+		Slam::Scopes::push($past);
 		
 		NOTE("Pushed new scope on stack: ", $past.name());
 		DUMP($past);
 	}
 	elsif $key eq 'close' {
 		NOTE("Popping parameter list from stack");
-		my $past	:= close::Compiler::Scopes::pop('declarator');
+		my $past	:= Slam::Scopes::pop('declarator');
 		my $params	:= $past<parameters>;
 		my $slurpy	:= 0;
 		
 		for ast_array($<param_list>) {
 			$params.push($_);
-			close::Compiler::Scopes::add_declarator_to($_, $past);
+			Slam::Scopes::add_declarator_to($_, $past);
 			
 			if $_<adverbs><slurpy> {
 				$slurpy := 1;
@@ -394,52 +393,33 @@ method parameter_list($/, $key) {
 	}
 }
 
-method specifier($/, $key) { PASSTHRU($/, $key); }
-
 method specifier_list($/) {
 	NOTE("Assembling specifier list");
 	
-	my @specs := ast_array($<specifier>);
+	my @specs := ast_array($<specs>);
 	ASSERT(+@specs, 'Specifier list requires at least one item');
 	my $past := @specs.shift();
-
-	for @specs {
-		$past := close::Compiler::Type::merge_specifiers($past, $_);
-	}
+	$past.attach(@specs);
 	
 	NOTE("done");
 	DUMP($past);
 	make $past;
 }
 
-=method tspec_builtin_type
-
-Creates a type specifier with noun set to the type name.
-
-=cut
-
-method tspec_builtin_type($/) {
+method tspec_builtin($/) {
 	my $name := ~ $<token>;
-	NOTE("Creating new type specifier for builtin type: ", $name);
+	NOTE("Creating new builtin specifier: ", $name);
 	
-	my $type_name := close::Compiler::Node::create('qualified_identifier', 
-		:parts(Array::new($name)),
-		:node($/),
+	my $noun := PAST::Val.new(:name($name), :node($/));
+	my $past := Slam::Type::Specifier::type_specifier($/,
+		:is_builtin(1),
+		:noun($noun),
 	);
-
-	DUMP($type_name);
-	my @matches := close::Compiler::Lookups::query_matching_types($type_name);
-	DUMP(@matches);
-	ASSERT(+@matches == 1, 
-		'query_matching_types should always be able to find exactly one matching builtin type');
-		
-	$type_name<apparent_type>  := @matches.shift();
-	my $past := close::Compiler::Node::create('type_specifier',
-		:noun($type_name));
 	
 	DUMP($past);
 	make $past;
 }
+
 
 =method tspec_function_attr
 
@@ -450,12 +430,16 @@ Creates a type specifier around the keyword.
 method tspec_function_attr($/) {
 	my $name := ~ $<token>;
 	NOTE("Creating new function attribute specifier: ", $name);
-	my $past := close::Compiler::Node::create('type_specifier');
-	$past{'is_' ~ $name} := 1;
+	
+	my $past := Slam::Type::Specifier::access_qualifier($/,
+		:name($name),
+	);
 
 	DUMP($past);
 	make $past;
 }
+
+method tspec_not_type($/, $key) { PASSTHRU($/, $key); }
 
 =method tspec_storage_class
 
@@ -466,9 +450,11 @@ Creates a token around the keyword.
 method tspec_storage_class($/) {
 	my $name := ~ $<token>;
 	NOTE("Creating new storage class specifier: ", $name);
-
-	my $past := close::Compiler::Type::specifier(:name($name), :node($/));
-		
+	
+	my $past := Slam::Type::Specifier::storage_class($/,
+		:name($name),
+	);
+	
 	DUMP($past);
 	make $past;
 }
@@ -483,7 +469,7 @@ method tspec_type_name($/) {
 	ASSERT($type_name<apparent_type>,
 		'Type_name lookup sets apparent type to current resolution of name');
 		
-	my $past := close::Compiler::Node::create('type_specifier',
+	my $past := Slam::Node::create('type_specifier',
 		:noun($type_name));
 
 	DUMP($past);
@@ -497,16 +483,16 @@ method using_namespace_directive($/) {
 		'Namespace paths must be namespace_name tokens');
 
 	# Resolve using-nsp to absolute value.
-	$using_nsp := close::Compiler::Namespaces::fetch_namespace_of($using_nsp);
+	$using_nsp := Slam::Namespaces::fetch_namespace_of($using_nsp);
 	
-	my $past := close::Compiler::Node::create('using_directive',
+	my $past := Slam::Node::create('using_directive',
 		:name('using namespace'),
 		:node($/),
 		:using_namespace($using_nsp),
 	);
 
-	my $block := close::Compiler::Scopes::current();
-	close::Compiler::Scopes::add_using_namespace($block, $past);
+	my $block := Slam::Scopes::current();
+	Slam::Scopes::add_using_namespace($block, $past);
 	
 	NOTE("Added namespace ", $using_nsp<display_name>, " to using list of block: ", $block.name());
 	DUMP($past);

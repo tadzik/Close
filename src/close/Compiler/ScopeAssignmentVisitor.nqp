@@ -6,7 +6,7 @@ Sets identifier scopes in PAST.
 
 =cut
 
-class close::Compiler::ScopeAssignmentVisitor;
+class Slam::ScopeAssignmentVisitor;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -33,17 +33,17 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
-	close::Compiler::Messages::add_error($node,
+	Slam::Messages::add_error($node,
 		Array::join('', @msg));
 }
 
 sub ADD_WARNING($node, *@msg) {
-	close::Compiler::Messages::add_warning($node,
+	Slam::Messages::add_warning($node,
 		Array::join('', @msg));
 }
 
 sub NODE_TYPE($node) {
-	return close::Compiler::Node::type($node);
+	return Slam::Node::type($node);
 }
 
 ################################################################
@@ -129,7 +129,7 @@ method _assign_scope_declarator_name($node) {
 	unless $node.scope() {
 		my $scope;
 		
-		for close::Compiler::Scopes::get_stack() {
+		for Slam::Scopes::get_stack() {
 			unless $scope {
 				$scope := $_.symbol_defaults()<scope>;
 			}
@@ -168,7 +168,7 @@ method _assign_scope_qualified_identifier($node) {
 			NOTE("ERROR: Qualified identifier with not declarator. Assigning package scope.");
 			
 			# No declarator -> error. Should already be tagged as an error.
-			my @messages := close::Compiler::Messages::get_messages($node);
+			my @messages := Slam::Messages::get_messages($node);
 			
 			ASSERT(+@messages > 0,
 				'A qid with no <declarator> should have an error message attached.');
@@ -198,15 +198,15 @@ sub assign_scopes($past) {
 	NOTE("Assigning scopes in PAST tree");
 	DUMP($past);
 
-	if close::Compiler::Config::query('Compiler', name(0), 'disabled') {
+	if Slam::Config::query('Compiler', name(0), 'disabled') {
 		NOTE("Configured off - skipping");
 	}
 	else {
-		$SUPER := close::Compiler::Visitor.new();
+		$SUPER := Slam::Visitor.new();
 		NOTE("Created SUPER-visitor");
 		DUMP($SUPER);
 		
-		my $visitor	:= close::Compiler::ScopeAssignmentVisitor.new();
+		my $visitor	:= Slam::ScopeAssignmentVisitor.new();
 		NOTE("Created visitor");
 		DUMP($visitor);
 		

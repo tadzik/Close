@@ -1,6 +1,6 @@
 # $Id$
 
-class close::Compiler::Visitor;
+class Slam::Visitor;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -27,17 +27,17 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
-	close::Compiler::Messages::add_error($node,
+	Slam::Messages::add_error($node,
 		Array::join('', @msg));
 }
 
 sub ADD_WARNING($node, *@msg) {
-	close::Compiler::Messages::add_warning($node,
+	Slam::Messages::add_warning($node,
 		Array::join('', @msg));
 }
 
 sub NODE_TYPE($node) {
-	return close::Compiler::Node::type($node);
+	return Slam::Node::type($node);
 }
 
 ################################################################
@@ -229,7 +229,7 @@ method visit_child_syms($visitor, $node) {
 	
 	if $node &&  $node<child_sym> {
 		for $node<child_sym> {
-			my @children := close::Compiler::Scopes::get_symbols($node, $_);
+			my @children := Slam::Scopes::get_symbols($node, $_);
 			
 			for @children {
 				Array::append(@results, $visitor.visit($_));
@@ -245,7 +245,7 @@ method visit_child_syms($visitor, $node) {
 method visit_node_generic_noresults($visitor, $node, @child_attrs) {
 	if $node.isa(PAST::Block) {
 		NOTE("Pushing this block onto the scope stack");
-		close::Compiler::Scopes::push($node);
+		Slam::Scopes::push($node);
 		self.visit_child_syms($visitor, $node);
 	}
 
@@ -258,7 +258,7 @@ method visit_node_generic_noresults($visitor, $node, @child_attrs) {
 	self.visit_children($visitor, $node);
 	
 	if $node.isa(PAST::Block) {
-		close::Compiler::Scopes::pop(NODE_TYPE($node));
+		Slam::Scopes::pop(NODE_TYPE($node));
 	}
 	
 	return @Results_placeholder;
@@ -269,7 +269,7 @@ method visit_node_generic_results($visitor, $node, @child_attrs) {
 	
 	if $node.isa(PAST::Block) {
 		NOTE("Pushing this block onto the scope stack");
-		close::Compiler::Scopes::push($node);
+		Slam::Scopes::push($node);
 		Array::append(@results, self.visit_child_syms($visitor, $node));
 	}
 
@@ -286,7 +286,7 @@ method visit_node_generic_results($visitor, $node, @child_attrs) {
 	Array::append(@results, self.visit_children($visitor, $node));
 	
 	if $node.isa(PAST::Block) {
-		close::Compiler::Scopes::pop(NODE_TYPE($node));
+		Slam::Scopes::pop(NODE_TYPE($node));
 	}
 	
 	return @results;

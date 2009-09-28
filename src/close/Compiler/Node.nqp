@@ -1,6 +1,6 @@
 # $Id$
 
-class close::Compiler::Node;
+module Slam::Node;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -27,7 +27,27 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub NODE_TYPE($node) {
-	return close::Compiler::Node::type($node);
+	return Slam::Node::type($node);
+}
+
+################################################################
+
+=sub _onload
+
+This code runs at initload, and explicitly creates this class as a subclass of
+Node.
+
+=cut
+
+_onload();
+
+sub _onload() {
+	my $meta := Q:PIR {
+		%r = new 'P6metaclass'
+	};
+
+	my $base := $meta.new_class('Slam::Node', :parent('PAST::Node'));
+	my $base := $meta.new_class('Slam::Block', :parent('PAST::Block'));
 }
 
 ################################################################
@@ -172,11 +192,11 @@ sub _create_function_definition($node, %attributes) {
 	Hash::merge_keys(%attributes, $from, :keys(@copy_attrs), :use_last(1));
 	
 	unless Scalar::defined(%attributes<hll>) {
-		%attributes<hll> := close::Compiler::Scopes::fetch_current_hll();
+		%attributes<hll> := Slam::Scopes::fetch_current_hll();
 	}
 	
 	unless Scalar::defined(%attributes<namespace>) {
-		my $nsp := close::Compiler::Scopes::fetch_current_namespace();
+		my $nsp := Slam::Scopes::fetch_current_namespace();
 		%attributes<namespace> := Array::clone($nsp.namespace());
 	}
 	
@@ -211,13 +231,13 @@ sub _create_initload_sub($node, %attributes) {
 	my $for_namespace := %attributes<for>;
 	Hash::delete(%attributes, 'for');
 
-	close::Compiler::Scopes::push($for_namespace);
+	Slam::Scopes::push($for_namespace);
 	
 	my $nsp_init := "void _nsp_init() :init :load { }";
-	close::Compiler::IncludeFile::parse_internal_string($nsp_init,
+	Slam::IncludeFile::parse_internal_string($nsp_init,
 		'namespace init function');
 		
-	close::Compiler::Scopes::pop(NODE_TYPE($for_namespace));
+	Slam::Scopes::pop(NODE_TYPE($for_namespace));
 }
 
 sub _create_label_name($node, %attributes) {
@@ -258,14 +278,14 @@ sub _create_namespace_path($node, %attributes) {
 	
 	unless %attributes<is_rooted> {
 		%attributes<is_rooted>	:= 1;
-		my $outer_nsp := close::Compiler::Scopes::fetch_current_namespace();
+		my $outer_nsp := Slam::Scopes::fetch_current_namespace();
 		my @namespace := Array::clone($outer_nsp.namespace());
 		@parts := Array::append(@namespace, @parts);
 		NOTE("Expanded path to [ ", Array::join(' ; ', @parts), " ]");
 	}
 	
 	unless %attributes<hll> {
-		%attributes<hll> := close::Compiler::Scopes::fetch_current_hll();
+		%attributes<hll> := Slam::Scopes::fetch_current_hll();
 	}
 	
 	%attributes<namespace>	:= @parts;
@@ -283,7 +303,7 @@ sub _create_parameter_declaration($node, %attributes) {
 
 sub _create_translation_unit($node, %attributes) {
 	%attributes<blocktype> := 'immediate';
-	%attributes<hll> := close::Compiler::Scopes::fetch_current_hll();
+	%attributes<hll> := Slam::Scopes::fetch_current_hll();
 }
 
 ################################################################
@@ -561,7 +581,7 @@ sub set_attributes($node, %attributes) {
 	}
 
 	if $node<source> {
-		$node<file>	:= close::Compiler::IncludeFile::current();
+		$node<file>	:= Slam::IncludeFile::current();
 		$node<line>	:= String::line_number_of($node<source>, :offset($node<pos>));
 		$node<char>	:= String::character_offset_of($node<source>, :line($node<line>), :offset($node<pos>));
 	}

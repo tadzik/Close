@@ -1,6 +1,6 @@
 # $Id$
 
-class close::Compiler::SymbolResolutionVisitor;
+class Slam::SymbolResolutionVisitor;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -27,17 +27,17 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
-	close::Compiler::Messages::add_error($node,
+	Slam::Messages::add_error($node,
 		Array::join('', @msg));
 }
 
 sub ADD_WARNING($node, *@msg) {
-	close::Compiler::Messages::add_warning($node,
+	Slam::Messages::add_warning($node,
 		Array::join('', @msg));
 }
 
 sub NODE_TYPE($node) {
-	return close::Compiler::Node::type($node);
+	return Slam::Node::type($node);
 }
 
 ################################################################
@@ -120,7 +120,7 @@ method _resolve_symbols_qualified_identifier($node) {
 	NOTE("Visiting qualified_identifier node: ", $node<display_name>);
 	DUMP($node);
 	
-	my @cands := close::Compiler::Lookups::query_scopes_containing_symbol($node);
+	my @cands := Slam::Lookups::query_scopes_containing_symbol($node);
 	NOTE("Found ", +@cands, " candidates for symbol resolution");
 	DUMP(@cands);
 		
@@ -137,17 +137,17 @@ method _resolve_symbols_qualified_identifier($node) {
 		ADD_ERROR($node, "Undeclared symbol: ", $node<display_name>);
 	}
 	elsif +@cands == 1 {
-		$resolved := close::Compiler::Scopes::get_symbols(@cands[0], $node.name())[0];
+		$resolved := Slam::Scopes::get_symbols(@cands[0], $node.name())[0];
 		NOTE("Found one candidate: ", $resolved<display_name>);
 		DUMP($resolved);
 	}
 	elsif +@cands > 1 {
 		if !$node<is_rooted> && !$node.namespace() {
-			my $local_scope := close::Compiler::Scopes::current();
+			my $local_scope := Slam::Scopes::current();
 			for @cands {
 				if $_ =:= $local_scope {
 		# FIXME: This [0] is wrong. I should do something to disambiguate based on type, maybe.
-					$resolved := close::Compiler::Scopes::get_symbols($_, $node.name())[0];
+					$resolved := Slam::Scopes::get_symbols($_, $node.name())[0];
 				}
 			}
 		}
@@ -174,7 +174,7 @@ method _resolve_symbols_qualified_identifier($node) {
 		# FIXME: Is this premature? Yes! The symbols aren't resolved yet.
 		$node<hll> := $resolved<hll>;
 		$node.namespace($resolved.namespace());
-		close::Compiler::Node::set_name($node, $resolved.name());
+		Slam::Node::set_name($node, $resolved.name());
 	}
 	
 	my @results := Array::new($node);
@@ -197,15 +197,15 @@ sub resolve_symbols($past) {
 	NOTE("Resolving symbols in PAST tree");
 	DUMP($past);
 
-	if close::Compiler::Config::query('Compiler', name(0), 'disabled') {
+	if Slam::Config::query('Compiler', name(0), 'disabled') {
 		NOTE("Configured off - skipping");
 	}
 	else {
-		$SUPER := close::Compiler::Visitor.new();
+		$SUPER := Slam::Visitor.new();
 		NOTE("Created SUPER-visitor");
 		DUMP($SUPER);
 		
-		my $visitor := close::Compiler::SymbolResolutionVisitor.new();
+		my $visitor := Slam::SymbolResolutionVisitor.new();
 		NOTE("Created visitor");
 		DUMP($visitor);
 

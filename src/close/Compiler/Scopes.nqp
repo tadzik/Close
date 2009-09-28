@@ -1,6 +1,6 @@
 # $Id$
 
-class close::Compiler::Scopes;
+class Slam::Scopes;
 
 sub ASSERT($condition, *@message) {
 	Dumper::ASSERT(Dumper::info(), $condition, @message);
@@ -27,17 +27,17 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
-	close::Compiler::Messages::add_error($node,
+	Slam::Messages::add_error($node,
 		Array::join('', @msg));
 }
 
 sub ADD_WARNING($node, *@msg) {
-	close::Compiler::Messages::add_warning($node,
+	Slam::Messages::add_warning($node,
 		Array::join('', @msg));
 }
 
 sub NODE_TYPE($node) {
-	return close::Compiler::Node::type($node);
+	return Slam::Node::type($node);
 }
 
 ################################################################
@@ -57,9 +57,9 @@ sub add_declarator_to($past, $scope) {
 	my $severity;
 	
 	for @already {
-		if !$duplicate && close::Compiler::Type::same_type($past<type>, $_<type>) {
+		if !$duplicate && Slam::Type::same_type($past<type>, $_<type>) {
 			$duplicate := $_;
-			$severity := close::Compiler::Type::update_redefined_symbol(
+			$severity := Slam::Type::update_redefined_symbol(
 				:original($_), :redefinition($duplicate));
 		}
 	}
@@ -83,8 +83,8 @@ sub add_declarator($past) {
 	NOTE("Adding declarator: ", $past.name());
 	DUMP($past);
 	
-	my $decl_nsp := close::Compiler::Namespaces::fetch_namespace_of($past);
-	my $current_nsp := close::Compiler::Scopes::fetch_current_namespace();
+	my $decl_nsp := Slam::Namespaces::fetch_namespace_of($past);
+	my $current_nsp := Slam::Scopes::fetch_current_namespace();
 	
 	# If we're declaring it locally, it goes into the current lexical 
 	# block. If non-local, it goes into the namespace block.
@@ -92,7 +92,7 @@ sub add_declarator($past) {
 	# (This is probably wrong - there should be a better way to know what goes where than by namespace.)
 	if $decl_nsp =:= $current_nsp {
 		NOTE("Using current scope");
-		$decl_nsp := close::Compiler::Scopes::current();
+		$decl_nsp := Slam::Scopes::current();
 	}
 	
 	add_declarator_to($past, $decl_nsp);
@@ -243,7 +243,7 @@ sub get_stack() {
 		@scope_stack := Array::empty();
 		NOTE("Stack exists. Now pushing pervasive scope.");
 		@scope_stack.push(
-			close::Compiler::Type::pervasive_scope()
+			Slam::Type::pervasive_scope()
 		);
 	}
 
@@ -264,7 +264,7 @@ sub get_symbols($scope, $name) {
 
 sub pop($type) {
 	my $old := get_stack().shift();
-	my $old_type := close::Compiler::Node::type($old);
+	my $old_type := Slam::Node::type($old);
 	
 	unless $type eq $old_type {
 		DIE("Scope stack mismatch. Popped '"
@@ -281,7 +281,7 @@ sub print_symbol_table($block) {
 	
 	for $block<child_sym> {
 		for get_symbols($block, $_) {
-			close::Compiler::Symbols::print_symbol($_) ;
+			Slam::Symbols::print_symbol($_) ;
 		}
 		
 		DUMP($block);
