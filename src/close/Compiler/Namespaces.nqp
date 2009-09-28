@@ -37,7 +37,7 @@ sub ADD_WARNING($node, *@msg) {
 }
 
 sub NODE_TYPE($node) {
-	return Slam::Node::type($node);
+	return $node.node_type;
 }
 
 ################################################################
@@ -178,7 +178,7 @@ sub query(@target) {
 }
 
 sub query_namespace_of($past_var) {
-	ASSERT($past_var.isa(PAST::Var), '$past_var parameter must be a PAST::Var node');
+	ASSERT($past_var.isa(Slam::Var), '$past_var parameter must be a Slam::Var node');
 	NOTE("Fetching namespace path: ", format_path_of($past_var));
 	
 	my @path := path_of($past_var);
@@ -227,7 +227,7 @@ Returns undef if not such namespace path exists.
 
 sub query_relative_namespace_of($namespace, $past_var) {
 	DUMP(:namespace($namespace), :past_var($past_var));
-	ASSERT($past_var.isa(PAST::Var), '$past_var parameter must be a PAST::Var node');
+	ASSERT($past_var.isa(Slam::Var), '$past_var parameter must be a Slam::Var node');
 	
 	my $result;
 	

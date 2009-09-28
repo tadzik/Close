@@ -37,7 +37,7 @@ sub ADD_WARNING($node, *@msg) {
 }
 
 sub NODE_TYPE($node) {
-	return Slam::Node::type($node);
+	return $node.node_type;
 }
 
 ################################################################
@@ -173,8 +173,8 @@ method _resolve_symbols_qualified_identifier($node) {
 		
 		# FIXME: Is this premature? Yes! The symbols aren't resolved yet.
 		$node<hll> := $resolved<hll>;
-		$node.namespace($resolved.namespace());
-		Slam::Node::set_name($node, $resolved.name());
+		$node.namespace($resolved.namespace);
+		$node.name($resolved.name);
 	}
 	
 	my @results := Array::new($node);

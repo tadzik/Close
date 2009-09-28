@@ -7,7 +7,7 @@ should be the last step before POSTing.
 
 Marshalls the PAST tree into a sequence of function declarations (subs) and 
 object (variable) definitions. Result is an array (mixed) of both, which is 
-encapsulated in a PAST::Stmts container. The C<cleanup_past> function returns
+encapsulated in a Slam::Stmts container. The C<cleanup_past> function returns
 the Stmts container. The individual C<_cleanup_past_XXX> methods return
 an array of bits to be encapsulated. If a node does not directly represent such
 a bit, it should pass back the result array of its children, otherwise append 
@@ -52,7 +52,7 @@ sub ADD_WARNING($node, *@msg) {
 }
 
 sub NODE_TYPE($node) {
-	return Slam::Node::type($node);
+	return $node.node_type;
 }
 
 ################################################################
@@ -178,7 +178,7 @@ method _cleanup_past_UNKNOWN($node) {
 		"'. Passing through to children.");
 	DUMP($node);
 
-	if $node.isa(PAST::Block) {
+	if $node.isa(Slam::Block) {
 		# Should I keep a list of push-able block types?
 		NOTE("Pushing this block onto the scope stack");
 		Slam::Scopes::push($node);
@@ -197,7 +197,7 @@ method _cleanup_past_UNKNOWN($node) {
 	NOTE("Visiting children");
 	self.visit_children($node);
 	
-	if $node.isa(PAST::Block) {
+	if $node.isa(Slam::Block) {
 		NOTE("Popping this block off the scope stack");
 		Slam::Scopes::pop(NODE_TYPE($node));
 	}

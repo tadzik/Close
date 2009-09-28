@@ -1,6 +1,30 @@
 # $Id$
 
 module Slam::Symbol::Declaration {
+
+=sub _onload
+
+This code runs at initload, and explicitly creates this class as a subclass of
+Node.
+
+=cut
+
+	_onload();
+
+	sub _onload() {
+		my $meta := Q:PIR {
+			%r = new 'P6metaclass'
+		};
+
+		my $base := $meta.new_class('Slam::Symbol', 
+			:parent('PCT::Node'),
+		);
+		$meta.new_class('Slam::Symbol::Declaration', :parent($base));
+		$meta.new_class('Slam::Symbol::Reference', :parent($base));
+	}
+
+	################################################################
+
 	sub ASSERT($condition, *@message) {
 		Dumper::ASSERT(Dumper::info(), $condition, @message);
 	}
@@ -25,44 +49,28 @@ module Slam::Symbol::Declaration {
 
 	################################################################
 
-	sub ADD_ERROR($node, *@msg) {
-		Slam::Messages::add_error($node,
-			Array::join('', @msg));
+	method pir_name(*@value) {
+		unless my $pir_name := self.ATTR('pir_name', @value) {
+			$pir_name := self.pir_name(self.name);
+		}
+		
+		return $pir_name;
 	}
 
-	sub ADD_WARNING($node, *@msg) {
-		Slam::Messages::add_warning($node,
-			Array::join('', @msg));
+	method is_implicit(*@value) { self.ATTR('pir_name', @value); }
+	method is_duplicate(*@value) { self.ATTR('pir_name', @value); }
+	
+	method type(*@value) {
+		self.ATTR('pir_name', @value); 
 	}
-
-	sub NODE_TYPE($node) {
-		return Slam::Node::type($node);
-	}
-
-	################################################################
-
-=sub _onload
-
-This code runs at initload, and explicitly creates this class as a subclass of
-Node.
-
-=cut
-
-	_onload();
-
-	sub _onload() {
-		my $meta := Q:PIR {
-			%r = new 'P6metaclass'
-		};
-
-		my $base := $meta.new_class('Slam::Symbol', 
-			:parent('PCT::Node'),
-		);
-		$meta.new_class('Slam::Symbol::Declaration', :parent($base));
-		$meta.new_class('Slam::Symbol::Reference', :parent($base));
-	}
-
-	################################################################
+	
+	method last_type(*@value) { self.ATTR('pir_name', @value); }
+	
+	# args is moved to .type().args(), I guess
+	#level - scope backlink for some reasons
+	
+	method initializer(*@value) { self.ATTR('pir_name', @value); }
+	method definition(*@value) { self.ATTR('pir_name', @value); }
 
 	sub declarator_name(%attributes) {
 		my @parts := %attributes<parts>;
@@ -183,4 +191,7 @@ Node.
 				Slam::Type::type_to_string($sym<type>));
 		}
 	}
+}
+
+module Slam::Symbol::Reference {
 }

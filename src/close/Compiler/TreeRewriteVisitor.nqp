@@ -7,7 +7,7 @@ should be the last step before POSTing.
 
 Marshalls the PAST tree into a sequence of function declarations (subs) and 
 object (variable) definitions. Result is an array (mixed) of both, which is 
-encapsulated in a PAST::Stmts container. The C<rewrite_tree> function returns
+encapsulated in a Slam::Stmts container. The C<rewrite_tree> function returns
 the Stmts container. The individual C<_rewrite_tree_XXX> methods return
 an array of bits to be encapsulated. If a node does not directly represent such
 a bit, it should pass back the result array of its children, otherwise append 
@@ -52,7 +52,7 @@ sub ADD_WARNING($node, *@msg) {
 }
 
 sub NODE_TYPE($node) {
-	return Slam::Node::type($node);
+	return $node.node_type;
 }
 
 ################################################################

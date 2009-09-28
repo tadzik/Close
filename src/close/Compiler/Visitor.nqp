@@ -37,7 +37,7 @@ sub ADD_WARNING($node, *@msg) {
 }
 
 sub NODE_TYPE($node) {
-	return Slam::Node::type($node);
+	return $node.node_type;
 }
 
 ################################################################
@@ -243,7 +243,7 @@ method visit_child_syms($visitor, $node) {
 }
 
 method visit_node_generic_noresults($visitor, $node, @child_attrs) {
-	if $node.isa(PAST::Block) {
+	if $node.isa(Slam::Block) {
 		NOTE("Pushing this block onto the scope stack");
 		Slam::Scopes::push($node);
 		self.visit_child_syms($visitor, $node);
@@ -257,7 +257,7 @@ method visit_node_generic_noresults($visitor, $node, @child_attrs) {
 	
 	self.visit_children($visitor, $node);
 	
-	if $node.isa(PAST::Block) {
+	if $node.isa(Slam::Block) {
 		Slam::Scopes::pop(NODE_TYPE($node));
 	}
 	
@@ -267,7 +267,7 @@ method visit_node_generic_noresults($visitor, $node, @child_attrs) {
 method visit_node_generic_results($visitor, $node, @child_attrs) {
 	my @results := Array::empty();
 	
-	if $node.isa(PAST::Block) {
+	if $node.isa(Slam::Block) {
 		NOTE("Pushing this block onto the scope stack");
 		Slam::Scopes::push($node);
 		Array::append(@results, self.visit_child_syms($visitor, $node));
@@ -285,7 +285,7 @@ method visit_node_generic_results($visitor, $node, @child_attrs) {
 	
 	Array::append(@results, self.visit_children($visitor, $node));
 	
-	if $node.isa(PAST::Block) {
+	if $node.isa(Slam::Block) {
 		Slam::Scopes::pop(NODE_TYPE($node));
 	}
 	

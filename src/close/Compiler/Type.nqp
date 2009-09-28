@@ -1,46 +1,6 @@
 # $Id$
 
-module Slam::Type;
-
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
-}
-
-sub BACKTRACE() {
-	Q:PIR {{
-		backtrace
-	}};
-}
-
-sub DIE(*@msg) {
-	Dumper::DIE(Dumper::info(), @msg);
-}
-
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
-}
-
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
-}
-
-################################################################
-
-sub ADD_ERROR($node, *@msg) {
-	Slam::Messages::add_error($node,
-		Array::join('', @msg));
-}
-
-sub ADD_WARNING($node, *@msg) {
-	Slam::Messages::add_warning($node,
-		Array::join('', @msg));
-}
-
-sub NODE_TYPE($node) {
-	return Slam::Node::type($node);
-}
-
-################################################################
+module Slam::Type {
 
 =sub _onload
 
@@ -49,98 +9,98 @@ Node.
 
 =cut
 
-_onload();
+	_onload();
 
-sub _onload() {
-	my $meta := Q:PIR {
-		%r = new 'P6metaclass'
-	};
-
-	my $base := $meta.new_class('Slam::Type', 
-		:parent('PCT::Node'),
-	);
-	$meta.new_class('Slam::Type::Specifier', :parent($base));
-	$meta.new_class('Slam::Type::Declarator', :parent($base));
-}
-
-################################################################
-
-method init(*@children, *%attributes) {
-	NOTE("Creating specifier node");
-	
-	self<id>	:= Slam::Node::make_id(%attributes<node_type>);
-	
-	Slam::Node::set_attributes(self, %attributes);
-	
-	my %empty;
-	%attributes := %empty;
-
-	Q:PIR {
-		.local pmc children, attributes
-		children = find_lex '@children'
-		attributes = find_lex '%attributes'
-		$P0 = get_hll_global [ 'PCT' ; 'Node' ], 'init'
-		self.$P0(children :flat, attributes :named :flat)
-	};
-
-	return self;
-}
-
-method is_pointer_type() {
-	return 0;
-}
-
-our @Type_attributes := (
-	'is_builtin',
-	'is_typedef',
-	'is_class',
-	'is_struct',
-	'is_union',
-	'is_enum'
-);
-
-sub is_type($object) {
-	NOTE("Checking if ", NODE_TYPE($object), " '", $object<display_name>, "' is a type");
-	DUMP($object);
-	ASSERT($object.isa(PAST::Var), 'Object must be a PAST::Var');
+	sub _onload() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
 		
-	my $result := 0;
-	
-	for @Type_attributes {
-		NOTE("Checking type-attribute: ", $_, " (", $object{$_}, ")");
-		$result := $result || $object<type>{$_};
+		say("Slam::Node::_onload");
+		
+		my $base := Slam::Node::SUBCLASS('Slam::Type');
+		
+		Slam::Node::SUBCLASS('Slam::Type::Specifier',
+			'Slam::Type');
+		Slam::Node::SUBCLASS('Slam::Type::Declarator', 
+			'Slam::Type');
+		Slam::Node::SUBCLASS('Slam::Type::AccessQualifier', 
+			'Slam::Type::Specifier', 'Slam::Val');
+		Slam::Node::SUBCLASS('Slam::Type::StorageClassSpecifier', 
+			'Slam::Type::Specifier', 'Slam::Val');
+		Slam::Node::SUBCLASS('Slam::Type::TypenameSpecifier', 
+			'Slam::Type::Specifier', 'Slam::Val');
+		Slam::Node::SUBCLASS('Slam::Type::Array', 
+			'Slam::Type::Declarator', 'Slam::Val');
+		Slam::Node::SUBCLASS('Slam::Type::Hash', 
+			'Slam::Type::Declarator', 'Slam::Val');
+		Slam::Node::SUBCLASS('Slam::Type::Function', 
+			'Slam::Type::Declarator', 'Slam::Block');
+		Slam::Node::SUBCLASS('Slam::Type::Pointer', 
+			'Slam::Type::Declarator', 'Slam::Val');
 	}
-	
-	NOTE("Returning: ", $result);
-	return $result;
-}
 
+	################################################################
+
+	sub ASSERT($condition, *@message) {
+		Dumper::ASSERT(Dumper::info(), $condition, @message);
+	}
+
+	sub BACKTRACE() {
+		Q:PIR {{
+			backtrace
+		}};
+	}
+
+	sub DIE(*@msg) {
+		Dumper::DIE(Dumper::info(), @msg);
+	}
+
+	sub DUMP(*@pos, *%what) {
+		Dumper::DUMP(Dumper::info(), @pos, %what);
+	}
+
+	sub NOTE(*@parts) {
+		Dumper::NOTE(Dumper::info(), @parts);
+	}
+
+	################################################################
+
+	method is_array()			{ return 0; }
+	method is_declarator()		{ return 0; }
+	method is_function()		{ return 0; }
+	method is_hash()			{ return 0; }
+	method is_pointer()			{ return 0; }
+	method is_pointer_type()		{ return self.is_pointer || self.is_array; }
+	method is_access_qualifier()	{ return 0; }
+	method is_specifier()		{ return 0; }
+	method is_type()			{ return 1; }
+	method is_typename_specifier()	{ return 0; }
+	
+	method nominal(*@value)		{ self.ATTR('nominal', @value); }
+	
+	
+	
+	
+	
+	
 sub new_dclr_alias($alias) {
 	DUMP(:alias($alias));
 	return $alias;
 }
 
-method nominal($next) {
-	if $next {
-		self<nominal> := $next;
-	}
-	
-	return self<nominal>;
-}
-	
 sub pervasive_scope() {
 	our $scope;
 	
 	unless Scalar::defined($scope) {
 		NOTE("Creating pervasive scope block");
 		
-		$scope := PAST::Block.new(
+		$scope := Slam::Block.new(
 			:blocktype('immediate'),
 			:namespace(Scalar::undef()),
 		);
 		
 		$scope<node_type> := 'pervasive scope';
-		Slam::Node::set_name($scope, 'pervasive types');
+		$scope.name('pervasive types');
 
 		NOTE("Parsing internal types");
 		# Attach types to scope
@@ -152,7 +112,7 @@ sub pervasive_scope() {
 		
 		NOTE("Adding types to block");
 		for @($scope) {
-			ASSERT($_.isa(PAST::VarList), 
+			ASSERT($_.isa(Slam::VarList), 
 				'There should be nothing in this block but the declarations we just built');
 			my $varlist := $_;
 			for @($varlist) {
@@ -272,14 +232,6 @@ sub same_type($type1, $type2, *%options) {
 	}
 	
 	return 1;
-}
-
-method storage_class($value?) {
-	if $value {
-		self<storage_class> := $value;
-	}
-	
-	return self<storage_class>;
 }
 
 sub type_to_string($type) {
@@ -446,71 +398,31 @@ sub update_redefined_symbol(*%args) {
 		}
 	}
 }
+}
+################################################################
+
+module Slam::Type::Array {
+	method is_array() { return 1; }
+	method elements(*@value)		{ self.ATTR('elements', @value); }
+}
+
+################################################################
+
+module Slam::Type::Function {
+	method is_function() { return 1; }
+	
+	method parameters(*@value)		{ self.ATTR('parameters', @value); }
+}
+
+################################################################
+
+module Slam::Type::Hash {
+	method is_hash() { return 1; }
+}
 
 ################################################################
 
 module Slam::Type::Declarator {
-
-	sub ASSERT($condition, *@message) {
-		Dumper::ASSERT(Dumper::info(), $condition, @message);
-	}
-
-	sub BACKTRACE() {
-		Q:PIR {{
-			backtrace
-		}};
-	}
-
-	sub DIE(*@msg) {
-		Dumper::DIE(Dumper::info(), @msg);
-	}
-
-	sub DUMP(*@pos, *%what) {
-		Dumper::DUMP(Dumper::info(), @pos, %what);
-	}
-
-	sub NOTE(*@parts) {
-		Dumper::NOTE(Dumper::info(), @parts);
-	}
-
-	################################################################
-
-	sub ADD_ERROR($node, *@msg) {
-		Slam::Messages::add_error($node,
-			Array::join('', @msg));
-	}
-
-	sub ADD_WARNING($node, *@msg) {
-		Slam::Messages::add_warning($node,
-			Array::join('', @msg));
-	}
-
-	sub NODE_TYPE($node) {
-		return Slam::Node::type($node);
-	}
-
-	################################################################
-
-	method add_specifier($specifier) {
-		self<etype><type> := $specifier;
-		self<etype> := $specifier;		
-		DUMP(self);
-	}
-	
-	sub array_of($node?, *%attributes) {
-		NOTE("Creating array_of declarator");
-		
-		my $declarator := _new(%attributes,
-			:declarator_type('array_of'),
-			:is_array(1),
-			:node($node),
-			:node_type('declarator'),
-		);
-
-		NOTE("done");
-		DUMP($declarator);
-		return $declarator;
-	}
 
 	method attach(@others) {
 		my $last := self;
@@ -522,276 +434,140 @@ module Slam::Type::Declarator {
 		return $last;
 	}
 	
-	sub function_returning($node?, *%attributes) {
-		NOTE("Creating function_returning declarator");
-		
-		my $params := Slam::Node::create('decl_varlist',
-			:name('parameter list'),
-		);
+	method is_declarator() { return 1; }
 	
-		my $declarator := _new(%attributes,
-			:declarator_type('function_returning'),
-			:is_function(1),
-			:node($node),
-			:node_type('declarator'),
-			:parameters($params),
-		);
+	method storage_class() { DIE("No storage_class on declarators."); }
+}
 
-		NOTE("done");
-		DUMP($declarator);
-		return $declarator;
+################################################################
+
+module Slam::Type::Pointer {
+	method is_pointer() {
+		return 1;
 	}
-
-	sub hash_of($node?, *%attributes) {
-		NOTE("Creating hash_of declarator");
-		
-		my $declarator := _new(%attributes,
-			:declarator_type('hash_of'),
-			:is_hash(1),
-			:node($node),
-			:node_type('declarator'),
-		);
-
-		NOTE("done");
-		DUMP($declarator);
-		return $declarator;
-	}
-
+	
 	method is_pointer_type() {
-		return self<is_pointer> || self<is_array>;
+		return 1;
 	}
 	
-	sub _new(%attrs, *@children, *%attributes) {
-		NOTE("Creating new Slam::Type::Declarator");
-		if %attributes<children> {
-			Array::append(@children, %attributes<children>);
-			Hash::delete(%attributes, 'children');
-		}
-		
-		Hash::merge(%attributes, %attrs);
-		
-		my $declarator := Q:PIR {
-			.local pmc children, attributes
-			children = find_lex '@children'
-			attributes = find_lex '%attributes'
-			$P0 = get_hll_global [ 'close' ; 'Compiler' ; 'Type' ], 'Declarator'
-			%r = $P0.'new'(children :flat, attributes :named :flat)
-		};
-		
-		DUMP($declarator);
-		return $declarator;
-	}
-	
-	sub pointer_to($node?, *%attributes) {
+	sub init(*@children, *%attributes) {
 		NOTE("Creating pointer_to declarator");
-		
+		ASSERT(+@children == 0,
+			"Children are not supported by pointer declarator");
+			
 		my @qualifiers := %attributes<qualifiers>;
 		Hash::delete(%attributes, 'qualifiers');
-		
-		my $declarator := _new(%attributes,
-			# The :children hack replaces :flat.
-			:children(@qualifiers), 
-			:declarator_type('pointer_to'),
-			:is_pointer(1),
-			:node($node),
-			:node_type('declarator'),
-		);
-	
-		NOTE("done");
-		DUMP($declarator);
-		return $declarator;
+
+		return self.INIT(@qualifiers, *%attributes);
 	}
 }
 
 ################################################################
 
+module Slam::Type::AccessQualifier {
+}
+
+################################################################
+
 module Slam::Type::Specifier {
-
-	sub ASSERT($condition, *@message) {
-		Dumper::ASSERT(Dumper::info(), $condition, @message);
-	}
-
-	sub BACKTRACE() {
-		Q:PIR {{
-			backtrace
-		}};
-	}
-
-	sub DIE(*@msg) {
-		Dumper::DIE(Dumper::info(), @msg);
-	}
-
-	sub DUMP(*@pos, *%what) {
-		Dumper::DUMP(Dumper::info(), @pos, %what);
-	}
-
-	sub NOTE(*@parts) {
-		Dumper::NOTE(Dumper::info(), @parts);
-	}
-
-	################################################################
-
-	sub ADD_ERROR($node, *@msg) {
-		Slam::Messages::add_error($node,
-			Array::join('', @msg));
-	}
-
-	sub ADD_WARNING($node, *@msg) {
-		Slam::Messages::add_warning($node,
-			Array::join('', @msg));
-	}
-
-	sub NODE_TYPE($node) {
-		return Slam::Node::type($node);
-	}
-
-	################################################################
-	
-	sub _new(%attrs, *@children, *%attributes) {
-		NOTE("Creating new Slam::Type::Specifier");
-		if %attributes<children> {
-			Array::append(@children, %attributes<children>);
-			Hash::delete(%attributes, 'children');
-		}
-		
-		Hash::merge(%attributes, %attrs);
-		
-		my $declarator := Q:PIR {
-			.local pmc children, attributes
-			children = find_lex '@children'
-			attributes = find_lex '%attributes'
-			$P0 = get_hll_global [ 'close' ; 'Compiler' ; 'Type' ], 'Specifier'
-			%r = $P0.'new'(children :flat, attributes :named :flat)
-		};
-		
-		DUMP($declarator);
-		return $declarator;
-	}
-	
-	sub access_qualifier($node?, *%attributes) {
-		ASSERT(%attributes<name>, 'access_qualifiers must have a name');
-		my $name := %attributes<name>;
-		NOTE("Creating '", $name, "' access_qualifier");
-		
-		%attributes{'is_' ~ $name} := 1;
-		my $declarator := _new(%attributes,
-			:specifier_type('access_qualifier'),
-			:is_qualifier(1),
-			:node($node),
-			:node_type('type_specifier'),
-		);
-
-		NOTE("done");
-		DUMP($declarator);
-		return $declarator;
-	}
-
 	method attach(@others) {
 		for @others {
 			self.merge_with($_);
 		}
 	}
-	
-	our $Merge_specifier_flags := (
-		'is_builtin',
-		'is_const',
-		'is_inline', 
-		'is_method',
-		'is_typedef',
-		'is_volatile',
-		'noun', 
-		'storage_class', 
-	);
 
-	method merge_with($merge_from) {
-		ASSERT(NODE_TYPE($merge_from) eq 'type_specifier',
-			'Merge_from argument must be a type specifier.');
-		
-		for $Merge_specifier_flags {
-			if $merge_from{$_} {
+	method has_access_qualifier()	{ return self.const || self.volatile; }
+	method has_storage_class()	{ return self.storage_class ne ''; }
+	
+	method is_builtin(*@value)	{ self.ATTR('is_builtin', @value); }
+	method is_const(*@value)		{ self.ATTR('is_const', @value); }
+	method is_dynamic()		{ return self.storage_class eq 'dynamic'; }
+	method is_extern(*@value)		{ self.ATTR('is_extern', @value); }
+	method is_inline(*@value)		{ self.ATTR('is_inline', @value); }
+	method is_lexical()			{ return self.storage_class eq 'lexical'; }
+	method is_method(*@value)	{ self.ATTR('is_method', @value); }
+	method is_parameter()		{ return self.storage_class eq 'parameter'; }
+	method is_register()			{ return self.storage_class eq 'register'; }
+	method is_specifier()		{ return 1; }
+	method is_static()			{ return self.storage_class eq 'static'; }
+	method is_typedef(*@value)	{ self.ATTR('is_typedef', @value); }
+	method is_typename_specifier()	{ return Scalar::defined(self.typename); }
+	method is_volatile(*@value)	{ self.ATTR('is_volatile', @value); }
+	
+	method has_storage_class()	{ return self.storage_class ne ''; }
+
+	method merge_with($from) {
+		ASSERT($from.isa(Slam::Type::Specifier),
+			'Merge from argument must be a type specifier.');
+			
+		for ('builtin', 'const', 'inline', 'method', 'typedef', 'volatile') {
+			if $from{$_} {
 				if self{$_} {
-					NOTE("Adding redundant-specifier warning.");
-					ADD_WARNING(self, 
-						"Redundant storage class specifier '", 
-						$merge_from.name(),
-						"'");
+					self.warning(:node($from),
+						:message("Redundant keyword '", $_, "'"),
+					);
 				}
 				else {
-					NOTE("Setting ", $_, " to ", $merge_from{$_});
-					self{$_} := $merge_from{$_};
+					self{$_} := $from{$_};
 				}
 			}
 		}
 
-		my $new_sc := $merge_from<storage_class>;
-		if $new_sc {
-			my $old_sc := self<storage_class>;
-			if $old_sc {
-				if $old_sc eq $new_sc {
-					NOTE("Adding redundant-storage class warning.");
-					ADD_WARNING(self, 
-					"Redundant storage class specifier '",
-					$merge_from.name(),
-					"'");
-				}
-				elsif $old_sc eq 'extern' && $new_sc eq 'lexical' {
-					NOTE("extern+lexical is okay");
-					self<storage_class> := $merge_from<storage_class>;
-				}
-				elsif $old_sc eq 'lexical' && $new_sc eq 'extern' {
-					NOTE("lexical+extern is okay, but don't overwrite lexical");
-				}
-				else {
-					NOTE("Adding conflicting storage class error.");
-					ADD_ERROR(self,
-						"Conflicting storage class specifiers '",
-						$old_sc, "' and '", $new_sc, "'");
-				}
+		my $new_sc	:= $from.storage_class;
+		my $old_sc	:= self.storage_class;
+		
+		if $new_sc && $old_sc {
+			if $old_sc eq $new_sc {
+				NOTE("Adding redundant-storage class warning.");
+				self.warning(:node($from),
+					:message("Redundant storage class specifier '",
+						$new_sc, "'"),
+				);
+			}
+			elsif $old_sc eq 'extern' && $new_sc eq 'lexical' {
+				NOTE("extern+lexical is okay");
+				self.storage_class($new_sc)
+			}
+			elsif $old_sc eq 'lexical' && $new_sc eq 'extern' {
+				NOTE("lexical+extern is okay, but don't overwrite lexical");
+				self.is_extern(1);
 			}
 			else {
-				self<storage_class> := $merge_from<storage_class>;
+				NOTE("Adding conflicting storage class error.");
+				self.error(:node($from),
+					:message("Conflicting storage class specifiers '",
+						$old_sc, "' and '", $new_sc, "'"));
 			}
 		}
+		elsif $old_sc {
+			self.storage_class($from.storage_class);
+		}
 	
-		if $merge_from<noun> {
-			if self<noun> {
-				NOTE("Adding conflicting type error.");
-				ADD_ERROR(self,
-					"Only one type name is allowed ",
-					"(consider removing '",
-					$merge_from<noun>.name(),
-					"')");
+		if $from.typename {
+			if self.typename {
+				self.error(:node($from),
+					:message("Only one type name is allowed. ",
+						"Consider removing ", 
+						$from.typename.displayname,
+					),
+				);
+			}
+			else {
+				self.typename($from.typename);
 			}
 		}
 		
 		DUMP(self);
 	}
-
-	sub storage_class($node?, *%attributes) {
-		ASSERT(%attributes<name>, 'storage_class specifiers must have a name');
-		my $name := %attributes<name>;
-		NOTE("Creating storage_class specifier for '", $name, "'");
-		
-		%attributes{'is_' ~ $name} := 1;
-		my $declarator := _new(%attributes,
-			:specifier_type('storage_class'),
-			:storage_class($name),
-			:is_storage_class(1),
-			:node($node),
-			:node_type('type_specifier'),
-		);
-
-		NOTE("done");
-		DUMP($declarator);
-		return $declarator;
-	}
+	
+	method noun(*@value)		{ self.ATTR('noun', @value); }
 
 	method scope() {
-		ASSERT(self<storage_class>, 
+		ASSERT(self.has_storage_class,
 			'.scope() only works on storage_class specifiers');
-		our %scopes;
-		
-		unless %scopes {
+		unless our %scopes {
+			NOTE("Initializing storage_class -> scope mapping");
+			
 			%scopes := Hash::new(
 				:dynamic(	'lexical'),
 				:extern(	'package'),
@@ -803,24 +579,24 @@ module Slam::Type::Specifier {
 			);
 		}
 		
-		return %scopes{self<storage_class>};
+		return %scopes{self.storage_class};
 	}
-
-	sub type_specifier($node?, *%attributes) {
-		ASSERT(%attributes<noun>, 'type_specifiers must have a noun');
-		my $noun := %attributes<noun>;
-		NOTE("Creating type_specifier for '", $noun.name(), "'");
-
-		my $declarator := _new(%attributes,
-			:specifier_type('type_specifier'),
-			:is_type_specifier(1),
-			:node($node),
-			:node_type('type_specifier'),
-			:noun($noun),
-		);
-
-		NOTE("done");
-		DUMP($declarator);
-		return $declarator;
+	
+	method storage_class(*@value)	{
+		if +@value {
+			if @value[0] eq 'extern' {
+				self.is_extern(1);
+			}
+		}
+		
+		return self.ATTR('storage_class', @value); 
 	}
+	
+	method typename(*@value)	{ self.ATTR('typename', @value); }
 }
+
+################################################################
+
+module Slam::Type::TypenameSpecifier {
+}
+

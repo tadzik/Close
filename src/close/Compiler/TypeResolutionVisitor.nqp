@@ -37,7 +37,7 @@ sub ADD_WARNING($node, *@msg) {
 }
 
 sub NODE_TYPE($node) {
-	return Slam::Node::type($node);
+	return $node.node_type;
 }
 
 ################################################################
@@ -120,7 +120,7 @@ method _type_resolve_UNKNOWN($node) {
 		"'. Passing through to children.");
 	DUMP($node);
 
-	if $node.isa(PAST::Block) {
+	if $node.isa(Slam::Block) {
 		# Should I keep a list of push-able block types?
 		NOTE("Pushing this block onto the scope stack");
 		Slam::Scopes::push($node);
@@ -139,7 +139,7 @@ method _type_resolve_UNKNOWN($node) {
 	NOTE("Visiting children");
 	self.visit_children($node);
 	
-	if $node.isa(PAST::Block) {
+	if $node.isa(Slam::Block) {
 		NOTE("Popping this block off the scope stack");
 		Slam::Scopes::pop(NODE_TYPE($node));
 	}

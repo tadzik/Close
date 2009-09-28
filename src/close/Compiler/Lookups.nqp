@@ -27,7 +27,7 @@ sub NOTE(*@parts) {
 ################################################################
 
 sub NODE_TYPE($node) {
-	Slam::Node::type($node);
+	$node.node_type;
 }
 
 ################################################################
@@ -61,7 +61,7 @@ sub get_search_list_of($qualified_identifier) {
 	return @search_list;
 }
 
-=sub PAST::Node[] lookup_qualified_identifier($ident)
+=sub Slam::Node[] lookup_qualified_identifier($ident)
 
 Given a qualified identifier -- a name that may or may not be prefixed with type
 or namespace names -- looks up the possible matches for the identifier using the
@@ -93,7 +93,7 @@ sub query_relative_scopes_matching_path($root, @path) {
 			my $scope := @candidate_q.shift();
 			NOTE("Looking at", $scope.name());
 			
-			if $scope.isa(PAST::Block) {
+			if $scope.isa(Slam::Block) {
 				my $cand := Slam::Scopes::get_namespace($scope, $id_part);
 				
 				if $cand {
@@ -219,7 +219,7 @@ sub query_symbols_matching($qualified_identifier) {
 }
 
 sub query_matching_types($node) {
-	ASSERT($node.isa(PAST::Var) && NODE_TYPE($node) eq 'qualified_identifier',
+	ASSERT($node.isa(Slam::Var) && NODE_TYPE($node) eq 'qualified_identifier',
 		'Type names must be qualified identifiers');
 	NOTE("Looking up type name: ", $node<display_name>);
 	DUMP($node);

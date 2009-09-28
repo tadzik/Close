@@ -1,84 +1,103 @@
 # $Id$
 
-class Slam::Messages;
+module Slam::Message {
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
-}
+=sub _onload
 
-sub BACKTRACE() {
-	Q:PIR {{
-		backtrace
-	}};
-}
+This code runs at initload, and explicitly creates this class as a subclass of
+Node.
 
-sub DIE(*@msg) {
-	Dumper::DIE(Dumper::info(), @msg);
-}
+=cut
 
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
-}
+	# Don't run - dependency order conflict. Copied to Node.
+	_onload();
 
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
-}
+	sub _onload() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+		say("Slam::Message::_onload");
+		
+		my $meta := Q:PIR {
+			%r = new 'P6metaclass'
+		};
 
-sub add_error($past, $msg) {
-	unless $past<messages> {
-		$past<messages> := Array::empty();
+		my $base := $meta.new_class('Slam::Message', 
+			:parent('Slam::Val'),
+		);
+		$meta.new_class('Slam::Type::Error', :parent($base));
+		$meta.new_class('Slam::Type::Warning', :parent($base));
+	}
+
+	################################################################
+
+	sub ASSERT($condition, *@message) {
+		Dumper::ASSERT(Dumper::info(), $condition, @message);
+	}
+
+	sub BACKTRACE() {
+		Q:PIR {{
+			backtrace
+		}};
+	}
+
+	sub DIE(*@msg) {
+		Dumper::DIE(Dumper::info(), @msg);
+	}
+
+	sub DUMP(*@pos, *%what) {
+		Dumper::DUMP(Dumper::info(), @pos, %what);
+	}
+
+	sub NOTE(*@parts) {
+		Dumper::NOTE(Dumper::info(), @parts);
+	}
+
+	################################################################
+
+	method format() {
+		my $result := '' ~ self.file ~ ':' 
+			~ self<pos_line> ~ ':' ~ self<pos_char> ~ ', ' 
+			~ self.severity ~ ': '
+			~ self.message;
+		return $result;
+	}
+
+	method message(*@value)	{ self.ATTR('message', Array::join('', @value)); }
+
+	method node($node) {
+		ASSERT($node.isa(Slam::Node), 
+			'Messages can only attach to Slam::Nodes');
+		
+		self.position($node<source>, $node<pos>);
+		self.file($node.file);
 	}
 	
-	$past<messages>.push(new_error($msg));
-	DUMP($past);
-	return $past;
-}
-
-sub add_warning($past, $msg) {
-	unless $past<messages> {
-		$past<messages> := Array::empty();
+	method severity(*@value)	{ self.ATTR('severity', @value); }
+	
+	method position($str, $offset) {
+		self<pos_line> := String::line_number_of($str, 
+			:offset($offset));
+		self<pos_char> := String::character_offset_of($str, 
+			:line(self<pos_line>),
+			:offset($offset));
 	}
 	
-	$past<messages>.push(new_warning($msg));
-	DUMP($past);
-	return $past;
+	method init(*@children, *%attrs) {
+		self.severity('message');
+		return self.INIT(@children, %attrs);
+	}
 }
 
-sub format_node_message($node, $message) {
-	my $from_line := String::line_number_of($node<source>, :offset($node<pos>));
-	my $from_char := String::character_offset_of($node<source>, :line($from_line), :offset($node<pos>));
-
-	my $result := '' ~ Slam::Scopes::current_file()
-		~ ':' ~ $from_line
-		~ ':' ~ $from_char
-		~ ', ' ~ $message<kind>
-		~ ': ' ~ $message.value();
-	
-	NOTE($result);
-	return $result;
+module Slam::Error {
+	method init(*@children, *%attrs) {
+		self.severity('error');
+		return self.INIT(@children, %attrs);
+	}
 }
 
-sub get_messages($past) {
-	my @messages := Array::clone($past<messages>);
-	
-	return @messages;
-}
-
-sub new_error($msg) {
-	my $error := new_message('error', $msg);
-	DUMP($error);
-	return $error;
-}
-
-sub new_warning($msg) {
-	my $warning := new_message('warning', $msg);
-	DUMP($warning);
-	return $warning;
-}
-
-sub new_message($kind, $msg) {
-	my $past := PAST::Val.new(:returns('String'), :value($msg));
-	$past<kind> := $kind;
-	DUMP($past);
-	return $past;
+module Slam::Warning {
+	method init(*@children, *%attrs) {
+		self.severity('warning');
+		return self.INIT(@children, %attrs);
+	}
 }

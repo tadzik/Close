@@ -37,7 +37,7 @@ sub ADD_WARNING($node, *@msg) {
 }
 
 sub NODE_TYPE($node) {
-	return Slam::Node::type($node);
+	return $node.node_type;
 }
 
 ################################################################
@@ -291,7 +291,7 @@ sub print_symbol_table($block) {
 }
 
 sub push($scope) {
-	ASSERT($scope.isa(PAST::Block), "Can't push a non-Block onto the lexical scope stack");
+	ASSERT($scope.isa(Slam::Block), "Can't push a non-Block onto the lexical scope stack");
 
 	get_stack().unshift($scope);
 	NOTE("Open ", NODE_TYPE($scope), " block: ", $scope<display_name>,

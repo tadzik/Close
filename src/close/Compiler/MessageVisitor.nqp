@@ -43,7 +43,7 @@ sub ADD_WARNING($node, *@msg) {
 }
 
 sub NODE_TYPE($node) {
-	return Slam::Node::type($node);
+	return $node.node_type;
 }
 
 ################################################################
@@ -147,7 +147,7 @@ method _show_messages_UNKNOWN($node) {
 
 	print_messages($node);
 	
-	if $node.isa(PAST::Block) {
+	if $node.isa(Slam::Block) {
 		# Should I keep a list of push-able block types?
 		NOTE("Pushing this Block onto the scope stack");
 		Slam::Scopes::push($node);
@@ -166,7 +166,7 @@ method _show_messages_UNKNOWN($node) {
 	NOTE("Visiting child nodes");
 	self.visit_children($node);
 	
-	if $node.isa(PAST::Block) {
+	if $node.isa(Slam::Block) {
 		Slam::Scopes::pop(NODE_TYPE($node));
 	}
 	
