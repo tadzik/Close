@@ -69,29 +69,29 @@ COMPILER_LIBS_PIR := \
 	src/Registry.pir 	\
 	src/Scalar.pir 	\
 	src/String.pir		\
-	src/close/Compiler/_INIT.pir	\
-	src/close/Compiler/Adverbs.pir			\
-	src/close/Compiler/Config.pir			\
-	src/close/Compiler/DeclarationCollectionVisitor.pir	\
-	src/close/Compiler/IncludeFile.pir			\
-	src/close/Compiler/Literal.pir			\
-	src/close/Compiler/Lookups.pir			\
-	src/close/Compiler/Messages.pir			\
-	src/close/Compiler/MessageVisitor.pir		\
-	src/close/Compiler/Namespaces.pir		\
-	src/close/Compiler/Node.pir			\
-	src/close/Compiler/PastCleanupVisitor.pir	\
-	src/close/Compiler/PrettyPrintVisitor.pir		\
-	src/close/Compiler/ScopeAssignmentVisitor.pir	\
-	src/close/Compiler/Scopes.pir			\
-	src/close/Compiler/Statements.pir			\
-	src/close/Compiler/SymbolResolutionVisitor.pir	\
-	src/close/Compiler/SymbolTable.pir		\
-	src/close/Compiler/Symbols.pir			\
-	src/close/Compiler/Type.pir			\
-	src/close/Compiler/TreeRewriteVisitor.pir	\
-	src/close/Compiler/TypeResolutionVisitor.pir	\
-	src/close/Compiler/Visitor.pir
+	src/Slam/_INIT.pir	\
+	src/Slam/Adverbs.pir			\
+	src/Slam/Config.pir			\
+	src/Slam/DeclarationCollectionVisitor.pir	\
+	src/Slam/IncludeFile.pir			\
+	src/Slam/Literal.pir			\
+	src/Slam/Lookups.pir			\
+	src/Slam/Messages.pir			\
+	src/Slam/MessageVisitor.pir		\
+	src/Slam/Namespaces.pir		\
+	src/Slam/Node.pir			\
+	src/Slam/PastCleanupVisitor.pir	\
+	src/Slam/PrettyPrintVisitor.pir		\
+	src/Slam/ScopeAssignmentVisitor.pir	\
+	src/Slam/Scopes.pir			\
+	src/Slam/Statements.pir			\
+	src/Slam/SymbolResolutionVisitor.pir	\
+	src/Slam/SymbolTable.pir		\
+	src/Slam/Symbols.pir			\
+	src/Slam/Type.pir			\
+	src/Slam/TreeRewriteVisitor.pir	\
+	src/Slam/TypeResolutionVisitor.pir	\
+	src/Slam/Visitor.pir
 
 DOCS := README
 
