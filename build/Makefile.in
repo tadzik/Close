@@ -48,7 +48,7 @@ CLOSE_LIB_PBC := library/close/close_lib.pbc
 #OPS_DEPS := build/src/ops/Makefile.in $(OPS_DIR)/close.ops
 
 ACTIONS_PM := \
-	src/parser/builtin_actions.nqp
+	src/Slam/parser/builtin_actions.nqp
 
 BUILTINS_PIR := \
 	src/builtins/grammar_utils.pir \
@@ -96,13 +96,13 @@ COMPILER_LIBS_PIR := \
 DOCS := README
 
 GRAMMARS_PG := \
-	src/parser/grammar.pg \
-	src/parser/builtins.pg \
-	src/parser/declarations.pg \
-	src/parser/expressions.pg \
-	src/parser/names.pg \
-	src/parser/statements.pg \
-	src/parser/tokens.pg
+	src/Slam/parser/grammar.pg \
+	src/Slam/parser/builtins.pg \
+	src/Slam/parser/declarations.pg \
+	src/Slam/parser/expressions.pg \
+	src/Slam/parser/names.pg \
+	src/Slam/parser/statements.pg \
+	src/Slam/parser/tokens.pg
 
 LIBRARY_SRC := \
 	library/close/load.cl \
@@ -113,13 +113,13 @@ LIBRARY_SRC := \
 GEN_SOURCES :=				\
 	src/gen_grammar.pir		\
 	src/gen_actions.pir			\
-	src/parser/grammar_actions.pir	\
-	src/parser/declaration_actions.pir	\
-	src/parser/expression_actions.pir	\
-	src/parser/name_actions.pir	\
-	src/parser/parse_utils.pir		\
-	src/parser/statement_actions.pir	\
-	src/parser/token_actions.pir	\
+	src/Slam/parser/grammar_actions.pir	\
+	src/Slam/parser/declaration_actions.pir	\
+	src/Slam/parser/expression_actions.pir	\
+	src/Slam/parser/name_actions.pir	\
+	src/Slam/parser/parse_utils.pir		\
+	src/Slam/parser/statement_actions.pir	\
+	src/Slam/parser/token_actions.pir	\
 	src/gen_builtins.pir			\
 	src/gen_library.pir
 
