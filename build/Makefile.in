@@ -72,26 +72,26 @@ COMPILER_LIBS_PIR := \
 	src/Slam/_INIT.pir	\
 	src/Slam/Adverbs.pir			\
 	src/Slam/Config.pir			\
-	src/Slam/DeclarationCollectionVisitor.pir	\
+	src/Slam/Visitors/DeclarationCollectionVisitor.pir	\
 	src/Slam/IncludeFile.pir			\
 	src/Slam/Literal.pir			\
 	src/Slam/Lookups.pir			\
 	src/Slam/Messages.pir			\
-	src/Slam/MessageVisitor.pir		\
+	src/Slam/Visitors/MessageVisitor.pir		\
 	src/Slam/Namespaces.pir		\
 	src/Slam/Node.pir			\
-	src/Slam/PastCleanupVisitor.pir	\
-	src/Slam/PrettyPrintVisitor.pir		\
-	src/Slam/ScopeAssignmentVisitor.pir	\
+	src/Slam/Visitors/PastCleanupVisitor.pir	\
+	src/Slam/Visitors/PrettyPrintVisitor.pir		\
+	src/Slam/Visitors/ScopeAssignmentVisitor.pir	\
 	src/Slam/Scopes.pir			\
 	src/Slam/Statements.pir			\
-	src/Slam/SymbolResolutionVisitor.pir	\
+	src/Slam/Visitors/SymbolResolutionVisitor.pir	\
 	src/Slam/SymbolTable.pir		\
 	src/Slam/Symbols.pir			\
 	src/Slam/Type.pir			\
-	src/Slam/TreeRewriteVisitor.pir	\
-	src/Slam/TypeResolutionVisitor.pir	\
-	src/Slam/Visitor.pir
+	src/Slam/Visitors/TreeRewriteVisitor.pir	\
+	src/Slam/Visitors/TypeResolutionVisitor.pir	\
+	src/Slam/Visitors/Visitor.pir
 
 DOCS := README
 
