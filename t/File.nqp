@@ -1,8 +1,8 @@
 # $Id$
 class File;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
+sub ASSERTold($condition, *@message) {
+	Dumper::ASSERTold(Dumper::info(), $condition, @message);
 }
 
 sub BACKTRACE() {
@@ -15,14 +15,14 @@ sub DIE(*@msg) {
 	Dumper::DIE(Dumper::info(), @msg);
 }
 
-sub DUMP(*@pos, *%what) {
+sub DUMPold(*@pos, *%what) {
 	my @info := Dumper::info();
-	@info[0] and Dumper::DUMP(@info, @pos, %what);
+	@info[0] and Dumper::DUMPold(@info, @pos, %what);
 }
 
-sub NOTE(*@parts) {
+sub NOTEold(*@parts) {
 	my @info := Dumper::info();
-	@info[0] and Dumper::NOTE(@info, @parts);
+	@info[0] and Dumper::NOTEold(@info, @parts);
 }
 
 ################################################################
@@ -48,11 +48,11 @@ sub exists($path) {
 }
 
 sub find_all($path, @search_list) {
-	NOTE("Finding all paths matching '", $path, "' in ", +@search_list, " directories");
+	NOTEold("Finding all paths matching '", $path, "' in ", +@search_list, " directories");
 	my @results := Array::empty();
 	
 	if String::char_at($path, 0) eq '/' {
-		NOTE("Path is rooted - not using search paths");
+		NOTEold("Path is rooted - not using search paths");
 		@search_list := Array::new('');
 	}
 	else {
@@ -61,16 +61,16 @@ sub find_all($path, @search_list) {
 	
 	for @search_list {
 		my $name := $_ ~ $path;
-		NOTE("Trying ", $name);
+		NOTEold("Trying ", $name);
 		
 		if exists($name) {
-			NOTE("Success! it's a match");
+			NOTEold("Success! it's a match");
 			@results.push($name);
 		}
 	}
 	
-	NOTE("Found ", +@results, " results");
-	DUMP(@results);
+	NOTEold("Found ", +@results, " results");
+	DUMPold(@results);
 	return @results;
 }
 			
@@ -95,7 +95,7 @@ sub rename($from, $to) {
 }
 
 sub slurp($path) {
-	NOTE("Slurping contents of file: ", $path);
+	NOTEold("Slurping contents of file: ", $path);
 	
 	my $data := Q:PIR {
 		$P0 = new 'FileHandle'
@@ -104,7 +104,7 @@ sub slurp($path) {
 		%r = box $S0
 	};
 	
-	NOTE("done");
-	DUMP($data);
+	NOTEold("done");
+	DUMPold($data);
 	return $data;
 }

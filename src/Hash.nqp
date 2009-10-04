@@ -108,6 +108,11 @@ sub merge_keys(%first, *@hashes, :@keys!, :%into?, :$use_last?) {
 	return %into;
 }
 
-sub new(*%pairs) {
+sub new(*@pos, *%pairs) {
+	if +@pos {
+		PCT::HLLCompiler.dumper(@pos, 'positional args to Hash::new');
+		Dumper::DIE('WTF? Remember Hash is the default class.');
+	}
+		
 	return %pairs;
 }

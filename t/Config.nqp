@@ -1,8 +1,8 @@
 # $Id:  $
 class Config;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
+sub ASSERTold($condition, *@message) {
+	Dumper::ASSERTold(Dumper::info(), $condition, @message);
 }
 
 sub BACKTRACE() {
@@ -15,14 +15,14 @@ sub DIE(*@msg) {
 	Dumper::DIE(Dumper::info(), @msg);
 }
 
-sub DUMP(*@pos, *%what) {
+sub DUMPold(*@pos, *%what) {
 	my @info := Dumper::info();
-	@info[0] and Dumper::DUMP(@info, @pos, %what);
+	@info[0] and Dumper::DUMPold(@info, @pos, %what);
 }
 
-sub NOTE(*@parts) {
+sub NOTEold(*@parts) {
 	my @info := Dumper::info();
-	@info[0] and Dumper::NOTE(@info, @parts);
+	@info[0] and Dumper::NOTEold(@info, @parts);
 }
 
 ################################################################
@@ -37,13 +37,13 @@ sub _get_pmc() {
 		};		
 	}
 	
-	DUMP($_Pmc);
+	DUMPold($_Pmc);
 	return $_Pmc;
 }
 
 sub query($key) {
-	NOTE("Querying for Config setting: '", $key, "'");
+	NOTEold("Querying for Config setting: '", $key, "'");
 	my $result := _get_pmc(){$key};
-	DUMP($result);
+	DUMPold($result);
 	return $result;
 }

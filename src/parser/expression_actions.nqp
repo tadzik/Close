@@ -1,5 +1,5 @@
 # $Id$
-class close::Grammar::Actions;
+class Slam::Grammar::Actions;
 
 method additive_expr($/) { binary_expr_l2r($/); }
 

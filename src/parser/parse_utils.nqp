@@ -4,7 +4,7 @@
 
 =begin comments
 
-close::Grammar::Actions - ast transformations for close
+Slam::Grammar::Actions - ast transformations for close
 
 This file contains the methods that are used by the parse grammar
 to build the PAST representation of an close program.
@@ -21,29 +21,14 @@ pod section of the grammar.
 
 =end comments
 
-class close::Grammar::Actions;
+class Slam::Grammar::Actions;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
-}
+Parrot::IMPORT('Dumper');
+	
+################################################################
 
-sub BACKTRACE() {
-	Q:PIR {{
-		backtrace
-	}};
-}
-
-sub DIE(*@msg) {
-	Dumper::DIE(Dumper::info(), @msg);
-}
-
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
-}
-
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
-}
+our $Config;
+our $Symbols;
 
 ################################################################
 
@@ -63,24 +48,48 @@ sub NODE_TYPE($node) {
 
 ################################################################
 
-sub PASSTHRU($/, $key) {
-	my $past := $/{$key}.ast;
-	my %named;
-	%named{$key} := $past;
-	Dumper::DUMP(Dumper::info(), undef, %named);
+method DISPATCH($/, $key, %code) {
+	if %code{$key} {
+		%code{$key}(self, $/);
+	}
+	else {
+		$/.panic("Invalid $key '", $key, "' passed to dispatch");
+	}
+}
+
+method ERROR($/, $message) {
+	NOTE("Parser found an error: ", $message);
+	my $past := Slam::Error.new(:node($/), :message($message));
+	MAKE($past);
+}
+
+sub MAKE($past, :$caller_level?) {
+	$caller_level := 1 + $caller_level;
+	NOTE("done: ", $past, :caller_level($caller_level));
+	DUMP($past, :caller_level($caller_level));
+	my $/ := Q:PIR { %r = find_caller_lex '$/' };
 	make $past;
+}
+
+sub PASSTHRU($/, $key, :$caller_level?) {
+	$caller_level := 1 + $caller_level;
+	my $past := $/{$key}.ast;
+	MAKE($past, :caller_level($caller_level));
 }
 
 =sub PAST::Var assemble_qualified_path($/)
 
-Creates and returns a PAST::Var populated by the contents of a Match object.
-The sub-fields used are:
+Creates and returns a Hash populated by the contents of a Match object.
+The named captures used are:
 
-=item * hll_name - the language name found after the 'hll:' prefix (optional)
+=item * $<hll_name> - the language name found after the 'hll:' prefix (optional). 
+Stored into %hash<hll>.
 
-=item * root - the '::' indicating the name is rooted (optional)
+=item * $<root> - the '::' indicating the name is rooted (optional). Stored into
+%hash<is_rooted>.
 
-=item * path - the various path elements
+=item * $<path> - the various path (namespace + name) elements (optional). 
+Stored into %hash<parts>.
 
 Returns a new PAST::Var with C<node>, C<name>, C<is_rooted>, and 
 C<hll> set (or not) appropriately.
@@ -102,7 +111,7 @@ sub assemble_qualified_path($/) {
 
 	if $<root> {
 		NOTE("This name is rooted.");
-		%attributes<is_root> := 1;
+		%attributes<is_rooted> := 1;
 	}
 	
 	DUMP(%attributes);
@@ -168,17 +177,36 @@ sub get_compilation_unit() {
 	return $compilation_unit;
 }
 
-our $Config := Scalar::undef();
-
-sub get_config(*@keys) {
-	NOTE("Get config setting: ", Array::join('::', @keys));
-
-	unless Scalar::defined($Config) {
-		$Config := Slam::Config.new();
+sub global_setup() {
+	unless our $init_done {
+		$init_done := 1;
+		
+		NOTE("Initializing global variables");
+		$Config := Registry<CONFIG>;
+		
+		my $hll := 'close';
+		$Symbols := Slam::SymbolTable.new(:default_hll($hll));
+		Registry<SYMTAB> := $Symbols;
+		
+		DUMP($Symbols);
+		
+		NOTE("Entering root namespace of default hll");
+		my $default_hll_name := Slam::Symbol::Declaration.new(
+			Hash::new(
+				:hll($hll), 
+				:is_rooted(1))
+		);
+		
+		$Symbols.enter_namespace_scope($default_hll_name);
+	
+		DUMP($Symbols);
+		NOTE("Loading internal types into pervasive scope");
+		my $pervasive := $Symbols.pervasive_scope;
+		$Symbols.enter_scope($pervasive);
+		$Symbols.print_stack();
+		Slam::IncludeFile::parse_internal_file('internal/types');
+		$Symbols.leave_scope($pervasive.node_type);
 	}
-	
-	my $result := $Config.value(@keys);
-	
-	DUMP($result);
-	return $result;
+		
+	NOTE("done");
 }

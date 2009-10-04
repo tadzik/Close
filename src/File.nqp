@@ -1,30 +1,8 @@
 # $Id$
 class File;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
-}
-
-sub BACKTRACE() {
-	Q:PIR {{
-		backtrace
-	}};
-}
-
-sub DIE(*@msg) {
-	Dumper::DIE(Dumper::info(), @msg);
-}
-
-sub DUMP(*@pos, *%what) {
-	my @info := Dumper::info();
-	@info[0] and Dumper::DUMP(@info, @pos, %what);
-}
-
-sub NOTE(*@parts) {
-	my @info := Dumper::info();
-	@info[0] and Dumper::NOTE(@info, @parts);
-}
-
+Parrot::IMPORT('Dumper');
+	
 ################################################################
 
 our $_Pmc;

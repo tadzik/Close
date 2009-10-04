@@ -2,6 +2,10 @@
 
 module Slam::Message {
 
+	Parrot::IMPORT('Dumper');
+		
+	################################################################
+
 =sub _onload
 
 This code runs at initload, and explicitly creates this class as a subclass of
@@ -15,41 +19,17 @@ Node.
 	sub _onload() {
 		if our $onload_done { return 0; }
 		$onload_done := 1;
-		say("Slam::Message::_onload");
 		
-		my $meta := Q:PIR {
-			%r = new 'P6metaclass'
-		};
+		my $base_name := 'Slam::Message';
+		
+		NOTE("Creating class ", $base_name);
+		my $base := Class::SUBCLASS($base_name, 'Slam::Var');
 
-		my $base := $meta.new_class('Slam::Message', 
-			:parent('Slam::Val'),
-		);
-		$meta.new_class('Slam::Type::Error', :parent($base));
-		$meta.new_class('Slam::Type::Warning', :parent($base));
-	}
-
-	################################################################
-
-	sub ASSERT($condition, *@message) {
-		Dumper::ASSERT(Dumper::info(), $condition, @message);
-	}
-
-	sub BACKTRACE() {
-		Q:PIR {{
-			backtrace
-		}};
-	}
-
-	sub DIE(*@msg) {
-		Dumper::DIE(Dumper::info(), @msg);
-	}
-
-	sub DUMP(*@pos, *%what) {
-		Dumper::DUMP(Dumper::info(), @pos, %what);
-	}
-
-	sub NOTE(*@parts) {
-		Dumper::NOTE(Dumper::info(), @parts);
+		for ('Error', 'Warning') {
+			my $subclass := 'Slam::' ~ $_;
+			NOTE("Creating subclass ", $subclass);
+			Class::SUBCLASS($subclass, $base);
+		}
 	}
 
 	################################################################
@@ -61,19 +41,19 @@ Node.
 			~ self.message;
 		return $result;
 	}
-
-	method message(*@value)	{ self.ATTR('message', Array::join('', @value)); }
-
-	method node($node) {
-		ASSERT($node.isa(Slam::Node), 
-			'Messages can only attach to Slam::Nodes');
-		
-		self.position($node<source>, $node<pos>);
-		self.file($node.file);
+	
+	method init(*@children, *%attributes) {
+		Slam::Node::init_(self, @children, %attributes);
+		self.position(self<source>, self<pos>);
+		return self;
 	}
-	
-	method severity(*@value)	{ self.ATTR('severity', @value); }
-	
+
+	method message(*@value) {
+		# TODO: I don't know if I'm getting an array-in-an-array, or what.
+		# Need to know what :message(a,b,c) does on .new()
+		self.ATTR('message', Array::new(Array::join('', @value))); 
+	}
+
 	method position($str, $offset) {
 		self<pos_line> := String::line_number_of($str, 
 			:offset($offset));
@@ -81,23 +61,14 @@ Node.
 			:line(self<pos_line>),
 			:offset($offset));
 	}
-	
-	method init(*@children, *%attrs) {
-		self.severity('message');
-		return self.INIT(@children, %attrs);
-	}
+
+	method severity()			{ return 'message'; }
 }
 
 module Slam::Error {
-	method init(*@children, *%attrs) {
-		self.severity('error');
-		return self.INIT(@children, %attrs);
-	}
+	method severity()			{ return 'error'; }
 }
 
 module Slam::Warning {
-	method init(*@children, *%attrs) {
-		self.severity('warning');
-		return self.INIT(@children, %attrs);
-	}
+	method severity()			{ return 'warning'; }
 }

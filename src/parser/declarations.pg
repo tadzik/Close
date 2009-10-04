@@ -1,6 +1,6 @@
 # $Id$
 
-#grammar close::Grammar is PGE::Grammar;
+#grammar Slam::Grammar is PGE::Grammar;
 
 =rule access_qualifier
 
@@ -10,8 +10,8 @@ L<#type_specifier> and L<#declarator> matching.
 =cut
 
 rule access_qualifier {
-	| <token=CONST>		{*}
-	| <token=VOLATILE>	{*}
+	| <token=CONST>		{*} #= CONST
+	| <token=VOLATILE>	{*} #= VOLATILE
 }
 
 =rule dclr_adverb
@@ -21,14 +21,15 @@ Matches the adverbs that may modify a declarator.
 =cut
 
 rule dclr_adverb {
-	| <token=ADV_ANON>	{*}
-	| <token=ADV_INIT>	{*}
-	| <token=ADV_LOAD>	{*}
-	| <token=ADV_MAIN>	{*}
-	| <token=ADV_MULTI> '(' ~ ')' <signature=string_literal: ')'> {*}
-	| <token=ADV_REG_CLASS> '(' ~ ')' <register_class=QUOTED_LIT> {*}
+	| <ADV_ANON>	{*} #= ADV_ANON
+	| <ADV_INIT>	{*} #= ADV_INIT
+	| <ADV_LOAD>	{*} #= ADV_LOAD
+	| <ADV_MAIN>	{*} #= ADV_MAIN
+	| <ADV_MULTI>	{*} #= ADV_MULTI
+	| <ADV_REG_CLASS> {*} #= ADV_REG_CLASS
+	| <ADV_VTABLE>	{*} #= ADV_VTABLE
+	
 	# | <token=ADV_METHOD> (handled by 'method' keyword?)
-	| <token=ADV_VTABLE>	{*}
 }
 
 =rule dclr_alias
@@ -62,9 +63,8 @@ the value of expression at the time of initialization.
 =cut
 
 rule dclr_array_or_hash {
-	| $<hash>='%'		{*} #= decl_hash_of
-	| <size=expression>		{*} #= decl_array_of
-	|				{*} #= decl_array_of
+	| $<hash>='%'		{*} #= hash
+	| <size=expression>?	{*} #= array
 }
 
 =rule dclr_atom
@@ -105,11 +105,6 @@ rule dclr_postfix {
 	    '[' ~ ']' <dclr_array_or_hash>	{*} #= dclr_array_or_hash
 }
 
-rule declaration {
-	<specifier_list> <symbol=declarator_part> [ ','  <symbol=declarator_part> ]*	
-	{*}
-}
-
 =rule declarator
 
 A declarator is that part of the declaration specific to a single name. The 
@@ -128,8 +123,8 @@ rule declarator {
 rule declarator_part {
 	<declarator>
 	<dclr_alias>?
-	[ <adverbs=dclr_adverb> ]*
-	{*} #= declarator
+	<adverbs=dclr_adverb>*
+	{*} #= after_declarator
 	[ '=' <initializer=expression>
 		{*} #= initializer
 	|  <?before '{' >	
@@ -160,9 +155,9 @@ Matches the adverbs that may appear in a parameter declaration.
 
 # :named('foo')
 rule param_adverb {
-	| <token=ADV_NAMED> ['(' ~ ')' <named=QUOTED_LIT> ]? {*}
-	| <token=ADV_OPTIONAL>	{*}
-	| <token=ADV_SLURPY>		{*}
+	| <token=ADV_NAMED>		{*} #= ADV_NAMED
+	| <token=ADV_OPTIONAL>	{*} #= ADV_OPTIONAL
+	| <token=ADV_SLURPY>		{*} #= ADV_SLURPY
 }
 
 =rule parameter_declaration
@@ -192,6 +187,48 @@ rule specifier_list {
 	{*}
 }
 
+=token symbol_declaration_end
+
+Recognizes a semicolon (always), but matches no semicolon if the last
+item in a declaration was a block (function definition) element.
+
+=item * int x ; 	// semicolon
+
+=item * int foo() {...}	// no semicolon
+
+=item * int bar() {...}; // also valid
+
+=item * int x <ERROR> // missing semicolon error
+
+=cut
+
+token symbol_declaration_end {
+	[ ';'	# Match a semicolon
+	|| 	# or, match no semicolon if last decl ended with }
+		<?{{	
+			$P0 = get_hll_global [ 'Slam' ; 'Grammar' ], '$!Decl_block'
+			$I0 = $P0
+			.return ($I0)
+		}}>
+	|| 	# or, inject an error in the token stream.
+		<ERROR: "Missing semicolon(';') at end of declaration.">
+	]
+}
+
+# NB: If the whole typedef-declared-at-comma thing is needed, put
+# action calls at the comma here. (I hope not.)
+rule symbol_declaration_list {
+	<specifier_list> 
+	<symbol=declarator_part> 
+	[ ','  <symbol=declarator_part> ]*	
+	<.symbol_declaration_end>
+	{*}
+}
+
+rule tspec_basic_type {
+	<type=BASIC_TYPE>	{*}
+}
+
 rule tspec_builtin {
 	| <token=_BUILTIN>	{*}
 }
@@ -216,8 +253,8 @@ rule tspec_storage_class {
 	| <token=TYPEDEF>	{*}
 }
 
-rule tspec_type_name {
-	<type_name>	 	{*}
+token tspec_type_name {
+	<type_name>		{*}
 }
 
 rule tspec_type_specifier {

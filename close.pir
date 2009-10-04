@@ -31,8 +31,8 @@ object.
     $P0 = get_hll_global ['PCT'], 'HLLCompiler'
     $P1 = $P0.'new'()
     $P1.'language'('close')
-    $P1.'parsegrammar'('close::Grammar')
-    $P1.'parseactions'('close::Grammar::Actions')
+    $P1.'parsegrammar'('Slam::Grammar')
+    $P1.'parseactions'('Slam::Grammar::Actions')
     $P1.'commandline_banner'("Close for Parrot VM\n")
     $P1.'commandline_prompt'('> ')
 .end
@@ -59,6 +59,7 @@ to the close compiler.
 .include 'src/parser/declaration_actions.pir'
 .include 'src/parser/expression_actions.pir'
 .include 'src/parser/name_actions.pir'
+.include 'src/parser/parse_utils.pir'
 .include 'src/parser/statement_actions.pir'
 .include 'src/parser/token_actions.pir'
 .include 'src/gen_library.pir'

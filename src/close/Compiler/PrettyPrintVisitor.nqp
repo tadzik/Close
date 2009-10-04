@@ -1,44 +1,8 @@
 # $Id$
 
-class Slam::PrettyPrintVisitor;
+module Slam::PrettyPrintVisitor;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
-}
-
-sub BACKTRACE() {
-	Q:PIR {{
-		backtrace
-	}};
-}
-
-sub DIE(*@msg) {
-	Dumper::DIE(Dumper::info(), @msg);
-}
-
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
-}
-
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
-}
-
-################################################################
-
-sub ADD_ERROR($node, *@msg) {
-	Slam::Messages::add_error($node,
-		Array::join('', @msg));
-}
-
-sub ADD_WARNING($node, *@msg) {
-	Slam::Messages::add_warning($node,
-		Array::join('', @msg));
-}
-
-sub NODE_TYPE($node) {
-	return $node.node_type;
-}
+Parrot::IMPORT('Dumper');
 
 ################################################################
 
@@ -58,7 +22,7 @@ method visit($node) {
 	my @results;
 	
 	if $node {
-		NOTE("Visiting ", NODE_TYPE($node), " node: ", $node.name());
+		NOTE("Visiting ", $node.node_type, " node: ", $node.name());
 		DUMP($node);
 		
 		@results := $SUPER.visit(self, $node);
@@ -73,7 +37,7 @@ method visit($node) {
 }
 
 method visit_children($node) {
-	NOTE("Visiting ", +@($node), " children of ", NODE_TYPE($node), " node: ", $node.name());
+	NOTE("Visiting ", +@($node), " children of ", $node.node_type, " node: ", $node.name());
 	DUMP($node);
 
 	my @results := $SUPER.visit_children(self, $node);
@@ -83,7 +47,7 @@ method visit_children($node) {
 }
 
 method visit_child_syms($node) {
-	NOTE("Visiting ", +@($node), " child_syms of ", NODE_TYPE($node), " node: ", $node.name());
+	NOTE("Visiting ", +@($node), " child_syms of ", $node.node_type, " node: ", $node.name());
 	DUMP($node);
 
 	my @results := $SUPER.visit_child_syms(self, $node);
@@ -102,7 +66,7 @@ our @Child_attribute_names := (
 );
 
 method _prettyprint_UNKNOWN($node) {	
-	NOTE("Unrecognized node type: '", NODE_TYPE($node), 
+	NOTE("Unrecognized node type: '", $node.node_type, 
 		"'. Passing through to children.");
 	DUMP($node);
 
@@ -131,7 +95,7 @@ method _prettyprint_UNKNOWN($node) {
 	
 	my @results := self.wrap_children($node,
 		Array::new(
-			"/* Unknown '" ~ NODE_TYPE($node) ~ "' node: '" ~ $node.name() ~ "' */",
+			"/* Unknown '" ~ $node.node_type ~ "' node: '" ~ $node.name() ~ "' */",
 			""
 		),
 		$indent,
@@ -140,7 +104,7 @@ method _prettyprint_UNKNOWN($node) {
 	
 	if $node.isa(PAST::Block) {
 		NOTE("Popping this block off the scope stack");
-		Slam::Scopes::pop(NODE_TYPE($node));
+		Slam::Scopes::pop($node.node_type);
 	}
 	
 	NOTE("Done with unknown node");
@@ -169,7 +133,7 @@ method _prettyprint_compound_statement($node) {
 	for @($node) {
 		Array::append(@kids, self.visit($_));
 		
-		if String::substr(NODE_TYPE($_), 0, 4) eq 'expr' {
+		if String::substr($_.node_type, 0, 4) eq 'expr' {
 			my $last := @kids[+@kids - 1];
 			$last := $last ~ ';';
 			@kids[+@kids - 1] := $last;
@@ -572,22 +536,32 @@ The top-level entry point. Pretty-prints the nodes below $past.
 =cut
 
 sub print($past) {
-	NOTE("Pretty-printing");
+	NOTE("Pretty-printing the PAST tree");
 	DUMP($past);
 
-	$SUPER	:= Slam::Visitor.new();
-	NOTE("Created SUPER-visitor");
-	DUMP($SUPER);
+	my $result := '';
 	
-	my $visitor	:= Slam::PrettyPrintVisitor.new();
-	NOTE("Created visitor");
-	DUMP($visitor);
+say("Class of PAST: ", Class::of($past));
+
+	if Registry<CONFIG>.query('Compiler', name(0), 'disabled') {
+		NOTE("Configured off - skipping");
+	}
+	else {
+		NOTE("Pretty-printing");
+		$SUPER	:= Slam::Visitor.new();
+		NOTE("Created SUPER-visitor");
+		DUMP($SUPER);
 	
-	my @results	:= $visitor.visit($past);
+		my $visitor	:= Slam::PrettyPrintVisitor.new();
+		NOTE("Created visitor");
+		DUMP($visitor);
 	
-	DUMP(@results);
+		my @results	:= $visitor.visit($past);
 	
-	my $result	:= Array::join("\n", @results);
+		DUMP(@results);
+	
+		$result	:= Array::join("\n", @results);
+	}
 
 	NOTE("done");
 	DUMP($result);
@@ -595,7 +569,7 @@ sub print($past) {
 }
 
 method wrap_children($node, @before, $indent, @after) {
-	NOTE("Wrapping children of ", NODE_TYPE($node), " node: ", $node.name());
+	NOTE("Wrapping children of ", $node.node_type, " node: ", $node.name());
 	DUMP(:before(@before), :indent($indent), :after(@after));
 	
 	my @results := Array::clone(@before);

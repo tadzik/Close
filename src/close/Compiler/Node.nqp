@@ -2,6 +2,11 @@
 
 module Slam::Node {
 
+	# Done in _onload
+	#Parrot::IMPORT('Dumper');
+		
+	################################################################
+
 =sub _onload
 
 This code runs at initload, and explicitly creates this class as a subclass of
@@ -15,41 +20,42 @@ PAST::Node.
 		if our $onload_done { return 0; }
 		$onload_done := 1;
 		
-		say("Slam::Node::_onload");
+		Parrot::IMPORT('Dumper');
+
+		my $get_string := "
+.namespace [ 'Slam' ; 'Node' ]
+.sub 'get_string' :vtable :method
+	$S0 = self.'display_name'()
+	.return ($S0)
+.end";
+		Parrot::compile($get_string);
 		
-		our $meta := Q:PIR { %r = new 'P6metaclass' };
-		my $base := $meta.new_class('Slam::Node');
+		my $base_name := 'Slam::Node';
+		
+		NOTE("Creating class ", $base_name);
+		#my $base := Class::NEW_CLASS($base_name);
+		my $base := Class::SUBCLASS($base_name, 'PAST::Node');
 
-		for ('Block', 'Control', 'Op', 'Val', 'Var', 'VarList') {
-			SUBCLASS('Slam::' ~ $_, 'PAST::' ~ $_, $base);
+		for ('Block', 'Control', 'Op', 'Stmts', 'Val', 'Var', 'VarList') {
+			my $subclass := 'Slam::' ~ $_;
+			NOTE("Creating subclass ", $subclass);
+			Class::SUBCLASS($subclass, 'PAST::' ~ $_, $base);
 		}
+		
+		NOTE("done");
 	}
 
 	################################################################
 
-	sub ASSERT($condition, *@message) {
-		Dumper::ASSERT(Dumper::info(), $condition, @message);
-	}
+=method ATTR
 
-	sub BACKTRACE() {
-		Q:PIR {
-			backtrace
-		};
-	}
+This is the backstop method for a good number of accessor methods. If the 
+attribute being accessed is just a get/set attr, with no special handling, then
+a direct call to this method is all that is needed. For example:
 
-	sub DIE(*@msg) {
-		Dumper::DIE(Dumper::info(), @msg);
-	}
+	method foo(*@value)	{ self.ATTR('foo', @value); }
 
-	sub DUMP(*@pos, *%what) {
-		Dumper::DUMP(Dumper::info(), @pos, %what);
-	}
-
-	sub NOTE(*@parts) {
-		Dumper::NOTE(Dumper::info(), @parts);
-	}
-
-	################################################################
+=cut
 
 	method ATTR($name, @value) {
 		if +@value {
@@ -82,35 +88,57 @@ an init() method.
 		return self;
 	}
 
-=method SUBCLASS($name, *@parents) 
-
-Creates a subclass, and attaches the 1 or more parents to it.
-
-=cut
-
-	method SUBCLASS($name, *@parents) {
-		our $meta;
-		unless Scalar::defined($meta) {
-			$meta := Q:PIR { %r = new 'P6metaclass' };
-		}
-
-		unless +@parents {
-			@parents.push('Slam::Node');
-		}
-		
-		my $class := $meta.new_class($name, 
-			:parent(@parents.shift));
-		
-		while @parents {
-			$meta.add_parent($class, @parents.shift);
-		}
-		
-		return $class;
-	}
-		
 	################################################################
 
-	method display_name(*@value)	{ self.ATTR('display_name', @value); }
+	method adverbs() {
+		unless self<adverbs> {
+			self<adverbs> := Hash::empty();
+		}
+		
+		return self<adverbs>;
+	}
+
+	method add_adverb($adverb) {
+		my $name := $adverb.name;
+		NOTE("Setting adverb '", $name, "' on ", self.node_type, 
+			" node ", self.display_name);
+		
+		if self.adverbs{$name} {
+			self.warning(:node($adverb), :message("Redundant adverb '", $name, "' ignored."));
+		}
+		else {
+			self.adverbs{$name} := $adverb;
+			$adverb.modify(self);
+		}
+		
+		NOTE("done");
+		DUMP(self);
+	}
+	
+	method attach_to($parent) {
+		$parent.push(self);
+	}
+	
+	method build_display_name() {
+		self.rebuild_display_name(0);
+
+		my $name := self.name;
+		unless $name { $name := ''; } # TT#1088
+		
+		$name := $name ~ ' (' ~ self.id ~ ')';
+		NOTE("Display_name set to: ", $name);
+		return self.display_name($name);
+	}
+	
+	method display_name(*@value) {
+		if +@value == 0 && self.rebuild_display_name {
+			NOTE("Rebuilding display name");
+			self.build_display_name;
+		}
+		
+		self.rebuild_display_name(0);
+		return self.ATTR('display_name', @value); 
+	}
 
 	method error(*%options) {
 		return self.message(
@@ -120,20 +148,32 @@ Creates a subclass, and attaches the 1 or more parents to it.
 			)
 		);
 	}
-	
+
 	method id(*@value) {
-		unless my $id := self.ATTR('id', @value) {
-			$id := make_id(self.node_type);
+		my $id := self<id>;
+		
+		unless $id {
+			if +@value	{ $id := self.ATTR('id', @value); }
+			else		{ $id := self.id(make_id(self.node_type)); }
+			
+			self.rebuild_display_name(1);
 		}
 		
 		return $id;
 	}
 
-	sub init(*@children, *%attributes) {
+	method init(*@children, *%attributes) {
+		return self.init_(@children, %attributes);
+	}
+	
+	# Init method callable from other NQP init subs.
+	method init_(@children, %attributes) {
 		self.id;	# Force it
 		return self.INIT(@children, %attributes);
 	}
 	
+	method is_statement()		{ return 0; }
+
 	sub make_id($type) {
 		our %id_counter;
 		
@@ -159,49 +199,41 @@ Creates a subclass, and attaches the 1 or more parents to it.
 	}
 	
 	method name(*@value) {
-		my $name;
-		
 		if +@value {
-			my $name := @value.shift;
-			
-			NOTE("Setting node name to '", $name, "'");
-			self<name> := $name;
-			
-			NOTE("Recomputing display_name");
-			my @path := Array::clone(self.namespace());
-			@path.push($name);
-			
-			if my $hll := self.hll {
-				@path.unshift('hll:' ~ $hll ~ ' ');
-			}
-			elsif self.is_rooted {
-				@path.unshift('');
-			}
-			
-			self.display_name(Array::join('::', @path));
-			NOTE("Display_name set to: ", self.display_name);
+			self.rebuild_display_name(1);
 		}
-		else {
-			$name := self.name;
+
+		return self.ATTR('name', @value);
+	}
+
+	method namespace(*@value) {
+		if +@value {
+			self.rebuild_display_name(1);
 		}
-		
-		NOTE("name is: ", $name);
-		return $name;
+
+		return PAST::Node::namespace(@value.shift);
 	}
 
 	method node_type() {
-		DUMP(self);
-		DIE("NOT REACHED");
+		my $class := Class::of(self);
+		my @parts := String::split(';', $class);
+		$class := Array::join('::', @parts);
+		return $class;
 	}
+
+	method rebuild_display_name(*@value) { self.ATTR('rebuild_display_name', @value); }
 	
 	method warning(*%options) {
+		unless %options<node> {
+			%options<node> := self;
+		}
+		
 		return self.message(
 			Slam::Warning.new(
 				:node(%options<node>),
 				:message(%options<message>),
 			)
 		);
-		
 	}
 	
 	
@@ -288,9 +320,9 @@ namespace_path target is in a namespace_definition.
 			NOTE("Expanded path to [ ", Array::join(' ; ', @parts), " ]");
 		}
 		
-		unless %attributes<hll> {
-			%attributes<hll> := Slam::Scopes::fetch_current_hll();
-		}
+		# unless %attributes<hll> {
+			# %attributes<hll> := Slam::Scopes::fetch_current_hll();
+		# }
 		
 		%attributes<namespace>	:= @parts;
 	}
@@ -513,38 +545,6 @@ namespace_path target is in a namespace_definition.
 	}
 
 		
-	sub set_adverb($node, $adverb) {
-		my $name := $adverb.name();
-		NOTE("Setting adverb '", $name, "' on ", $node.node_type, " node ", $node.name());
-		$node<adverbs>{$name} := $adverb;
-
-		if $name eq 'flat' {
-			$node.flat(1);
-		}
-		elsif $name eq 'named' {
-			my $named_what := $adverb<named>;
-			
-			if $named_what {
-				$node.named($named_what);
-			}
-		}
-		elsif $name eq 'slurpy' {
-			$node.slurpy(1);
-		}
-		else {
-			my $pirflags := $adverb.value();
-			
-			if $node<pirflags> {
-				$pirflags := $node<pirflags> ~ ' ' ~ $pirflags;
-			}
-			
-			$node<pirflags> := $pirflags;
-		}
-		
-		NOTE("done");
-		DUMP($node);
-	}
-
 	sub set_attributes($node, %attributes) {
 		my $set_name := 0;
 		
@@ -611,6 +611,11 @@ namespace_path target is in a namespace_definition.
 ################################################################
 
 module Slam::Block {
+	
+	Parrot::IMPORT('Dumper');
+		
+	################################################################
+
 	sub _create_function_definition($node, %attributes) {
 		our @copy_attrs := (
 			'display_name',
@@ -639,9 +644,9 @@ module Slam::Block {
 		copy_adverbs($from, $node);
 		Hash::merge_keys(%attributes, $from, :keys(@copy_attrs), :use_last(1));
 		
-		unless Scalar::defined(%attributes<hll>) {
-			%attributes<hll> := Slam::Scopes::fetch_current_hll();
-		}
+		# unless Scalar::defined(%attributes<hll>) {
+			# %attributes<hll> := Slam::Scopes::fetch_current_hll();
+		# }
 		
 		unless Scalar::defined(%attributes<namespace>) {
 			my $nsp := Slam::Scopes::fetch_current_namespace();
@@ -651,7 +656,7 @@ module Slam::Block {
 		copy_block($from<type>, $node);
 		
 		# Add every function, in order of creation, to the compilation_unit
-		close::Grammar::Actions::get_compilation_unit().push($node);
+		Slam::Grammar::Actions::get_compilation_unit().push($node);
 			
 		Hash::delete(%attributes, 'from');
 	}
@@ -662,6 +667,11 @@ module Slam::Block {
 ################################################################
 
 module Slam::Op {
+	
+	Parrot::IMPORT('Dumper');
+		
+	################################################################
+
 	method inline(*@value)	{ self.ATTR('inline', @value); }
 	method lvalue(*@value)	{ self.ATTR('lvalue', @value); }
 	method opattr(%hash)	{ Slam::Op.opattr(self, %hash); }
@@ -750,6 +760,11 @@ module Slam::Op {
 }
 
 module Slam::Val {
+	
+	Parrot::IMPORT('Dumper');
+		
+	################################################################
+
 	method value(*@value)	{ self.ATTR('value', @value); }
 	method lvalue(*@value) {
 		if +@value {
@@ -759,35 +774,13 @@ module Slam::Val {
 
 		self.ATTR('lvalue', @value);
 	}
-	our %Adverb_aliases;
-	%Adverb_aliases{'...'} := 'slurpy';
-	%Adverb_aliases{'?'} := 'optional';
+}
 
-	sub _create_adverb($node, %attributes) {
-		NOTE("Processing adverb node");
+module Slam::Var {
+	
+	Parrot::IMPORT('Dumper');
 		
-		my $name := %attributes<name>;
-		
-		if String::char_at($name, 0) eq ':' {
-			$name := String::substr($name, 1);
-		}
-		
-		if %Adverb_aliases{$name} {
-			$name := %Adverb_aliases{$name};
-		}
-		
-		my $value := ':' ~ $name;
-		
-		if Scalar::defined(%attributes<signature>) {
-			$value := $value ~ '(' ~ %attributes<signature> ~ ')';
-		}
-		else {
-			Hash::delete(%attributes, 'signature');
-		}
-		
-		%attributes<name> := $name;
-		%attributes<returns> := 'String';
-		%attributes<value> := $value;
-	}
+	################################################################
 
+	method lvalue(*@value)	{ self.ATTR('value', @value); }
 }

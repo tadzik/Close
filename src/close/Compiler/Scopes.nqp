@@ -1,55 +1,144 @@
 # $Id$
 
-class Slam::Scopes;
+module Slam::Scope {
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
-}
+	#Parrot::IMPORT('Dumper');
+		
+	################################################################
 
-sub BACKTRACE() {
-	Q:PIR {{
-		backtrace
-	}};
-}
+=sub _onload
 
-sub DIE(*@msg) {
-	Dumper::DIE(Dumper::info(), @msg);
-}
-
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
-}
-
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
-}
-
-################################################################
-
-sub ADD_ERROR($node, *@msg) {
-	Slam::Messages::add_error($node,
-		Array::join('', @msg));
-}
-
-sub ADD_WARNING($node, *@msg) {
-	Slam::Messages::add_warning($node,
-		Array::join('', @msg));
-}
-
-sub NODE_TYPE($node) {
-	return $node.node_type;
-}
-
-################################################################
-
-=sub add_declarator_to($declaration, $scope)
-
-Insert a single declarator-name into the symbol table for a block.
+This code runs at initload, and explicitly creates this class as a subclass of
+Node.
 
 =cut
 
+	_onload();
+
+	sub _onload() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+
+		Parrot::IMPORT('Dumper');
+	
+		NOTE("Slam::Scope::_onload");
+	
+		my $base := Class::SUBCLASS('Slam::Scope', 'Slam::Block');
+	}
+
+	################################################################
+
+	method add_using_namespace($directive) {
+		ASSERT($directive.isa(Slam::Statement::UsingNamespace),
+			'$directive parameter must be a UsingNamespace statement');
+		
+		my $namespace	:= $directive.using_namespace;
+		my $already	:= 0;
+		
+		for self.using_namespaces {
+			if $_ =:= $namespace {
+				$already := 1;
+				$directive.add_warning(:message(
+					"This directive is redundant. ",
+					"Namespace ", $directive.display_name,
+					" is already used."),
+				);
+			}
+		}
+		
+		unless $already {
+			self.using_namespaces.unshift($namespace);
+		}
+		
+		NOTE("Now there are ", +self.using_namespaces, " entries");
+	}
+
+=method declare($symbol)
+
+Declares a Slam::Symbol in the scope. If two symbol declarations with the same name 
+collide in the same scope, the following rules apply:
+
+=item # If the symbols are both marked as multi, they are merged.
+
+=item # If the types are declaration-compatible (see L<Slam::Type>), then the collision 
+is considered a re-declaration of a single symbol. The two declarations are unified, and
+a re-declaration warning may be issued.
+
+=item # In any other case, the collision is an error.  TODO: I think there may be an 
+argument made for lexical/package coexistence, when the package symbol is a nested 
+function. That is:
+
+	void foo() {
+		void bar() {...}
+		pmc bar;
+		...
+	}
+
+Because the nested function is "really" outside, in the namespace, with a local presence
+in the symtable because if the declaration. (Trumping any using-namespace directives,
+for example.) But I'm not smart enough to develop a story about why that's a good idea,
+so ixnay.
+
+=cut
+
+	method declare($symbol) {
+		ASSERT($symbol.isa(Slam::Symbol::Declaration),
+			'Only symbol declarations can be added to scopes');
+		NOTE("Adding symbol ", $symbol, " to ", self.node_type, " block ", self);
+		
+		if $symbol.has_qualified_name {
+			DIE("Don't know how to handle q-name declarations");
+		}
+		
+		my $name := $symbol.name;
+		my $prior := self.symbol($name);
+		
+		if $prior {
+			if $prior.can_merge($symbol) {
+				$prior.merge_declarations($symbol);
+			}
+			else {
+				$symbol.error(:message(
+					"Redeclaration of '", $name,
+					"' not compatible with current declaration."));
+			}
+		}
+		else {
+			self.symbol($name, :declaration($symbol));
+			self.push($symbol);
+		}
+	}
+	
+	method lookup($reference) {
+		my $name := $reference.name;
+		NOTE("Scope '", self, "' looking up ", $name);
+		DUMP(self);
+		DUMP($reference);
+		
+		my $result := self.symbol($name) && self.symbol($name)<declaration>;
+
+		NOTE("Done. Found: ", $result);
+		DUMP($result);
+		return $result;
+	}
+	
+	method using_namespaces() {
+		unless self<using_namespaces> {
+			self<using_namespaces> := Array::empty();
+		}
+		
+		return self<using_namespaces>;
+	}
+}
+
+class Slam::Scopes;
+
+	Parrot::IMPORT('Dumper');
+		
+	################################################################
+
 sub add_declarator_to($past, $scope) {
-	NOTE("Adding name '", $past.name(), "' to ", NODE_TYPE($scope), " block '", $scope<display_name>, "'");
+	NOTE("Adding name '", $past.name(), "' to ", $scope.node_type, " block '", $scope<display_name>, "'");
 	my $name := $past.name();
 	my @already := get_symbols($scope, $name);
 
@@ -76,14 +165,14 @@ sub add_declarator_to($past, $scope) {
 		}
 	}
 	
-	put_symbol($scope, $name, $past);
+	$scope.symbol($name, $past);
 }
 
 sub add_declarator($past) {
 	NOTE("Adding declarator: ", $past.name());
 	DUMP($past);
 	
-	my $decl_nsp := Slam::Namespaces::fetch_namespace_of($past);
+	my $decl_nsp := Slam::Namespace::fetch_namespace_of($past);
 	my $current_nsp := Slam::Scopes::fetch_current_namespace();
 	
 	# If we're declaring it locally, it goes into the current lexical 
@@ -98,93 +187,6 @@ sub add_declarator($past) {
 	add_declarator_to($past, $decl_nsp);
 }
 		
-sub add_declarator_to_current($past) {
-	my $scope := current();
-	NOTE("Adding name '", $past.name(), "' to ", $scope<lstype>, " scope '", $scope.name(), "'");
-	add_declarator_to($past, $scope);
-}
-
-sub add_using_namespace($scope, $using_nsp) {
-	ASSERT(NODE_TYPE($using_nsp) eq 'using_directive',
-		'This is only valid for using_directives');
-		
-	my $nsp := $using_nsp<using_namespace>;
-	NOTE("Adding namespace '", $nsp<display_name>, "' to ", NODE_TYPE($scope), 
-		" scope '", $scope.name(), "'");
-	
-	if $scope<using_namespaces> {
-		my $found := 0;
-		
-		for $scope<using_namespaces> {
-			if $_ =:= $nsp {
-				$found := 1;
-				NOTE("Already present");
-				ADD_WARNING($using_nsp,
-					"Using namespace directive is redundant.");
-			}
-		}
-		
-		if $found == 0 {
-			$scope<using_namespaces>.shift($nsp);
-		}
-	}
-	else {
-		$scope<using_namespaces> := Array::new($nsp);
-	}
-	
-	NOTE("Now there are ", +($scope<using_namespaces>), " entries");
-}
-
-sub current() {
-	my $scope := get_stack()[0];
-	DUMP($scope);
-	return $scope;
-}
-
-sub declare_object($scope, $object) {
-	NOTE("Declaring object '", $object.name(), "' in ", $scope<lstype>, " scope '", $scope.name(), "'");
-	my $name	:= $object.name();
-	add_declarator_to($object, $scope);
-}
-
-sub dump_stack() {
-	DUMP(get_stack());
-}
-
-sub fetch_current_hll() {
-	my $hll	:= 'close';	
-	my $block	:= query_inmost_scope_with_attr('hll');
-	
-	if $block {
-		$hll	:= $block.hll();
-	}
-	
-	return $hll;
-}
-
-sub fetch_current_namespace() {
-	my $block := query_inmost_scope_with_attr('is_namespace');
-
-	unless $block {
-		dump_stack();
-		DIE("INTERNAL ERROR: "
-			~ "Unable to locate current namespace block. "
-			~ " This should never happen.");
-	}
-
-	NOTE("Found namespace: ", $block<display_name>);
-	DUMP($block);
-	return $block;
-}
-
-sub current_file() {
-	my $filename := Q:PIR {
-		%r = find_dynamic_lex '$?FILES'
-	};
-	
-	return $filename;
-}
-
 # FIXME: Don't know how to deal with ?value
 sub query_inmost_scope_with_attr($attr, $value?) {
 	for get_search_list() {
@@ -196,12 +198,6 @@ sub query_inmost_scope_with_attr($attr, $value?) {
 	}
 	
 	return undef;
-}
-
-sub get_namespace($scope, $name) {
-	my $namespace := $scope<child_nsp>{$name};
-	DUMP(:name($name), :result($namespace));
-	return $namespace;
 }
 
 =sub get_search_list
@@ -238,12 +234,13 @@ sub get_stack() {
 	our $init_done;
 	
 	unless $init_done {
+	say("Create scope stack");
 		NOTE("Creating scope stack");
 		$init_done := 1;
 		@scope_stack := Array::empty();
 		NOTE("Stack exists. Now pushing pervasive scope.");
 		@scope_stack.push(
-			Slam::Type::pervasive_scope()
+			Slam::Scope::Pervasive::get_instance()
 		);
 	}
 
@@ -260,73 +257,4 @@ sub get_symbols($scope, $name) {
 	NOTE("Found ", +@symbols, " results");
 	DUMP(@symbols);
 	return @symbols;
-}
-
-sub pop($type) {
-	my $old := get_stack().shift();
-	my $old_type := Slam::Node::type($old);
-	
-	unless $type eq $old_type {
-		DIE("Scope stack mismatch. Popped '"
-			~ $old_type ~ "', but expected '"
-			~ $type);
-	}
-	
-	DUMP($old);
-	return $old;
-}
-
-sub print_symbol_table($block) {
-	NOTE("printing...");
-	
-	for $block<child_sym> {
-		for get_symbols($block, $_) {
-			Slam::Symbols::print_symbol($_) ;
-		}
-		
-		DUMP($block);
-	}
-	
-	NOTE("finished");
-}
-
-sub push($scope) {
-	ASSERT($scope.isa(Slam::Block), "Can't push a non-Block onto the lexical scope stack");
-
-	get_stack().unshift($scope);
-	NOTE("Open ", NODE_TYPE($scope), " block: ", $scope<display_name>,
-		" Now ", +(get_stack()), " on stack.");
-	DUMP($scope);
-}
-
-sub put_symbol($scope, $name, $object) {
-	NOTE("Adding symbol ", $name, 
-		" to ", NODE_TYPE($scope), 
-		" scope ", $scope<display_name>, " (", $scope<id>, ")");
-	DUMP($scope);
-	DUMP($object);
-	
-	unless Hash::exists($scope<child_sym>, $name) {
-		$scope<child_sym>{$name} := Array::empty();
-	}
-	
-	my $found := 0;
-	
-	for $scope<child_sym>{$name} {
-		if $_ =:= $object {
-			NOTE("This object is already present. Skipping.");
-			$found := 1;
-		}
-	}
-	
-	unless $found {
-		$scope<child_sym>{$name}.push($object);
-	}
-	
-	NOTE("Now there are ", +$scope<child_sym>{$name}, " symbols named ", $name);
-	DUMP($scope<child_sym>{$name});
-}
-
-sub set_namespace($scope, $name, $namespace) {
-	$scope<child_nsp>{$name} := $namespace;
 }

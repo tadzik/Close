@@ -1,5 +1,5 @@
 # $Id$
-class close::Grammar::Actions;
+module Slam::Grammar::Actions;
 
 =method declarator_name
 
@@ -9,30 +9,27 @@ resulting PAST::Var is not resolved.
 =cut
 
 method declarator_name($/) {
+	NOTE("Creating declarator_name for ", $<path>[-1].ast.value);
 	my %attrs := assemble_qualified_path($/);
-	my $past := Slam::Symbols::declarator_name(%attrs);
-	NOTE("Created declarator_name for ", $past<display_name>);
-	DUMP($past);
-	make $past;
+	my $past := Slam::Symbol::Declaration.new(%attrs);
+	MAKE($past);
 }
 
 method label_name($/) {
 	NOTE("Creating new label_name: ", ~ $<label>);
-	my $past := Slam::Node::create('label_name', 
+	my $past := Slam::Compiler::Node::create('label_name', 
 		:name(~ $<label>), 
 		:node($/));
-	
-	DUMP($past);
-	make $past;
+	MAKE($past);
 }
 
 method namespace_name($/, $key) { PASSTHRU($/, $key); }
 
 method namespace_path($/) {
-	my $past := assemble_qualified_path('namespace_path', $/);
-	NOTE("Created namespace_path for ", $past<display_name>);
-	DUMP($past);
-	make $past;
+	NOTE("Creating namespace path");
+	my %attrs := assemble_qualified_path($/);
+	my $past := Slam::Symbol::Namespace.new(%attrs);
+	MAKE($past);
 }
 
 method new_alias_name($/) {
@@ -43,11 +40,8 @@ method new_alias_name($/) {
 
 method qualified_identifier($/) {
 	my %attrs := assemble_qualified_path($/);
-	my $past := Slam::Symbols::qualified_identifier(%attrs);
-	NOTE("Created qualified_identifier for ", $past<display_name>);
-	
-	DUMP($past);
-	make $past;
+	my $past := Slam::Symbol::Reference.new(%attrs);
+	MAKE($past);
 }
 
 method simple_identifier($/) {
@@ -57,33 +51,10 @@ method simple_identifier($/) {
 	make $past;
 }
 
-method type_name($/, $key) { PASSTHRU($/, $key); }
-
-# our $Is_valid_type_name := 0;
-
-# method type_name($/) {
-	# my $past := $<qualified_identifier>.ast;
-	# NOTE("Checking for typename '", $past<display_name>, "'");
-	
-	# $Is_valid_type_name := 0;
-	# my @matches := Slam::Lookups::query_matching_types($past);
-	
-	# if +@matches {
-		# NOTE("Found valid matching typename");
-		# $Is_valid_type_name := 1;
-		# $past<apparent_type> := @matches[0];
-		
-		# if +@matches > 1 {
-			# ADD_ERROR($past,
-				# "Ambiguous type specification: '",
-				# $past<display_name>,
-				# "' matches more than one type.");
-		# }
-	# }
-	# else {
-		# NOTE("No valid matching typename");
-	# }
-		
-	# DUMP($past);
-	# make $past;
-# }
+method type_name($/, $key) {
+	our $Symbols;
+	our $Is_valid_type;		# Global accessed by grammar rule.
+	my $past := $/{$key}.ast;
+	$Is_valid_type := $Symbols.query_type_name($past);
+	MAKE($past);	
+}

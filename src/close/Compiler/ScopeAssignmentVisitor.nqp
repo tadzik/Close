@@ -8,8 +8,8 @@ Sets identifier scopes in PAST.
 
 class Slam::ScopeAssignmentVisitor;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
+sub ASSERTold($condition, *@message) {
+	Dumper::ASSERTold(Dumper::info(), $condition, @message);
 }
 
 sub BACKTRACE() {
@@ -22,12 +22,12 @@ sub DIE(*@msg) {
 	Dumper::DIE(Dumper::info(), @msg);
 }
 
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
+sub DUMPold(*@pos, *%what) {
+	Dumper::DUMPold(Dumper::info(), @pos, %what);
 }
 
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
+sub NOTEold(*@parts) {
+	Dumper::NOTEold(Dumper::info(), @parts);
 }
 
 ################################################################
@@ -71,8 +71,8 @@ Delegates to SUPER.visit. This method should be copied unchanged into the new co
 method visit($node) {
 	my @results := $SUPER.visit(self, $node);
 	
-	NOTE("done");
-	DUMP(@results);
+	NOTEold("done");
+	DUMPold(@results);
 	return @results;
 }
 
@@ -113,16 +113,16 @@ our @Child_attribute_names := (
 
 # Just pass the visitor along.
 method _assign_scope_UNKNOWN($node) {	
-	NOTE("No custom handler exists for '", NODE_TYPE($node), 
+	NOTEold("No custom handler exists for '", NODE_TYPE($node), 
 		"' node '", $node.name(), "'. Passing through to children.");
-	DUMP($node);
+	DUMPold($node);
 	return $SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
 }
 
 our @Results := Array::empty();
 
 method _assign_scope_declarator_name($node) {
-	NOTE("Assigning scope to declarator_name: ", $node<display_name>);
+	NOTEold("Assigning scope to declarator_name: ", $node<display_name>);
 	
 	$SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
 
@@ -135,19 +135,19 @@ method _assign_scope_declarator_name($node) {
 			}
 		}
 		
-		ASSERT($scope, 
+		ASSERTold($scope, 
 			'There must be a default scope set for every declaration.');
-		NOTE("Setting scope of object '", $node<display_name>, "' to ", $scope);
+		NOTEold("Setting scope of object '", $node<display_name>, "' to ", $scope);
 		$node.scope($scope);
 	}
 	
-	NOTE("done");
-	DUMP($node);
+	NOTEold("done");
+	DUMPold($node);
 	return @Results;
 }
 
 method _assign_scope_qualified_identifier($node) {
-	NOTE("Assigning scope to qualified_identifier: ", $node<display_name>);
+	NOTEold("Assigning scope to qualified_identifier: ", $node<display_name>);
 	
 	$SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
 
@@ -157,7 +157,7 @@ method _assign_scope_qualified_identifier($node) {
 		if $node<declarator> {
 			$scope := $node<declarator><scope>;
 			
-			ASSERT($scope,
+			ASSERTold($scope,
 				'Every declarator should have a scope assigned by SymbolResolutionVisitor');
 			
 			if $scope eq 'parameter' {
@@ -165,23 +165,23 @@ method _assign_scope_qualified_identifier($node) {
 			}
 		}
 		else {
-			NOTE("ERROR: Qualified identifier with not declarator. Assigning package scope.");
+			NOTEold("ERROR: Qualified identifier with not declarator. Assigning package scope.");
 			
 			# No declarator -> error. Should already be tagged as an error.
 			my @messages := Slam::Messages::get_messages($node);
 			
-			ASSERT(+@messages > 0,
+			ASSERTold(+@messages > 0,
 				'A qid with no <declarator> should have an error message attached.');
 			
 			$scope := 'package';
 		}
 			
-		NOTE("Setting scope to '", $scope, "'");
+		NOTEold("Setting scope to '", $scope, "'");
 		$node.scope($scope);
 	}
 	
-	NOTE("done");
-	DUMP($node);
+	NOTEold("done");
+	DUMPold($node);
 	return @Results;
 }
 
@@ -195,24 +195,24 @@ to visit the PAST node that is passed from the compiler.
 =cut
 
 sub assign_scopes($past) {
-	NOTE("Assigning scopes in PAST tree");
-	DUMP($past);
+	NOTEold("Assigning scopes in PAST tree");
+	DUMPold($past);
 
-	if Slam::Config::query('Compiler', name(0), 'disabled') {
-		NOTE("Configured off - skipping");
+	if Registry<CONFIG>.query('Compiler', name(0), 'disabled') {
+		NOTEold("Configured off - skipping");
 	}
 	else {
 		$SUPER := Slam::Visitor.new();
-		NOTE("Created SUPER-visitor");
-		DUMP($SUPER);
+		NOTEold("Created SUPER-visitor");
+		DUMPold($SUPER);
 		
 		my $visitor	:= Slam::ScopeAssignmentVisitor.new();
-		NOTE("Created visitor");
-		DUMP($visitor);
+		NOTEold("Created visitor");
+		DUMPold($visitor);
 		
 		$visitor.visit($past);
 		
-		NOTE("done");
-		DUMP($past);
+		NOTEold("done");
+		DUMPold($past);
 	}
 }

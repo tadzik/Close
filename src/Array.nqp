@@ -2,8 +2,8 @@
 
 class Array;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
+sub ASSERTold($condition, *@message) {
+	Dumper::ASSERTold(Dumper::info(), $condition, @message);
 }
 
 sub BACKTRACE() {
@@ -16,12 +16,12 @@ sub DIE(*@msg) {
 	Dumper::DIE(Dumper::info(), @msg);
 }
 
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
+sub DUMPold(*@pos, *%what) {
+	Dumper::DUMPold(Dumper::info(), @pos, %what);
 }
 
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
+sub NOTEold(*@parts) {
+	Dumper::NOTEold(Dumper::info(), @parts);
 }
 
 ################################################################
@@ -32,6 +32,17 @@ sub append(@dest, @append) {
 	}
 	
 	return @dest;
+}
+
+method contains($item) {
+say("Checking containment");
+	for self {
+		if $_ =:= $item {
+			return 1;
+		}
+	}
+	
+	return 0;
 }
 
 sub delete(@array, $index) {
@@ -97,15 +108,15 @@ at the start of the array.
 =cut
 
 sub bsearch(@array, $value, *%adverbs) {
-	DUMP(:array(@array));
-	NOTE("bsearch: for value ", $value);
+	DUMPold(:array(@array));
+	NOTEold("bsearch: for value ", $value);
 	my $low := 0 + %adverbs<low>;
 
 	if $low < 0 {
 		$low := $low + @array;
 	}
 	
-	NOTE("low end: ", $low);
+	NOTEold("low end: ", $low);
 	
 	my $high := +@array + %adverbs<high>;
 	
@@ -113,7 +124,7 @@ sub bsearch(@array, $value, *%adverbs) {
 		$high := %adverbs<high>;
 	}
 
-	NOTE("high end: ", $high);
+	NOTEold("high end: ", $high);
 	
 	my $top := $high;
 	
@@ -128,7 +139,7 @@ sub bsearch(@array, $value, *%adverbs) {
 		&compare := %adverbs<cmp>;
 	}
 	
-	NOTE("Compare function is: ", &compare);
+	NOTEold("Compare function is: ", &compare);
 	
 	my $mid;
 	while $low < $high {
@@ -161,7 +172,7 @@ sub bsearch(@array, $value, *%adverbs) {
 		$result := $low;
 	}
 	
-	NOTE("Returning ", $result);
+	NOTEold("Returning ", $result);
 	return $result;
 }
 

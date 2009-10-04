@@ -6,7 +6,7 @@ $ Rev: $
 
 =cut
 
-grammar close::Grammar is PCT::Grammar;
+grammar Slam::Grammar is PCT::Grammar;
 
 =rule TOP
 
@@ -27,7 +27,7 @@ convenience target for namespace and translation unit definitions.
 =cut
 
 rule declaration_sequence {
-	<.ws> <decl=declarative_statement>*
+	<decl=declarative_statement>*
 }
 
 =rule declarative_statement
@@ -40,9 +40,11 @@ L<include_file>s and L<using_namespace_directive>s.
 =cut
 
 rule declarative_statement {
-	| <include_directive>	{*} #= include_directive
+{{say "Trying declarative_statement" }}
+	[ <include_directive>	{*} #= include_directive
 	| <namespace_definition>	{*} #= namespace_definition
-	| <declaration_statement>	{*} #= declaration_statement
+	| {{say "Trying declaration_stmt" }}<declaration_statement>	{*} #= declaration_statement
+	]
 }
 
 =rule include_directive

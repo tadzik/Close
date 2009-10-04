@@ -2,8 +2,8 @@
 
 class Hash;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
+sub ASSERTold($condition, *@message) {
+	Dumper::ASSERTold(Dumper::info(), $condition, @message);
 }
 
 sub BACKTRACE() {
@@ -16,12 +16,12 @@ sub DIE(*@msg) {
 	Dumper::DIE(Dumper::info(), @msg);
 }
 
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
+sub DUMPold(*@pos, *%what) {
+	Dumper::DUMPold(Dumper::info(), @pos, %what);
 }
 
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
+sub NOTEold(*@parts) {
+	Dumper::NOTEold(Dumper::info(), @parts);
 }
 
 ################################################################

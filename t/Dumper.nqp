@@ -16,14 +16,14 @@ our %Already_in;
 %Already_in<INFO>	:= 0;
 %Already_in<NOTE>	:= 0;
 
-sub ASSERT(@info, $condition, @message) {
+sub ASSERTold(@info, $condition, @message) {
 	unless %Already_in<ASSERT> {
 		%Already_in<ASSERT>++;
 	
 		if $condition {
 			if @info[0] && @info[0] % 8 >= 4 {
 				@message.unshift("ASSERT PASSED: ");
-				NOTE(@info, @message);
+				NOTEold(@info, @message);
 			}
 		}
 		else {
@@ -58,7 +58,7 @@ sub DIE(@info, @msg) {
 	}
 }
 
-sub DUMP(@info, @pos, %named) {
+sub DUMPold(@info, @pos, %named) {
 	unless %Already_in<DUMP> {
 		%Already_in<DUMP>++;
 
@@ -86,7 +86,7 @@ sub DUMP_(*@what) {
 	}
 }
 
-sub NOTE(@info, @parts) {
+sub NOTEold(@info, @parts) {
 	unless %Already_in<NOTE> {
 		%Already_in<NOTE>++;
 
@@ -145,7 +145,7 @@ sub info() {
 		$proceed := get_config($class_name, $caller_name);
 		
 		if $proceed {
-			# Foo calls NOTE(), calls info(), calls stack_depth() : subtract 3
+			# Foo calls NOTEold(), calls info(), calls stack_depth() : subtract 3
 			$stack_depth	:= stack_depth() - 3;
 			@result := Array::new($proceed, $stack_depth, $class_name, $caller_name);
 		}
@@ -158,7 +158,7 @@ sub info() {
 
 sub get_config($class, $sub) {	
 	my @keys := Array::new('Dump', $class, $sub);
-	my $result := Slam::Config::query_array(@keys);
+	my $result := Registry<CONFIG>.query_array(@keys);
 	return $result;
 }
 

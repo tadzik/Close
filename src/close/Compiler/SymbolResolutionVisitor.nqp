@@ -2,8 +2,8 @@
 
 class Slam::SymbolResolutionVisitor;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
+sub ASSERTold($condition, *@message) {
+	Dumper::ASSERTold(Dumper::info(), $condition, @message);
 }
 
 sub BACKTRACE() {
@@ -16,12 +16,12 @@ sub DIE(*@msg) {
 	Dumper::DIE(Dumper::info(), @msg);
 }
 
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
+sub DUMPold(*@pos, *%what) {
+	Dumper::DUMPold(Dumper::info(), @pos, %what);
 }
 
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
+sub NOTEold(*@parts) {
+	Dumper::NOTEold(Dumper::info(), @parts);
 }
 
 ################################################################
@@ -65,8 +65,8 @@ Delegates to SUPER.visit. This method should be copied unchanged into the new co
 method visit($node) {
 	my @results := $SUPER.visit(self, $node);
 	
-	NOTE("done");
-	DUMP(@results);
+	NOTEold("done");
+	DUMPold(@results);
 	return @results;
 }
 
@@ -110,19 +110,19 @@ our @Child_attribute_names := (
 
 # Just pass the visitor along.
 method _resolve_symbols_UNKNOWN($node) {	
-	NOTE("No custom handler exists for '", NODE_TYPE($node), 
+	NOTEold("No custom handler exists for '", NODE_TYPE($node), 
 		"' node '", $node.name(), "'. Passing through to children.");
-	DUMP($node);
+	DUMPold($node);
 	return $SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
 }
 
 method _resolve_symbols_qualified_identifier($node) {
-	NOTE("Visiting qualified_identifier node: ", $node<display_name>);
-	DUMP($node);
+	NOTEold("Visiting qualified_identifier node: ", $node<display_name>);
+	DUMPold($node);
 	
 	my @cands := Slam::Lookups::query_scopes_containing_symbol($node);
-	NOTE("Found ", +@cands, " candidates for symbol resolution");
-	DUMP(@cands);
+	NOTEold("Found ", +@cands, " candidates for symbol resolution");
+	DUMPold(@cands);
 		
 	# Currently there is no type-based disambiguation. 
 	
@@ -133,13 +133,13 @@ method _resolve_symbols_qualified_identifier($node) {
 	my $resolved;
 	
 	if +@cands == 0 {
-		NOTE("Attaching undeclared symbol error");
+		NOTEold("Attaching undeclared symbol error");
 		ADD_ERROR($node, "Undeclared symbol: ", $node<display_name>);
 	}
 	elsif +@cands == 1 {
 		$resolved := Slam::Scopes::get_symbols(@cands[0], $node.name())[0];
-		NOTE("Found one candidate: ", $resolved<display_name>);
-		DUMP($resolved);
+		NOTEold("Found one candidate: ", $resolved<display_name>);
+		DUMPold($resolved);
 	}
 	elsif +@cands > 1 {
 		if !$node<is_rooted> && !$node.namespace() {
@@ -159,7 +159,7 @@ method _resolve_symbols_qualified_identifier($node) {
 				@names.push($_.name());
 			}
 		
-			NOTE("Adding 'ambiguous symbol' error");
+			NOTEold("Adding 'ambiguous symbol' error");
 			ADD_ERROR($node, "Ambiguous symbol: ",
 				$node<display_name>, 
 				" - could resolve to any of these paths:\n\t",
@@ -179,8 +179,8 @@ method _resolve_symbols_qualified_identifier($node) {
 	
 	my @results := Array::new($node);
 	
-	NOTE("done");
-	DUMP(@results);
+	NOTEold("done");
+	DUMPold(@results);
 	return @results;
 }
 
@@ -194,23 +194,23 @@ the declaration of the symbol they refer to.
 =cut
 
 sub resolve_symbols($past) {
-	NOTE("Resolving symbols in PAST tree");
-	DUMP($past);
+	NOTEold("Resolving symbols in PAST tree");
+	DUMPold($past);
 
-	if Slam::Config::query('Compiler', name(0), 'disabled') {
-		NOTE("Configured off - skipping");
+	if Registry<CONFIG>.query('Compiler', name(0), 'disabled') {
+		NOTEold("Configured off - skipping");
 	}
 	else {
 		$SUPER := Slam::Visitor.new();
-		NOTE("Created SUPER-visitor");
-		DUMP($SUPER);
+		NOTEold("Created SUPER-visitor");
+		DUMPold($SUPER);
 		
 		my $visitor := Slam::SymbolResolutionVisitor.new();
-		NOTE("Created visitor");
-		DUMP($visitor);
+		NOTEold("Created visitor");
+		DUMPold($visitor);
 
 		$visitor.visit($past);
 	}
 		
-	NOTE("done");
+	NOTEold("done");
 }

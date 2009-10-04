@@ -1,34 +1,13 @@
 # $Id$
 
 class Scalar;
-
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
-}
-
-sub BACKTRACE() {
-	Q:PIR {{
-		backtrace
-	}};
-}
-
-sub DIE(*@msg) {
-	Dumper::DIE(Dumper::info(), @msg);
-}
-
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
-}
-
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
-}
-
+	Parrot::IMPORT('Dumper');
+	
 ################################################################
 
 sub defined($what) {
-	NOTE("Checking if something is defined");
-	DUMP($what);
+	#NOTEold("Checking if something is defined");
+	#DUMPold($what);
 	
 	my $result := Q:PIR {{
 		$P0 = find_lex '$what'
@@ -36,7 +15,7 @@ sub defined($what) {
 		%r = box $I0
 	}};
 	
-	NOTE("Returning ", $result);
+	#NOTEold("Returning ", $result);
 	return $result;
 }
 

@@ -1,27 +1,20 @@
 # $Id: Scopes.nqp 155 2009-09-25 04:42:21Z austin_hastings@yahoo.com $
 
-class Slam::IncludeFile;
+module Slam::IncludeFile;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
-}
+#Parrot::IMPORT('Dumper');
 
-sub BACKTRACE() {
-	Q:PIR {{
-		backtrace
-	}};
-}
+################################################################
 
-sub DIE(*@msg) {
-	Dumper::DIE(Dumper::info(), @msg);
-}
+_onload();
 
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
-}
+sub _onload() {
+	if our $onload_done { return 0; }
+	$onload_done := 1;
 
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
+	Parrot::IMPORT('Dumper');
+	
+	NOTE("running.");
 }
 
 ################################################################
@@ -29,15 +22,6 @@ sub NOTE(*@parts) {
 sub ADD_ERROR($node, *@msg) {
 	Slam::Messages::add_error($node,
 		Array::join('', @msg));
-}
-
-sub ADD_WARNING($node, *@msg) {
-	Slam::Messages::add_warning($node,
-		Array::join('', @msg));
-}
-
-sub NODE_TYPE($node) {
-	return $node.node_type;
 }
 
 ################################################################
@@ -110,15 +94,15 @@ sub in_include_file() {
 	return get_stack() > 0;
 }
 
-our %Include_search_paths;
-%Include_search_paths<system> := Array::new(
-	'include',
-);
-
-%Include_search_paths<user> := Array::new('.');
-
 sub include_type_search_path($type) {
-	return %Include_search_paths{$type};
+	unless our %include_search_paths {
+		%include_search_paths := Hash::new(
+			:system(	Array::new('include')),
+			:user(	Array::new('.')),
+		);
+	}
+	
+	return %include_search_paths{$type};
 }
 
 sub parse_text($text) {
@@ -211,11 +195,15 @@ sub push($filename) {
 
 sub set_FILES($value) {
 	Q:PIR {
+		$P0 = find_dynamic_lex '$?FILES'
+		if null $P0 goto skip
+			
 		$P0 = find_lex '$value'
 		$P1 = shift $P0
 		store_dynamic_lex '$?FILES', $P1
 
 		$P1 = shift $P0
 		set_hll_global '$!ws', $P1
+	skip:
 	};
 }

@@ -48,10 +48,10 @@ CLOSE_LIB_PBC := library/close/close_lib.pbc
 #OPS_DEPS := build/src/ops/Makefile.in $(OPS_DIR)/close.ops
 
 ACTIONS_PM := \
-	src/parser/parse_utils.nqp \
 	src/parser/builtin_actions.nqp
 
 BUILTINS_PIR := \
+	src/builtins/grammar_utils.pir \
 	src/builtins/literals.pir \
 	src/builtins/optable.pir \
 	src/builtins/say.pir \
@@ -59,16 +59,22 @@ BUILTINS_PIR := \
 
 COMPILER_LIBS_PIR := \
 	src/Array.pir		\
+	src/Class.pir		\
 	src/Config.pir	\
 	src/Dumper.pir	\
 	src/File.pir		\
 	src/Hash.pir		\
 	src/OS.pir		\
+	src/Parrot.pir 	\
+	src/Registry.pir 	\
 	src/Scalar.pir 	\
 	src/String.pir		\
+	src/close/Compiler/_INIT.pir	\
+	src/close/Compiler/Adverbs.pir			\
 	src/close/Compiler/Config.pir			\
 	src/close/Compiler/DeclarationCollectionVisitor.pir	\
 	src/close/Compiler/IncludeFile.pir			\
+	src/close/Compiler/Literal.pir			\
 	src/close/Compiler/Lookups.pir			\
 	src/close/Compiler/Messages.pir			\
 	src/close/Compiler/MessageVisitor.pir		\
@@ -78,7 +84,9 @@ COMPILER_LIBS_PIR := \
 	src/close/Compiler/PrettyPrintVisitor.pir		\
 	src/close/Compiler/ScopeAssignmentVisitor.pir	\
 	src/close/Compiler/Scopes.pir			\
+	src/close/Compiler/Statements.pir			\
 	src/close/Compiler/SymbolResolutionVisitor.pir	\
+	src/close/Compiler/SymbolTable.pir		\
 	src/close/Compiler/Symbols.pir			\
 	src/close/Compiler/Type.pir			\
 	src/close/Compiler/TreeRewriteVisitor.pir	\
@@ -102,16 +110,17 @@ LIBRARY_SRC := \
 	library/close/ok.cl \
 	library/close/string.cl
 	
-GEN_SOURCES := \
-	src/gen_grammar.pir \
-	src/gen_actions.pir \
+GEN_SOURCES :=				\
+	src/gen_grammar.pir		\
+	src/gen_actions.pir			\
 	src/parser/grammar_actions.pir	\
 	src/parser/declaration_actions.pir	\
 	src/parser/expression_actions.pir	\
 	src/parser/name_actions.pir	\
+	src/parser/parse_utils.pir		\
 	src/parser/statement_actions.pir	\
 	src/parser/token_actions.pir	\
-	src/gen_builtins.pir \
+	src/gen_builtins.pir			\
 	src/gen_library.pir
 
 SOURCES := $(GEN_SOURCES) \
@@ -194,26 +203,9 @@ close.pbc: $(SOURCES)
 close@exe@: close.pbc
 	$(PBC_TO_EXE) close.pbc
 
-# src/gen_actions.pir: src/gen_actions.nqp
-	# @echo "**** Compiling gen_actions.nqp to PIR"
-	# $(PARROT) $(PARROT_ARGS) $(NQP) --target=pir	\
-		# --output=src/gen_actions.pira			\
-		# src/gen_actions.nqp
-	# $(STRIP_PIRA) src/gen_actions.pira			\
-		# > src/gen_actions.pir
-	
 src/gen_actions.nqp: $(ACTIONS_PM) Makefile
 	@echo "**** Collecting gen_actions.nqp"
 	cat $(ACTIONS_PM) > src/gen_actions.nqp
-
-# src/grammar_actions.pir: src/parser/grammar_actions.nqp
-	# @echo "**** Compiling $< to PIR"
-	# $(PARROT) $(PARROT_ARGS) $(NQP)  --target=pir \
-		# --output=src/grammar_actions.pira \
-		# src/parser/grammar_actions.nqp
-	# $(STRIP_PIRA) src/grammar_actions.pira \
-		# > src/grammar_actions.pir
-	# $(RM_F) src/grammar_actions.pira
 
 src/gen_builtins.pir: $(BUILTINS_PIR)
 	@echo "**** Collecting gen_builtins.pir"
@@ -225,6 +217,7 @@ src/gen_grammar.pg: $(GRAMMARS_PG) Makefile
 	
 src/gen_library.pir: $(COMPILER_LIBS_PIR) Makefile
 	@echo "**** Assembling gen_library.pir from compiler libs"
+	@echo "Files: " $(COMPILER_LIBS_PIR)
 	$(CAT) $(COMPILER_LIBS_PIR) > src/gen_library.pir
 
 $(CLOSE_GROUP): $(PMC_DEPS)

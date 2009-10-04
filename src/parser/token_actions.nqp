@@ -1,16 +1,102 @@
 # $Id$
-class close::Grammar::Actions;
+class Slam::Grammar::Actions;
+
+method ADV_ANON($/) {
+	my $past := Slam::Adverb.new(:name(~ $/), :node($/));
+	make $past;
+}
+
+method ADV_FLAT($/) {
+	my $past := Slam::Adverb::Flat.new(:name(~ $/), :node($/));
+	make $past;
+}
+
+method ADV_INIT($/) {
+	my $past := Slam::Adverb.new(:name(~ $/), :node($/));
+	make $past;
+}
+
+method ADV_LOAD($/) {
+	my $past := Slam::Adverb.new(:name(~ $/), :node($/));
+	make $past;
+}
+
+method ADV_MAIN($/) {
+	my $past := Slam::Adverb.new(:name(~ $/), :node($/));
+	make $past;
+}
+
+method ADV_METHOD($/) {
+	my $past := Slam::Adverb.new(:name(~ $/), :node($/));
+	make $past;
+}
+
+method ADV_MULTI($/) {
+	my $past := Slam::Adverb.new(:name(~ $/), :node($/),
+		:signature($<signature>.ast),
+	);
+	make $past;
+}
+
+method ADV_NAMED($/) {
+	my $past := Slam::Adverb.new(:name(~ $/), :node($/));
+	
+	if $<named> {
+		my $named := $<named>[0].ast.value();
+		$past.named($named);
+	}
+
+	make $past;
+}
+
+method ADV_OPTIONAL($/) {
+	my $past := Slam::Adverb.new(:name(~ $/), :node($/));
+	make $past;
+}
+
+method ADV_REG_CLASS($/) {
+	my $past := Slam::Adverb::RegisterClass.new(:name(~ $/), :node($/),
+		:register_class($<register_class>.ast.value),
+	);
+	make $past;
+}
+
+method ADV_SLURPY($/) {
+	my $past := Slam::Adverb::Slurpy.new(:name(~ $/), :node($/));
+	make $past;
+}
+
+method ADV_VTABLE($/) {
+	my $past := Slam::Adverb::Vtable.new(:name(~ $/), :node($/));
+	
+	if $<vtable> {
+		my $vtable := $<vtable>[0].ast.value;
+		$past.vtable($vtable);
+	}
+	
+	make $past;
+}
 
 method BAREWORD($/) {
 	NOTE("Parsed BAREWORD");
 	
-	my $past := Slam::Node::create('bareword',
+	my $past := PAST::Val.new(
 		:node($/),
 		:name(~ $/),
 		:value(~ $/),
 	);
-	
-	DUMP($past);
+
+	MAKE($past);
+}
+
+method BASIC_TYPE($/) {
+	NOTE("Saw basic type name: ", ~ $/);
+	my $past := Slam::Symbol::Reference.new(:name(~$/), :node($/));
+	MAKE($past);
+}
+
+method CONST($/) {
+	my $past := Slam::Type::Specifier(:name(~$/), :node($/), :is_const(1));
 	make $past;
 }
 
@@ -62,38 +148,30 @@ method IDENTIFIER($/, $key) { PASSTHRU($/, $key); }
 method INTEGER_LIT($/) {
 	NOTE("Parsed INTEGER_LIT");
 	
-	my $past := Slam::Node::create('integer_literal',
-		:name(~ $/),
-		:node($/),
-		:value(~ $<value>),
-	);
+	my $past := Slam::Literal::Integer.new(:node($/),
+		:value(~ $<value>));
 	
 	if $<bad_octal> {
-		ADD_WARNING($past, 
-			"Integer literals like '", $past.value(),
+		$past.warning(:message("Integer literals like '", 
+			$past.value(),
 			"' are not interpreted as octal. Use the 0o ",
-			"(zero, oh) prefix for octal literals.");
+			"(zero, oh) prefix for octal literals."));
 	}
 	
 	if $<lu_part> {
-		ADD_WARNING($past,
-			"Integer suffix '",  ~$<lu_part>, "' ignored");
+		$past.warning(:message(
+			"Integer suffix '",  ~$<lu_part>, "' ignored"));
 	}
 	
-	DUMP($past);
-	make $past;
+	MAKE($past);
 }
 
 method QUOTED_LIT($/, $key) {
 	NOTE("Parsed QUOTED_LIT");
 	
-	my $past := Slam::Node::create('quoted_literal',
-		:name(~ $/),
-		:node($/),
-		:quote($key),
-		:value($<string_literal>.ast),
-	);
-	
+	my $past := PAST::Val.new(:name(~$/), :node($/), 
+		:value($<string_literal>.ast));
+	$past<quote> := $key;
 	DUMP($past);
 	make $past;
 }
@@ -127,6 +205,11 @@ method USER_HEADER($/) {
 	);
 	
 	DUMP($past);
+	make $past;
+}
+
+method VOLATILE($/) {
+	my $past := Slam::Type::Specifier(:name(~$/), :node($/), :is_volatile(1));
 	make $past;
 }
 

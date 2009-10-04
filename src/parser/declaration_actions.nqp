@@ -1,6 +1,6 @@
 # $Id$
 
-class close::Grammar::Actions;
+module Slam::Grammar::Actions;
 
 =method access_qualifier
 
@@ -8,39 +8,9 @@ Creates a type-specifier entry, to be attached to a declarator or specifier.
 
 =cut
 
-method access_qualifier($/) {
-	my $name := ~ $<token>;
-	NOTE("Creating new cv qualifier: ", $name);
-	my $past := Slam::Type::Specifier::access_qualifier($/,
-		:name($name),
-	);
-	DUMP($past);
-	make $past;
-}
+method access_qualifier($/, $key)	{ PASSTHRU($/, $key); }
 
-method dclr_adverb($/) {
-	NOTE("Found declarator_adverb: ", ~$/);
-
-	my $signature;
-	
-	if $<signature> {
-		$signature := ~ $<signature>;
-		NOTE("Got signature: ", $signature);
-	}
-	elsif $<register_class> {
-		$signature := $<register_class>.ast.value();
-	}
-	
-	my $past := Slam::Node::create('adverb', 
-		:node($/), 
-		:name(~$<token>),
-		:signature($signature),
-		:value(~$<token>),
-	);
-
-	DUMP($past);
-	make $past;
-}
+method dclr_adverb($/, $key)	{ PASSTHRU($/, $key); }
 
 =method dclr_alias
 
@@ -61,12 +31,21 @@ and attaches any attributes required (array #elements).
 =cut
 
 method dclr_array_or_hash($/, $key) {
-	my $past := Slam::Node::create($key, :node($/));
+	my $past;
 	
-	if $<size> {
-		$past<elements> := $<size>.ast;
+	if $key eq 'hash' {
+		NOTE("Building Hash declarator");
+		$past := Slam::Type::Hash.new(:node($/));
 	}
-
+	elsif $key eq 'array' {
+		NOTE("Building Array declarator");
+		$past := Slam::Type::Array.new(:node($/),
+			:elements($<size>.ast));
+	}
+	else {
+		$/.panic("Unexpected $key value '", $key, "'");
+	}
+	
 	DUMP($past);
 	make $past;
 }
@@ -82,11 +61,8 @@ any qualifiers as children of the node.
 
 method dclr_pointer($/) {
 	NOTE("Creating pointer declarator");
-	my $past := Slam::Type::Declarator::pointer_to(
-		:node($/),
-		:qualifiers(ast_array($<access_qualifier>)),
-		:name(~ $/),
-	);
+	my $past := Slam::Type::Pointer.new(:name(~ $/), :node($/));
+	$past.qualify(ast_array($<access_qualifier>));
 	
 	DUMP($past);
 	make $past;
@@ -100,85 +76,66 @@ Passes through the array, hash, or function declarator.
 
 method dclr_postfix($/, $key) { PASSTHRU($/, $key); }
 
-method declaration($/) {
-	my $past	:= Slam::Node::create('decl_varlist');
-	my $specs	:= $<specifier_list>.ast;
-	
-	NOTE("Processing declarators");
-	
-	for $<symbol> {
-		my $declarator := $_.ast;
-		
-		# For functions. I don't know if this affects anything else.
-		if $declarator<definition> {
-			NOTE("Replacing declarator with definition");
-			$declarator := $declarator<definition>;
-		}
+method declarator($/) {	
+	my $symbol := $<dclr_atom>.ast;
+	ASSERT($symbol.isa(Slam::Symbol::Declaration),
+		"A symbol at the heart of every declarator!");
+	NOTE("Processing declarator: ", $symbol);
+	DUMP($symbol);
 
-		NOTE("Merging specifier with declarator '", $declarator.name(), "'");
-		$declarator<etype><type> := $specs;
-		$declarator<etype> := $specs;
-			
-		# FIXME: Is this needed? Should this be a separate pass?
-		#NOTE("Adding declarator to its scope");
-		#Slam::Scopes::add_declarator($declarator);
-		
-		NOTE("Adding declarator to decl-varlist");
-		$past.push($declarator);
+	# Postfix declarators go on in order: X()[][%] is
+	# a function returning an array of hash.
+	my @postfix_dclrs := ast_array($<dclr_postfix>);
+
+	NOTE(+@postfix_dclrs, " postfix declarators");
+	for @postfix_dclrs {
+		$symbol.add_type_info($_);
+	}
+	
+	# Prefix declarators go on in reverse order: *volatile *const X
+	# is a const pointer to volatile pointer 
+	my @prefix_dclrs := Array::reverse(ast_array($<dclr_pointer>));
+	
+	NOTE(+@prefix_dclrs, " prefix declarators");
+	for @prefix_dclrs {
+		$symbol.add_type_info($_);
 	}
 
-	NOTE("done");
-	DUMP($past);
-	make $past;
+	NOTE("Declarator fixed up (specifiers not added yet)");
+	DUMP($symbol);
+	make $symbol;
 }
 
-method declarator($/) {	
-	my $past := $<dclr_atom>.ast;
-	NOTE("Processing declarator: ", $past.name());
-	DUMP($past);
+method _declarator_part_after_declarator($/) {
+	my $symbol := $<declarator>.ast;
+	NOTE("Assembling type and alias info for ", $symbol.name);
 	
-	my $last_dclr := $past<etype>;
+	# int '$x' alias x;
+	# $x is the pirname, x is the alias, x is the name
+	if $<dclr_alias> {
+		$symbol.alias($<dclr_alias>[0].ast);
+		NOTE("Aliased to ", $symbol.name);
+	}
+	
+	for $<adverbs> {
+		$symbol.add_adverb($_.ast);
+	}
 
-	for $<dclr_postfix> {
-		NOTE("Adding postfix declarator: ", $_.ast.name());
-		$last_dclr<type> := $_.ast;
-		$last_dclr := $_.ast;
-	}
+	# So far, there is no block.
+	Q:PIR {{
+		$P0 = box 0
+		set_hll_global [ 'Slam' ; 'Grammar' ], '$!Decl_block', $P0
+	}};
 	
-	$past<etype> := $last_dclr;
-
-	# Reverse the chain of pointer declarators:
-	# int *const *volatile X;  becomes
-	# X -> *volatile -> *const -> int
-	my $pointer_chain;
-	$last_dclr := Scalar::undef();
-	
-	for $<dclr_pointer> {
-		$_.ast<type> := $pointer_chain;
-		$pointer_chain := $_.ast;
-		
-		unless $last_dclr {
-			$last_dclr := $pointer_chain;
-		}
-	}
-	
-	# Append pointer chain to declarators
-	# X -> array of -> pointer to...
-	if $last_dclr {
-		$past<etype><type> := $pointer_chain;
-		$past<etype> := $last_dclr;
-	}
-	
-	NOTE("Declarator fixed up (specifiers not added yet)");
-	DUMP($past);
-	make $past;
+	DUMP($symbol);
+	# No make here. See _done
 }
 
 method _declarator_part_close_block($/) {
 		# Now there is a block.
 		Q:PIR {{
 			$P0 = box 1
-			set_hll_global ['close';'Grammar'], '$!Decl_block', $P0
+			set_hll_global [ 'Slam' ;'Grammar'], '$!Decl_block', $P0
 		}};
 		
 		NOTE("Closing decl block");
@@ -189,36 +146,9 @@ method _declarator_part_close_block($/) {
 		$past<using_namespaces> := $<body>[0].ast<using_namespaces>;
 }
 
-method _declarator_part_declarator($/) {
-	my $past := $<declarator>.ast;
-	NOTE("Assembling declarator ", $past.name());
-	
-	# int '$x' alias x; say(x);
-	# $x is the pirname, x is the alias, x is the name
-	if $<dclr_alias> {
-		$past<alias> := $<dclr_alias>[0].ast;
-		$past<pirname> := $past.name();
-		Slam::Node::set_name($past, $past<alias>.name());
-	}
-	
-	for $<adverbs> {
-		Slam::Node::set_adverb($past, $_.ast);
-	}
-
-	# So far, there is no block.
-	Q:PIR {{
-		$P0 = box 0
-		set_hll_global ['close';'Grammar'], '$!Decl_block', $P0
-	}};
-	
-	DUMP($past);
-}
-
 method _declarator_part_done($/) {
 	my $past := $<declarator>.ast;
-	NOTE("done");
-	DUMP($past);
-	make $past;
+	MAKE($past);
 }
 
 method _declarator_part_initializer($/) {
@@ -253,21 +183,14 @@ method _declarator_part_open_block($/) {
 }
 	
 # NQP currently generates get_hll_global for functions. So qualify them all.
-our %_declarator_part;
-%_declarator_part<close_block>	:= close::Grammar::Actions::_declarator_part_close_block;
-%_declarator_part<declarator>	:= close::Grammar::Actions::_declarator_part_declarator;
-%_declarator_part<done>		:= close::Grammar::Actions::_declarator_part_done;
-%_declarator_part<initializer>	:= close::Grammar::Actions::_declarator_part_initializer;
-%_declarator_part<open_block>	:= close::Grammar::Actions::_declarator_part_open_block;
+our %_decl_part;
+%_decl_part<close_block>		:= Slam::Grammar::Actions::_declarator_part_close_block;
+%_decl_part<after_declarator>	:= Slam::Grammar::Actions::_declarator_part_after_declarator;
+%_decl_part<done>			:= Slam::Grammar::Actions::_declarator_part_done;
+%_decl_part<initializer>		:= Slam::Grammar::Actions::_declarator_part_initializer;
+%_decl_part<open_block>		:= Slam::Grammar::Actions::_declarator_part_open_block;
 
-method declarator_part($/, $key) {
-	if %_declarator_part{$key} {
-		%_declarator_part{$key}(self, $/);
-	}
-	else {
-		$/.panic("Invalid $key '", $key, "' passed to declarator_part()");
-	}
-}
+method declarator_part($/, $key) { self.DISPATCH($/, $key, %_decl_part); }
 
 =method namespace_alias_declaration
 
@@ -288,27 +211,7 @@ method namespace_alias_declaration($/) {
 	make $past;
 }
 
-method param_adverb($/) {
-	NOTE("Creating parameter adverb from: ", $/);
-
-	my $named;
-	
-	if $<named> {
-		my $param_name := $<named>[0].ast;
-		DUMP($param_name);
-		$named := $param_name.value();
-	}
-	
-	my $past := Slam::Node::create('adverb', 
-		:node($/), 
-		:name(~$<token>),
-		:named($named),
-		:value(~$<token>),
-	);
-	
-	DUMP($past);
-	make $past;
-}
+method param_adverb($/, $key)	{ PASSTHRU($/, $key); }
 
 =method parameter_declaration
 
@@ -398,6 +301,7 @@ method specifier_list($/) {
 	
 	my @specs := ast_array($<specs>);
 	ASSERT(+@specs, 'Specifier list requires at least one item');
+	
 	my $past := @specs.shift();
 	$past.attach(@specs);
 	
@@ -406,14 +310,56 @@ method specifier_list($/) {
 	make $past;
 }
 
+=method symbol_declaration_list
+
+Attaches specifier_list to each symbol's declarator. Declares symbols
+within their respective scopes.
+
+=cut
+
+method symbol_declaration_list($/) {
+	my $past	:= Slam::Statement::SymbolDeclarationList.new();
+	my $specs	:= $<specifier_list>.ast;
+	
+	NOTE("Collecting declared symbols");
+	
+	for ast_array($<symbol>) {
+		NOTE($_);
+		$_.add_type_info($specs);
+		$_.attach_to($past);
+	}
+	
+	MAKE($past);
+}
+
+method tspec_basic_type($/) {
+	our $Symbols;
+	
+	my $typename := $<type>.ast;
+	NOTE("Creating new builtin specifier: ", $typename.name);
+	
+	unless $Symbols.pervasive_scope.symbol($typename.name) {
+		DIE("Basic type '", $typename.name, "' not in pervasive scope.");
+	}
+	
+	my $past := Slam::Type::Specifier.new(
+		:is_builtin(1),
+		:node($/),
+		:typename($typename),
+	);
+
+	MAKE($past);
+}
+
 method tspec_builtin($/) {
 	my $name := ~ $<token>;
 	NOTE("Creating new builtin specifier: ", $name);
 	
-	my $noun := PAST::Val.new(:name($name), :node($/));
-	my $past := Slam::Type::Specifier::type_specifier($/,
+	my $typename := PAST::Val.new(:name($name), :node($/));
+	my $past := Slam::Type::Specifier.new(
+		:node($/),
 		:is_builtin(1),
-		:noun($noun),
+		:typename($typename),
 	);
 	
 	DUMP($past);
@@ -451,7 +397,9 @@ method tspec_storage_class($/) {
 	my $name := ~ $<token>;
 	NOTE("Creating new storage class specifier: ", $name);
 	
-	my $past := Slam::Type::Specifier::storage_class($/,
+	my $past := Slam::Type::Specifier.new(
+		:node($/),
+		:storage_class($name),
 		:name($name),
 	);
 	
@@ -462,39 +410,21 @@ method tspec_storage_class($/) {
 method tspec_type_specifier($/, $key) { PASSTHRU($/, $key); }
 
 method tspec_type_name($/) {
-	my $type_name := $<type_name>.ast;
-	my $name	:= $type_name.name();
-	NOTE("Creating new specifier for type_name: ", $name);
-
-	ASSERT($type_name<apparent_type>,
-		'Type_name lookup sets apparent type to current resolution of name');
-		
-	my $past := Slam::Node::create('type_specifier',
-		:noun($type_name));
-
-	DUMP($past);
-	make $past;
+	my $type := $<type_name>.ast;
+	NOTE("Creating new specifier for type name: ", $type);
+	my $past := Slam::Type::Specifier.new(:typename($type));
+	MAKE($past);
 }
 
 method using_namespace_directive($/) {
 	my $using_nsp := $<namespace>.ast;
-	NOTE("Using ", NODE_TYPE($using_nsp), " namespace ", $using_nsp.name());
-	ASSERT(NODE_TYPE($using_nsp) eq 'namespace_path',
-		'Namespace paths must be namespace_name tokens');
+	ASSERT($using_nsp.node_type eq 'namespace_path',
+		'Namespace paths must be namespace_pathtokens');
+	NOTE("Using  namespace ", $using_nsp);
 
-	# Resolve using-nsp to absolute value.
-	$using_nsp := Slam::Namespaces::fetch_namespace_of($using_nsp);
-	
-	my $past := Slam::Node::create('using_directive',
-		:name('using namespace'),
-		:node($/),
+	my $past := Slam::Statement::UsingNamespace.new(:node($/),
 		:using_namespace($using_nsp),
 	);
 
-	my $block := Slam::Scopes::current();
-	Slam::Scopes::add_using_namespace($block, $past);
-	
-	NOTE("Added namespace ", $using_nsp<display_name>, " to using list of block: ", $block.name());
-	DUMP($past);
 	make $past;
 }

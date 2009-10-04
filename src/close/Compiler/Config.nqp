@@ -1,178 +1,123 @@
 # $Id$
 
-class Slam::Config;
+module Slam::Config;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
-}
-
-sub BACKTRACE() {
-	Q:PIR {{
-		backtrace
-	}};
-}
-
-sub DIE(*@msg) {
-	Dumper::DIE(Dumper::info(), @msg);
-}
-
-sub DUMP(*@pos, *%what) {
-	my @info := Dumper::info();
-	@info[0] and Dumper::DUMP(@info, @pos, %what);
-}
-
-sub NOTE(*@parts) {
-	my @info := Dumper::info();
-	@info[0] and Dumper::NOTE(@info, @parts);
-}
-
+# Done inside _onload(), so Config can be loaded early by _INIT
+#Parrot::IMPORT('Dumper');
+		
 ################################################################
-our %Config_data;
 
-# Bootstrap values, fed to Dumper before we parse the real config file.
-%Config_data<Dump><Config><_list_configs>		:= 1;
-%Config_data<Dump><Config><_parse_config>	:= 0;
-%Config_data<Dump><Config><read>			:= 7;
-%Config_data<Dump><Config><value>			:= 0;
-%Config_data<Dump><Config><write>			:= 1;
+_onload();
 
+sub _onload() {
+	if our $onload_done { return 0; }
+	$onload_done := 1;
 
-our $Config_file;
-our $Line_number;
-
-sub _fetch_container(@path) {
-	my %config := %Config_data;
+	Parrot::IMPORT('Dumper');
 	
-	for @path {
-		my $part := String::trim($_);
+	Class::SUBCLASS('Slam::Config', 'Hash');	
+	
+	# Store an instance in the Registry
+	my $config := Slam::Config.new();
+	Registry<CONFIG> := $config;
+	
+	$config.store('Dump::File::slurp', 1);
+	
+	$config.store('Dump::Slam::Config::_onload', 0);
+	$config.store('Dump::Slam::Config::file', 1);
+	$config.store('Dump::Slam::Config::parse_config', 0);
+	$config.store('Dump::Slam::Config::query', 1);
+	$config.store('Dump::Slam::Config::store', 1);
+	
+	$config.store('Dump::Stack::Root', 'parrot::close::Compiler::main');
+	
+	NOTE("Slam::Config::_onload: done");
+}
 		
-		unless String::length($part) {
-			say("Warning: ", Array::join("::", @path),
-				" - zero-length sub-keys are not allowed");
-			$part := 'null';
-		}
-		
-		unless %config{$part}<> {
-			#NOTE("Creating sub-hash ", $part);
-			%config{$part}<> := 1;
-		}
-		
-		%config := %config{$part};
+################################################################
+
+method file($filename?) {
+	
+	if $filename && self<_filename> ne $filename {
+		NOTE("Reading filename: ", $filename);
+		my $data := File::slurp($filename);
+		self.parse_config($data);
+		self<_filename> := $filename;
+		DUMP(self);
 	}
 	
-	return %config;
+	return self<_filename>;
 }
 
-sub _list_configs($hash, $prefix) {
-	my $result := '';
+method init(*@children, *%attributes) {
+	self<_filename> := '<no filename set>';
 	
-	for $hash {
-		my $value := $hash{$_};
-		my $is_hash := Q:PIR {
-			$P0 = find_lex '$value'
-			$I0 = isa $P0, 'Hash'
-			%r = box $I0
-		};
+	# There is no parent .init
+	return self;
+}
+
+method new(*@children, *%attributes) {
+	my $new := Q:PIR { 
+		.local pmc attributes, children
+		attributes = find_lex '%attributes'
+		children = find_lex '@children'
 		
-		if $is_hash {
-			$result := $result
-				~ _list_configs($value, $prefix ~ $_ ~ '::');
-		}
-		else {
-			$result := $result
-				~ $prefix ~ $_ ~ " = " ~ $value ~ "\n";
-		}
-	}
+		$P0 = self.'HOW'()
+		$P0 = getattribute $P0, 'parrotclass'
+		$P0 =  new $P0
+		%r = $P0.'init'(children :flat, attributes :flat :named)
+	};
 	
-	return $result;
+	return $new;
 }
 
-sub _parse_config($data) {
-	my @lines		:= String::split("\n", $data);
-	my $line_number	:= 0;
-	
+method parse_config($data) {
+	my @lines := String::split("\n", $data);
 	DUMP(@lines);
+	
+	my $line_number := 0;
 	for @lines {
 		$line_number++;
+		NOTE(substr("    " ~ $line_number, -4), ": ", $_);
+		
 		my $line := String::trim($_);
-
-		if $line && String::char_at($line, 0) ne '#' {
-			my @kv	:= String::split('=', $line);
-			my $key	:= @kv.shift();
-			my $value	:= String::trim(Array::join('=', @kv));
-			#NOTE("Key: ", $key);
-			#NOTE("Value: ", $value);
+		
+		if $line && $line[0] ne '#' {
+			my @kv := String::split('=', $line);
+			my $key := String::trim(@kv.shift);
 			
-			if !@kv {
-				say("Warning: ", $Config_file, 
-					" line ", $line_number,
-					": incorrectly-formed config line: ", $line);
+			if String::length($key) == 0 {
+				say("Warning: in file '", self<_filename>,
+					"', line #", $line_number,
+					": zero-length keys are not allowed.");
+				say($line);
 			}
 			else {
-				my @key_parts := String::split('::', $key);
-				my $last	:= String::trim(@key_parts.pop());
-				my %hash	:= _fetch_container(@key_parts);
-				#NOTE("Last sub-key is '", $last, "'");
 				
-				unless String::length($last) {
-					say("Warning: ", $Config_file,
-						" line ", $line_number,
-						": zero-length sub-keys are not allowed: ", $line);
-					$last := 'null';
-				}
+				my $value := String::trim(Array::join('=', @kv));
 				
-				%hash{$last} := $value;
+				NOTE("Key:	", $key);
+				NOTE("Value:	", $value);
+				
+				self.store($key, $value);
 			}
 		}
 	}
 	
-	DUMP(%Config_data);
+	DUMP(self);
 }
 
-our $_Config := Slam::Config.new();
-
-sub query(*@keys) {
-	return $_Config.value(@keys);
-}
-
-sub query_array(@keys) {
-	return $_Config.value(@keys);
-}
-
-sub read($filename) {
-	#NOTE("Reading filename: ", $filename);
-	say("Reading filename: ", $filename);
-	if %Config_data<> ne $filename {
-		%Config_data<>	:= $filename;
-		my $data		:= File::slurp($filename);
-		_parse_config(	$data);
-	}
-}
-
-method value(@path, *@what) {
-	#NOTE("key = ", Array::join('::', @path));
-	my $last := @path.pop();
-	my %config := _fetch_container(@path);
+method query(*@keys) {
+	my $key := Array::join('::', @keys);
+	NOTE('Querying for key: ', $key);
 	
-	if +@what {
-		my $value := Array::join('', @what);
-		#NOTE("Set value to '", $value, "'");
-		%config{$last} := $value;
-	}
+	my $value := self<_data>{$key};
+	NOTE("Value: ", $value);
 	
-	#NOTE("value = ", %config{$last});
-	return %config{$last};
+	return $value;
 }
 
-method write($filename) {
-	my $data := _list_configs(%Config_data, '');
-	
-	Q:PIR {
-		$P0 = new 'FileHandle'
-		$P1 = find_lex '$filename'
-		$P0.'open'($P1, 'w')
-		$P1 = find_lex '$data'
-		$P0.'print'($P1)
-		$P0.'close'()
-	};
+method store($key, $value) {
+	NOTE("Slam::Config: Storing key '", $key, "' value: ", $value);
+	return self<_data>{$key} := $value;
 }

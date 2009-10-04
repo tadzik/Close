@@ -2,8 +2,8 @@
 
 class String;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
+sub ASSERTold($condition, *@message) {
+	Dumper::ASSERTold(Dumper::info(), $condition, @message);
 }
 
 sub BACKTRACE() {
@@ -16,12 +16,12 @@ sub DIE(*@msg) {
 	Dumper::DIE(Dumper::info(), @msg);
 }
 
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
+sub DUMPold(*@pos, *%what) {
+	Dumper::DUMPold(Dumper::info(), @pos, %what);
 }
 
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
+sub NOTEold(*@parts) {
+	Dumper::NOTEold(Dumper::info(), @parts);
 }
 
 ################################################################
@@ -52,7 +52,7 @@ is equivalent to doing C<$str[$index]>, except that doesn't work.
 =cut
 
 sub char_at($str, $index) {
-	#NOTE("index = ", $index, ", str = ", $str);
+	#NOTEold("index = ", $index, ", str = ", $str);
 	
 	my $result := Q:PIR {
 		$P0 = find_lex '$str'
@@ -61,12 +61,12 @@ sub char_at($str, $index) {
 		%r = box $S1
 	};
 	
-	#NOTE("Result = '", $result, "'");
+	#NOTEold("Result = '", $result, "'");
 	return $result;
 }
 
 sub character_offset_of($string, *%opts) {
-	DUMP(:string($string), :options(%opts));
+	DUMPold(:string($string), :options(%opts));
 
 	our %Line_number_info;
 	
@@ -82,7 +82,7 @@ sub character_offset_of($string, *%opts) {
 	
 	my $line		:= -1 + %opts<line>;
 	my $line_offset	:= %Line_number_info{$string}[$line];
-	NOTE("Line number offset is: ", $line_offset);
+	NOTEold("Line number offset is: ", $line_offset);
 	my $result := $offset - $line_offset;
 	return $result;
 }
@@ -141,7 +141,7 @@ sub find_cclass($class_name, $str, *%opts) {
 	
 	my $cclass := 0 + %Cclass_id{$class_name};
 	
-	#NOTE("class = ", $class_name, "(", $cclass, "), offset = ", $offset, ", count = ", $count, ", str = ", $str);
+	#NOTEold("class = ", $class_name, "(", $cclass, "), offset = ", $offset, ", count = ", $count, ", str = ", $str);
 
 	my $result := Q:PIR {
 		.local int cclass, offset, count
@@ -161,7 +161,7 @@ sub find_cclass($class_name, $str, *%opts) {
 		
 	};
 	
-	#NOTE("Result = ", $result);
+	#NOTEold("Result = ", $result);
 	return $result;
 }
 
@@ -188,7 +188,7 @@ sub find_not_cclass($class_name, $str, *%opts) {
 	
 	my $class := 0 + %Cclass_id{$class_name};
 
-	#NOTE("class = ", $class_name, "(", $class, "), offset = ", $offset, ", count = ", $count, ", str = ", $str);
+	#NOTEold("class = ", $class_name, "(", $class, "), offset = ", $offset, ", count = ", $count, ", str = ", $str);
 	
 	my $result := Q:PIR {
 		$P0 = find_lex '$class'
@@ -203,7 +203,7 @@ sub find_not_cclass($class_name, $str, *%opts) {
 		%r = box $I0
 	};
 	
-	#NOTE("Result = ", $result);
+	#NOTEold("Result = ", $result);
 	return $result;
 }
 
@@ -234,7 +234,7 @@ sub is_cclass($class_name, $str, *%opts) {
 	my $offset	:= 0 + %opts<offset>;
 	my $class	:= 0 + %Cclass_id{$class_name};
 	
-	#NOTE("class = ", $class_name, "(", $class, "), offset = ", $offset, ", str = ", $str);
+	#NOTEold("class = ", $class_name, "(", $class, "), offset = ", $offset, ", str = ", $str);
 	
 	my $result := Q:PIR {
 		$P0 = find_lex '$class'
@@ -247,14 +247,14 @@ sub is_cclass($class_name, $str, *%opts) {
 		%r = box $I0
 	};
 	
-	#NOTE("Result = ", $result);
+	#NOTEold("Result = ", $result);
 	return $result;
 }
 
 sub length($str, *%opts) {
 	my $offset	:= 0 + %opts<offset>;
-	#NOTE("Computing length of string beyond offset ", $offset);
-	#DUMP($str);
+	#NOTEold("Computing length of string beyond offset ", $offset);
+	#DUMPold($str);
 	
 	my $result	:= Q:PIR {
 		$P0 = find_lex '$str'
@@ -269,13 +269,13 @@ sub length($str, *%opts) {
 	
 	$result := $result - $offset;
 	
-	#NOTE("Result = ", $result);
+	#NOTEold("Result = ", $result);
 	return $result;
 }
 
 sub _init_line_number_info($string) {
-	#NOTE("Initializing line-number information of previously-unseen string");
-	#DUMP($string);
+	#NOTEold("Initializing line-number information of previously-unseen string");
+	#DUMPold($string);
 	
 	my @lines := Array::new(-1);
 	my $len := String::length($string);
@@ -289,15 +289,15 @@ sub _init_line_number_info($string) {
 	our %Line_number_info;
 	
 	%Line_number_info{$string} := @lines;
-	#NOTE("String parsed into ", +@lines, " lines");
-	#DUMP(@lines);
+	#NOTEold("String parsed into ", +@lines, " lines");
+	#DUMPold(@lines);
 }
 
 sub line_number_of($string, *%opts) {
-	DUMP(:string($string), :options(%opts));
+	DUMPold(:string($string), :options(%opts));
 
 	unless $string {
-		NOTE("String is empty or undef. Returning 1");
+		NOTEold("String is empty or undef. Returning 1");
 		return 1;
 	}
 
@@ -309,7 +309,7 @@ sub line_number_of($string, *%opts) {
 	
 	my $offset := 0 + %opts<offset>;
 	
-	NOTE("Bsearching for line number of ", $offset, " in string");
+	NOTEold("Bsearching for line number of ", $offset, " in string");
 	
 	my $line := Array::bsearch(%Line_number_info{$string}, $offset, :cmp('<=>'));
 	
@@ -319,7 +319,7 @@ sub line_number_of($string, *%opts) {
 	}
 
 	#$line ++;
-	NOTE("Returning line number (1-based): ", $line);
+	NOTEold("Returning line number (1-based): ", $line);
 	return $line;
 }
 
@@ -355,7 +355,7 @@ sub repeat($str, $times) {
 }
 
 sub split($delim, $str) {
-	#NOTE("delim = '", $delim, "', str = ", $str);
+	#NOTEold("delim = '", $delim, "', str = ", $str);
 	
 	my @array := Q:PIR {
 		$P0 = find_lex '$delim'
@@ -365,7 +365,7 @@ sub split($delim, $str) {
 		%r = split $S0, $S1
 	};
 	
-	#DUMP(@array);
+	#DUMPold(@array);
 	return @array;
 }
 
@@ -413,10 +413,10 @@ sub substr($str, $start, *@rest) {
 sub trim($str) {
 	my $result	:= '';
 	my $left	:= find_not_cclass('WHITESPACE', $str);
-	#NOTE("$left : ", $left);
+	#NOTEold("$left : ", $left);
 	
 	my $len	:= length($str);
-	#NOTE("$len  : ", $len);
+	#NOTEold("$len  : ", $len);
 	
 	if $left < $len {
 		my $right := $len - 1;
@@ -425,12 +425,12 @@ sub trim($str) {
 			$right --;
 		}
 		
-		#NOTE("$right: ", $right);
+		#NOTEold("$right: ", $right);
 		
 		# NB: +1 below to re-include non-ws that broke while.
 		$result := substr($str, $left, $right - $left + 1);
 	}
 	
-	#NOTE("result: ", $result);
+	#NOTEold("result: ", $result);
 	return $result;
 }

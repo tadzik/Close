@@ -1,5 +1,5 @@
 # $Id$
-class close::Grammar::Actions;
+class Slam::Grammar::Actions;
 
 method built_in($/, $key)                { PASSTHRU($/, $key); }
 
@@ -10,7 +10,7 @@ method builtin_clone($/) {
 		:pasttype('inline'),
 		:inline('    %r = clone %0'));
 	$past.push($<obj>.ast);
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 
@@ -39,7 +39,7 @@ method builtin_concat($/) {
 	}
 
 	$past.inline($inline);
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 
@@ -50,7 +50,7 @@ method builtin_elements($/) {
 		:pasttype('pirop'),
 		:pirop('elements IP'),
 		$<arr>.ast);
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 
@@ -71,7 +71,7 @@ method builtin_exists($/) {
 	$past.push($index[0]);
 	$past.push($index[1]);
 	
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 
@@ -84,7 +84,7 @@ method builtin_find_caller_lex($/) {
 	
 	$past.push($<name>.ast);
 	
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 
@@ -119,7 +119,7 @@ method builtin_isa($/) {
 		:inline("\t$P0 = split '::', '" ~ $class_key ~ "'\n"
 			~ "\t%r = get_root_namespace $P0\n"));
 	$past.push($class);
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 
@@ -131,7 +131,7 @@ method builtin_isntsame($/) {
 		:pirop('isntsame IPP'));
 	$past.push($<arg1>.ast);
 	$past.push($<arg2>.ast);
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 
@@ -143,7 +143,7 @@ method builtin_isnull($/) {
 		:pirop('isnull'));
 
 	$past.push($<expression>.ast);
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 
@@ -155,7 +155,7 @@ method builtin_issame($/) {
 		:pirop('issame IPP'));
 	$past.push($<arg1>.ast);
 	$past.push($<arg2>.ast);
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 
@@ -164,7 +164,7 @@ method builtin_issame($/) {
 # Given a past symbol, return the symbol hash.
 sub get_global_symbol_info($sym) {
 	my @path := namespace_path_of_var($sym);
-	my $block := Slam::Namespaces::fetch(@path);
+	my $block := Slam::Namespace::fetch(@path);
 
 	#say("Found block: ", $block.name());
 	my $name := $sym.name();
@@ -188,7 +188,7 @@ sub symbol_defined_anywhere($past) {
 				}
 				else {
 					#say("--- FOUND in unrecognized object:");
-					#DUMP($def<decl>, "Declaration");
+					#DUMPold($def<decl>, "Declaration");
 					DIE("Unexpected data item");
 				}
 
@@ -233,7 +233,7 @@ method builtin_new($/) {
 		$past.push($<args1>[0].ast);
 	}
 
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 
@@ -255,7 +255,7 @@ method builtin_pop($/) {
 		:inline('    %r = pop %0'));
 	$past.push($<arr>.ast);
 
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 
@@ -293,7 +293,7 @@ method builtin_shift($/) {
 		$<arr>.ast);
 	#$past.push($<arr>.ast);
 
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 
@@ -305,7 +305,7 @@ method builtin_split($/) {
 		:pirop('split Pss'));
 	$past.push($<delim>.ast);
 	$past.push($<str>.ast);
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 
@@ -317,7 +317,7 @@ method builtin_typeof($/) {
 		:pasttype('pirop'),
 		:pirop('typeof SP'));
 	$past.push($obj);
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 
@@ -342,7 +342,7 @@ method builtin_unshift($/) {
 		$past := $past.pop();
 	}
 
-	#DUMP($past);
+	#DUMPold($past);
 	make $past;
 }
 

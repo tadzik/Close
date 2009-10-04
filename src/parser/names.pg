@@ -114,7 +114,7 @@ plus the path of the namespace, delimited by double-colons (::). For example,
 C<hll : close :: Foo :: Bar> is valid, although the spaces are optional.
 
 This is called a I<rooted path> because the opcode used in PIR for this kind
-of access would be C<get_root_global [ 'close' ; 'Foo' ; 'Bar' ], ...>
+of access would be C<get_root_global [ 'Slam' ; 'Foo' ; 'Bar' ], ...>
 
 =item # Hll path
 
@@ -178,10 +178,10 @@ parsed as a qualified identifier.)
 
 =cut
 
-rule qualified_identifier {
-	[ [ HLL ':' <hll_name> ]? 			# Maybe an hll:close prefix
+rule qualified_identifier { {{ say "trying qid" }}
+	[ [ <.HLL> ':' <hll_name> ]? 		# Maybe an hll:close prefix
 		$<root>='::' ]?			# Maybe rooted namespace
-	<path=BAREWORD>			# Definitely a bareword.
+	<path=BAREWORD> {{say "bareword"}}			# Definitely a bareword.
 		[ '::' <path=BAREWORD> ]*	# Maybe a namespace qualifier
 	{*}
 }
@@ -199,7 +199,7 @@ An alias must be created for any unusual symbol names.)
 =cut
 
 rule declarator_name {
-	| [ HLL ':' <hll_name> ]?
+	| [ <.HLL> ':' <hll_name> ]?
 		$<root>='::'
 		[ <path=IDENTIFIER> 
 			[ '::' <path=IDENTIFIER> ]* ]?
@@ -208,7 +208,15 @@ rule declarator_name {
 	{*}
 }
 
-=rule type_name
+#####
+
+
+token short_ident {
+	[ <id=BAREWORD> | <id=QUOTED_LIT> ]
+	{*}
+}
+
+=token type_name
 
 New types may be introduced in Close via the C<typedef> keyword, and by the 
 tagged declaration of aggregates (classes, structs, unions, and enums). New 
@@ -216,21 +224,14 @@ types I<must> be declared prior to being used as a type specifier in a declarati
 
 =cut
 
-rule type_name {
-	<qualified_identifier> {*} #= qualified_identifier
-	# {*}
-	# <?{{ 
-		# $P0 = get_hll_global [ 'close' ; 'Grammar' ; 'Actions' ], '$Is_valid_type_name'
-		# .return ($P0)
-	# }}>
-}
-
-#####
-
-
-token short_ident {
-	[ <id=BAREWORD> | <id=QUOTED_LIT> ]
-	{*}
+token type_name {
+	[ <BASIC_TYPE>		{*} #= BASIC_TYPE
+	| <qualified_identifier> 	{*} #= qualified_identifier
+	]
+	<?{{ 
+		$P0 = get_hll_global [ 'Slam' ; 'Grammar' ; 'Actions' ], '$Is_valid_type'
+		.return ($P0)
+	}}>
 }
 
 =head3 Adverbs

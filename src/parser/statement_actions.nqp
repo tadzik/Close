@@ -1,39 +1,36 @@
 # $Id$
-class close::Grammar::Actions;
 
+module Slam::Grammar::Actions;
+
+our $Symbols;
+	
 method statement($/, $key)              { PASSTHRU($/, $key); }
-
 method extern_statement($/, $key) { PASSTHRU($/, $key); }
 
 method null_statement($/) {
-	my $past := PAST::Op.new(:node($/), :pasttype('null'));
-	DUMP($past);
-	make $past;
+	MAKE(Slam::Statement::Null.new(:node($/)));
 }
 
-method compound_statement($/, $key) {
-	if $key eq 'open' {
-		NOTE("Creating new compound_statement, pushing on scope stack");
-		my $past := Slam::Node::create('compound_statement');
-		Slam::Scopes::push($past);
-		DUMP($past);
+method _compound_statement_close($/) {
+	my $past := $Symbols.leave_scope('Slam::Statement::Block');
+	
+	for ast_array($<statements>) {
+		$_.attach_to($past);
 	}
-	elsif $key eq 'close' {
-		my $past := Slam::Scopes::pop('compound_statement');
-		NOTE("Popped compound_statement from scope stack");
-		
-		for $<statements> {
-			$past.push($_.ast);
-		}
-		
-		NOTE("Block has ", +@($past), " elements inside");
-		DUMP($past);
-		make $past;
-	} 
-	else {
-		DIE("Unexpected $key value: '", $key, "' in action method compound_statement");
-	}
+
+	MAKE($past);
 }
+
+method _compound_statement_open($/) {
+	$Symbols.enter_block_scope(:node($/));
+}
+
+# NQP currently generates get_hll_global for functions. So qualify them all.
+our %_cmpd_stmt;
+%_cmpd_stmt<close> := Slam::Grammar::Actions::_compound_statement_close;
+%_cmpd_stmt<open> := Slam::Grammar::Actions::_compound_statement_open;
+
+method compound_statement($/, $key) { self.DISPATCH($/, $key, %_cmpd_stmt); }
 
 method conditional_statement($/) {
     my $keyw;

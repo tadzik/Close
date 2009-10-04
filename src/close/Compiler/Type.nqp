@@ -2,6 +2,10 @@
 
 module Slam::Type {
 
+	Parrot::IMPORT('Dumper');
+		
+	################################################################
+
 =sub _onload
 
 This code runs at initload, and explicitly creates this class as a subclass of
@@ -14,117 +18,45 @@ Node.
 	sub _onload() {
 		if our $onload_done { return 0; }
 		$onload_done := 1;
+
+		my $base_name := 'Slam::Type';
 		
-		say("Slam::Node::_onload");
+		NOTE("Creating class: ", $base_name);
+		my $base := Class::NEW_CLASS($base_name);
 		
-		my $base := Slam::Node::SUBCLASS('Slam::Type');
-		
-		Slam::Node::SUBCLASS('Slam::Type::Specifier',
-			'Slam::Type');
-		Slam::Node::SUBCLASS('Slam::Type::Declarator', 
-			'Slam::Type');
-		Slam::Node::SUBCLASS('Slam::Type::AccessQualifier', 
-			'Slam::Type::Specifier', 'Slam::Val');
-		Slam::Node::SUBCLASS('Slam::Type::StorageClassSpecifier', 
-			'Slam::Type::Specifier', 'Slam::Val');
-		Slam::Node::SUBCLASS('Slam::Type::TypenameSpecifier', 
-			'Slam::Type::Specifier', 'Slam::Val');
-		Slam::Node::SUBCLASS('Slam::Type::Array', 
-			'Slam::Type::Declarator', 'Slam::Val');
-		Slam::Node::SUBCLASS('Slam::Type::Hash', 
-			'Slam::Type::Declarator', 'Slam::Val');
-		Slam::Node::SUBCLASS('Slam::Type::Function', 
-			'Slam::Type::Declarator', 'Slam::Block');
-		Slam::Node::SUBCLASS('Slam::Type::Pointer', 
-			'Slam::Type::Declarator', 'Slam::Val');
+		NOTE("Creating subclasses");
+		Class::SUBCLASS('Slam::Type::Specifier', 'Slam::Val', $base);
+		my $declarator := Class::SUBCLASS('Slam::Type::Declarator', $base);
+		Class::SUBCLASS('Slam::Type::Array', 'Slam::Val', $declarator);
+		Class::SUBCLASS('Slam::Type::Function', 'Slam::Block', $declarator);
+		Class::SUBCLASS('Slam::Type::Hash', 'Slam::Val', $declarator);
+		Class::SUBCLASS('Slam::Type::MultiSub', 'Slam::Val', $declarator);
+		Class::SUBCLASS('Slam::Type::Pointer', 'Slam::Val', $declarator);
 	}
 
 	################################################################
 
-	sub ASSERT($condition, *@message) {
-		Dumper::ASSERT(Dumper::info(), $condition, @message);
-	}
-
-	sub BACKTRACE() {
-		Q:PIR {{
-			backtrace
-		}};
-	}
-
-	sub DIE(*@msg) {
-		Dumper::DIE(Dumper::info(), @msg);
-	}
-
-	sub DUMP(*@pos, *%what) {
-		Dumper::DUMP(Dumper::info(), @pos, %what);
-	}
-
-	sub NOTE(*@parts) {
-		Dumper::NOTE(Dumper::info(), @parts);
-	}
-
-	################################################################
-
+	method can_merge($other)		{ DIE("NOT REACHED"); }
 	method is_array()			{ return 0; }
-	method is_declarator()		{ return 0; }
-	method is_function()		{ return 0; }
+	method is_declarator()			{ return 0; }
+	method is_function()			{ return 0; }
 	method is_hash()			{ return 0; }
+	method is_multi()			{ return 0; }
 	method is_pointer()			{ return 0; }
 	method is_pointer_type()		{ return self.is_pointer || self.is_array; }
-	method is_access_qualifier()	{ return 0; }
-	method is_specifier()		{ return 0; }
-	method is_type()			{ return 1; }
+	method is_access_qualifier()		{ return 0; }
+	method is_specifier()			{ return 0; }
+	method is_type()				{ return 1; }
 	method is_typename_specifier()	{ return 0; }
 	
 	method nominal(*@value)		{ self.ATTR('nominal', @value); }
 	
-	
-	
-	
-	
-	
-sub new_dclr_alias($alias) {
-	DUMP(:alias($alias));
-	return $alias;
-}
-
-sub pervasive_scope() {
-	our $scope;
-	
-	unless Scalar::defined($scope) {
-		NOTE("Creating pervasive scope block");
-		
-		$scope := Slam::Block.new(
-			:blocktype('immediate'),
-			:namespace(Scalar::undef()),
-		);
-		
-		$scope<node_type> := 'pervasive scope';
-		$scope.name('pervasive types');
-
-		NOTE("Parsing internal types");
-		# Attach types to scope
-		Slam::Scopes::push($scope);
-		Slam::Scopes::dump_stack();
-		
-		Slam::IncludeFile::parse_internal_file('internal/types');
-		Slam::Scopes::pop(NODE_TYPE($scope));
-		
-		NOTE("Adding types to block");
-		for @($scope) {
-			ASSERT($_.isa(Slam::VarList), 
-				'There should be nothing in this block but the declarations we just built');
-			my $varlist := $_;
-			for @($varlist) {
-				Slam::Scopes::add_declarator_to($_, $scope);
-			}
-		}
-		
+	method update_symbol($symbol) {
+		ASSERT($symbol.isa(Slam::Symbol::Declaration),
+			'Can only update symbol declarations.');
+		# Default: nothing.
 	}
 	
-	return $scope;
-}
-
 =sub same_type($type1, $type2, :relaxed(1)?, :allow_multi(1)?)
 
 Compares C<$type1> and C<$type2> to determine if they are the same (or compatible,
@@ -162,7 +94,7 @@ sub same_type($type1, $type2, *%options) {
 			return 1;
 		}
 		
-		if NODE_TYPE($type1) ne NODE_TYPE($type2) {
+		if $type1.node_type ne $type2.node_type {
 			return 0;
 		}
 		
@@ -213,7 +145,7 @@ sub same_type($type1, $type2, *%options) {
 			}
 		}
 		elsif $type1<is_specifier> {
-			if $type1<noun>.name() ne  $type2<noun>.name() {
+			if $type1<typename>.name() ne  $type2<typename>.name() {
 				return 0;
 			}
 			
@@ -223,8 +155,8 @@ sub same_type($type1, $type2, *%options) {
 			}
 		}
 		else {
-			DUMP($type1, $type2);
-			ASSERT(0, 'Not reached unless types are horribly misconfigured');
+			DUMPold($type1, $type2);
+			ASSERTold(0, 'Not reached unless types are horribly misconfigured');
 		}
 		
 		$type1 := $type1<next>;
@@ -290,15 +222,15 @@ Returns the severity of the redefinition: 'error', 'harmless', or 'same'.
 sub update_redefined_symbol(*%args) {
 	my $original	:= %args<original>;
 	my $update	:= %args<redefinition>;
-	ASSERT($original && $update, ':original() and :redefinition() parameters are required.');
-	ASSERT(same_type($original, $update), 'PRECONDITION');
+	ASSERTold($original && $update, ':original() and :redefinition() parameters are required.');
+	ASSERTold(same_type($original, $update), 'PRECONDITION');
 	
 	my $severity := 'ignore';
 	
 	my $orig_spec := $original<etype>;
-	ASSERT($orig_spec<is_specifier>, 'Symbol etype must link to type specifier');
+	ASSERTold($orig_spec<is_specifier>, 'Symbol etype must link to type specifier');
 	my $upd_spec := $update<etype>;
-	ASSERT($upd_spec<is_specifier>, 'Symbol etype must link to type specifier');
+	ASSERTold($upd_spec<is_specifier>, 'Symbol etype must link to type specifier');
 
 	# Check initializers
 	my $init := $update<initializer>;
@@ -402,22 +334,19 @@ sub update_redefined_symbol(*%args) {
 ################################################################
 
 module Slam::Type::Array {
-	method is_array() { return 1; }
-	method elements(*@value)		{ self.ATTR('elements', @value); }
-}
-
-################################################################
-
-module Slam::Type::Function {
-	method is_function() { return 1; }
+	method can_merge($other) {
+		if ! $other.is_array 
+			|| (Scalar::defined(self.elements)
+				&& Scalar::defined($other.elements)
+				&& self.elements != $other.elements) {
+			return 0;
+		}
+		
+		return self.nominal.can_merge($other.nominal);
+	}
 	
-	method parameters(*@value)		{ self.ATTR('parameters', @value); }
-}
-
-################################################################
-
-module Slam::Type::Hash {
-	method is_hash() { return 1; }
+	method elements(*@value)		{ self.ATTR('elements', @value); }
+	method is_array() { return 1; }
 }
 
 ################################################################
@@ -433,82 +362,151 @@ module Slam::Type::Declarator {
 		
 		return $last;
 	}
+
+	method is_declarator()			{ return 1; }
+	method storage_class()		{ DIE("No storage_class on declarators."); }
+}
+
+################################################################
+
+module Slam::Type::Function {
+	method can_merge($other) {
+		unless $other.is_function { return 0; }
+		
+		my @params := self.parameters;
+		my @oparams := $other.parameters;
+		
+		if +@params != +@oparams { return 0; }
+		
+		my $index := 0;
+		for @params {
+			unless $_.can_merge(@oparams[$index]) {
+				return 0;
+			}
+			
+			$index++;
+		}
+		
+		return self.nominal.can_merge($other.nominal);
+	}
 	
-	method is_declarator() { return 1; }
+	method is_function()			{ return 1; }
+	method is_method(*@value)		{ self.ATTR('is_method', @value); }
+	method parameters(*@value)	{ self.ATTR('parameters', @value); }
+}
+
+################################################################
+
+module Slam::Type::Hash {
+	method can_merge($other) {
+		return $other.is_hash 
+			&& self.nominal.can_merge($other.nominal);
+	}
 	
-	method storage_class() { DIE("No storage_class on declarators."); }
+	method is_hash() { return 1; }
+}
+
+################################################################
+
+module Slam::Type::MultiSub {
+	method can_merge($other)		{ return $other.is_multi; }
+	method is_multi()			{ return 1; }
 }
 
 ################################################################
 
 module Slam::Type::Pointer {
-	method is_pointer() {
-		return 1;
+	method can_merge($other) {
+		if ! $other.is_pointer 
+			|| self.is_const	!= $other.is_const
+			|| self.is_volatile	!= $other.is_volatile {
+			return 0;
+		}
+		
+		return self.nominal.can_merge($other.nominal);
 	}
 	
-	method is_pointer_type() {
-		return 1;
-	}
+	method is_pointer()			{ return 1; }
+	method is_pointer_type()		{ return 1; }
 	
-	sub init(*@children, *%attributes) {
-		NOTE("Creating pointer_to declarator");
-		ASSERT(+@children == 0,
-			"Children are not supported by pointer declarator");
+	method qualify(@quals) {
+		for @quals {
+			ASSERT($_.isa(Slam::Type::Specifier),
+				'Only specifiers may qualify a pointer');
+			ASSERT($_.is_const || $_.is_volatile,
+				'Only const or volatile may qualify a pointer');
 			
-		my @qualifiers := %attributes<qualifiers>;
-		Hash::delete(%attributes, 'qualifiers');
-
-		return self.INIT(@qualifiers, *%attributes);
+			my $redundant := 0;
+			
+			if $_.is_const {
+				if self.is_const	{ $redundant++; }
+				else			{ self.is_const(1); }
+			}
+			elsif $_.is_volatile {
+				if self.is_volatile	{ $redundant++; }
+				else			{ self.is_volatile(1); }
+			}
+			
+			if $redundant {
+				self.warning(:node($_), 
+					:message("Redundant access qualifier '",
+						$_.name, "'"),
+				);
+			}
+		}
 	}
-}
-
-################################################################
-
-module Slam::Type::AccessQualifier {
 }
 
 ################################################################
 
 module Slam::Type::Specifier {
+	
+	Parrot::IMPORT('Dumper');
+
 	method attach(@others) {
 		for @others {
 			self.merge_with($_);
 		}
+		
+		return self;
 	}
 
-	method has_access_qualifier()	{ return self.const || self.volatile; }
-	method has_storage_class()	{ return self.storage_class ne ''; }
+	method can_merge($other) {
+		DIE("NOT IMPLEMENTED");
+	}
 	
-	method is_builtin(*@value)	{ self.ATTR('is_builtin', @value); }
+	method has_access_qualifier()	{ return self.is_const || self.is_volatile; }
+	method has_storage_class()		{ return self.storage_class; }
+	
+	method is_builtin(*@value)		{ self.ATTR('is_builtin', @value); }
 	method is_const(*@value)		{ self.ATTR('is_const', @value); }
-	method is_dynamic()		{ return self.storage_class eq 'dynamic'; }
+	method is_dynamic()			{ return self.storage_class eq 'dynamic'; }
 	method is_extern(*@value)		{ self.ATTR('is_extern', @value); }
 	method is_inline(*@value)		{ self.ATTR('is_inline', @value); }
 	method is_lexical()			{ return self.storage_class eq 'lexical'; }
-	method is_method(*@value)	{ self.ATTR('is_method', @value); }
+	method is_method(*@value)		{ self.ATTR('is_method', @value); }
 	method is_parameter()		{ return self.storage_class eq 'parameter'; }
 	method is_register()			{ return self.storage_class eq 'register'; }
-	method is_specifier()		{ return 1; }
+	method is_specifier()			{ return 1; }
 	method is_static()			{ return self.storage_class eq 'static'; }
-	method is_typedef(*@value)	{ self.ATTR('is_typedef', @value); }
+	method is_typedef()			{ return self.storage_class eq 'typedef'; }
 	method is_typename_specifier()	{ return Scalar::defined(self.typename); }
-	method is_volatile(*@value)	{ self.ATTR('is_volatile', @value); }
+	method is_volatile(*@value)		{ self.ATTR('is_volatile', @value); }
 	
-	method has_storage_class()	{ return self.storage_class ne ''; }
-
 	method merge_with($from) {
 		ASSERT($from.isa(Slam::Type::Specifier),
 			'Merge from argument must be a type specifier.');
 			
 		for ('builtin', 'const', 'inline', 'method', 'typedef', 'volatile') {
-			if $from{$_} {
-				if self{$_} {
+			my $is_flag := 'is_' ~ $_;
+			if $from{$is_flag} {
+				if self{$is_flag} {
 					self.warning(:node($from),
-						:message("Redundant keyword '", $_, "'"),
+						:message("Redundant keyword '", $is_flag, "'"),
 					);
 				}
 				else {
-					self{$_} := $from{$_};
+					self{$is_flag} := $from{$is_flag};
 				}
 			}
 		}
@@ -518,28 +516,28 @@ module Slam::Type::Specifier {
 		
 		if $new_sc && $old_sc {
 			if $old_sc eq $new_sc {
-				NOTE("Adding redundant-storage class warning.");
+				NOTEold("Adding redundant-storage class warning.");
 				self.warning(:node($from),
 					:message("Redundant storage class specifier '",
 						$new_sc, "'"),
 				);
 			}
 			elsif $old_sc eq 'extern' && $new_sc eq 'lexical' {
-				NOTE("extern+lexical is okay");
+				NOTEold("extern+lexical is okay");
 				self.storage_class($new_sc)
 			}
 			elsif $old_sc eq 'lexical' && $new_sc eq 'extern' {
-				NOTE("lexical+extern is okay, but don't overwrite lexical");
+				NOTEold("lexical+extern is okay, but don't overwrite lexical");
 				self.is_extern(1);
 			}
 			else {
-				NOTE("Adding conflicting storage class error.");
+				NOTEold("Adding conflicting storage class error.");
 				self.error(:node($from),
 					:message("Conflicting storage class specifiers '",
 						$old_sc, "' and '", $new_sc, "'"));
 			}
 		}
-		elsif $old_sc {
+		elsif $new_sc {
 			self.storage_class($from.storage_class);
 		}
 	
@@ -559,29 +557,7 @@ module Slam::Type::Specifier {
 		
 		DUMP(self);
 	}
-	
-	method noun(*@value)		{ self.ATTR('noun', @value); }
 
-	method scope() {
-		ASSERT(self.has_storage_class,
-			'.scope() only works on storage_class specifiers');
-		unless our %scopes {
-			NOTE("Initializing storage_class -> scope mapping");
-			
-			%scopes := Hash::new(
-				:dynamic(	'lexical'),
-				:extern(	'package'),
-				:lexical(	'lexical'),
-				:parameter(	'lexical'),
-				:register(	'register'),
-				:static(	'package'),
-				:typedef(	'typedef'),
-			);
-		}
-		
-		return %scopes{self.storage_class};
-	}
-	
 	method storage_class(*@value)	{
 		if +@value {
 			if @value[0] eq 'extern' {
@@ -593,10 +569,45 @@ module Slam::Type::Specifier {
 	}
 	
 	method typename(*@value)	{ self.ATTR('typename', @value); }
+	
+	method update_symbol($symbol) {
+		ASSERT($symbol.isa(Slam::Symbol::Declaration),
+			'Can only update symbol declarations.');
+
+		if self.is_builtin {
+			$symbol.is_builtin(1);
+			self.is_builtin(0);
+		}
+		
+		if self.is_const {
+			$symbol.is_const(1);	
+			#self.is_const(0);	- don't reset, a typedef may need it.
+		}
+		
+		if self.is_extern {
+			$symbol.is_extern(1);
+			self.is_extern(0);
+		}
+		
+		if self.is_inline {
+			$symbol.is_inline(1);	
+			self.is_inline(0);
+		}
+		
+		if self.is_method {
+			$symbol.is_method(1);	
+			self.is_method(0);
+		}
+		
+		if self.is_volatile {
+			$symbol.is_volatile(1);	
+			#self.is_volatile(0);	- don't reset, a typedef may need it.
+		}
+
+		if self.storage_class {
+			NOTE("Setting storage class: ", self.storage_class);
+			$symbol.storage_class(self.storage_class);
+			self.storage_class(Scalar::undef());
+		}
+	}
 }
-
-################################################################
-
-module Slam::Type::TypenameSpecifier {
-}
-

@@ -2,8 +2,8 @@
 
 class Slam::TypeResolutionVisitor;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
+sub ASSERTold($condition, *@message) {
+	Dumper::ASSERTold(Dumper::info(), $condition, @message);
 }
 
 sub BACKTRACE() {
@@ -16,12 +16,12 @@ sub DIE(*@msg) {
 	Dumper::DIE(Dumper::info(), @msg);
 }
 
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
+sub DUMPold(*@pos, *%what) {
+	Dumper::DUMPold(Dumper::info(), @pos, %what);
 }
 
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
+sub NOTEold(*@parts) {
+	Dumper::NOTEold(Dumper::info(), @parts);
 }
 
 ################################################################
@@ -65,8 +65,8 @@ method visit($node) {
 	my @results;
 	
 	if $node {
-		NOTE("Visiting ", NODE_TYPE($node), " node: ", $node.name());
-		DUMP($node);
+		NOTEold("Visiting ", NODE_TYPE($node), " node: ", $node.name());
+		DUMPold($node);
 		
 		@results := $SUPER.visit(self, $node);
 	}
@@ -74,8 +74,8 @@ method visit($node) {
 		@results := Array::empty();
 	}
 	
-	NOTE("done");
-	DUMP(@results);
+	NOTEold("done");
+	DUMPold(@results);
 	return @results;
 }
 
@@ -87,22 +87,22 @@ the new code.
 =cut
 
 method visit_children($node) {
-	NOTE("Visiting ", +@($node), " children of ", NODE_TYPE($node), " node: ", $node.name());
-	DUMP($node);
+	NOTEold("Visiting ", +@($node), " children of ", NODE_TYPE($node), " node: ", $node.name());
+	DUMPold($node);
 
 	my @results := $SUPER.visit_children(self, $node);
 	
-	DUMP(@results);
+	DUMPold(@results);
 	return @results;
 }
 
 method visit_child_syms($node) {
-	NOTE("Visiting ", +@($node), " child_syms of ", NODE_TYPE($node), " node: ", $node.name());
-	DUMP($node);
+	NOTEold("Visiting ", +@($node), " child_syms of ", NODE_TYPE($node), " node: ", $node.name());
+	DUMPold($node);
 
 	my @results := $SUPER.visit_child_syms(self, $node);
 	
-	DUMP(@results);
+	DUMPold(@results);
 	return @results;
 }
 	
@@ -116,39 +116,39 @@ our @Child_attribute_names := (
 );
 
 method _type_resolve_UNKNOWN($node) {	
-	NOTE("No custom handler exists for node type: '", NODE_TYPE($node), 
+	NOTEold("No custom handler exists for node type: '", NODE_TYPE($node), 
 		"'. Passing through to children.");
-	DUMP($node);
+	DUMPold($node);
 
 	if $node.isa(Slam::Block) {
 		# Should I keep a list of push-able block types?
-		NOTE("Pushing this block onto the scope stack");
+		NOTEold("Pushing this block onto the scope stack");
 		Slam::Scopes::push($node);
 	
-		NOTE("Visiting child_sym entries");
+		NOTEold("Visiting child_sym entries");
 		self.visit_child_syms($node);
 	}
 
 	for @Child_attribute_names {
 		if $node{$_} {
-			NOTE("Visiting <", $_, "> attribute");
+			NOTEold("Visiting <", $_, "> attribute");
 			self.visit(node{$_});
 		}
 	}
 	
-	NOTE("Visiting children");
+	NOTEold("Visiting children");
 	self.visit_children($node);
 	
 	if $node.isa(Slam::Block) {
-		NOTE("Popping this block off the scope stack");
+		NOTEold("Popping this block off the scope stack");
 		Slam::Scopes::pop(NODE_TYPE($node));
 	}
 
 	# We need to return an array of something.
 	my @results := Array::new($node);
 	
-	NOTE("done");
-	#DUMP(@results);
+	NOTEold("done");
+	#DUMPold(@results);
 	return @results;
 }
 
@@ -223,31 +223,31 @@ with no problems to ::V (Rule 1.)
 =cut
 
 method _type_resolve_type_specifier($node) {
-	DUMP($node);
-	ASSERT(NODE_TYPE($node) eq 'type_specifier',
+	DUMPold($node);
+	ASSERTold(NODE_TYPE($node) eq 'type_specifier',
 		'Only type_specifiers get this treatment');
 	
 	my $type_name := $node.name();
 		
 	unless $type_name {
 		$type_name := $node<noun>.name();
-		NOTE("Fetching type_name from node of original qualified_identifier");
+		NOTEold("Fetching type_name from node of original qualified_identifier");
 	}
 	
-	NOTE("Resolving type specifier: ", $type_name);
+	NOTEold("Resolving type specifier: ", $type_name);
 
 	my @types := Slam::Lookups::query_matching_types($node<noun>);
-	NOTE("Found ", +@types , " candidates for typename resolution");
-	DUMP(@types);
+	NOTEold("Found ", +@types , " candidates for typename resolution");
+	DUMPold(@types);
 	
-	ASSERT(+@types > 0,
+	ASSERTold(+@types > 0,
 		'For a type-specifier to parse, there must have been at least one type_name that matched');
 	
 	my $resolved;
 	
 	if +@types == 1 {
 		$resolved := @types[0];
-		NOTE("Found exactly one candidate.");
+		NOTEold("Found exactly one candidate.");
 	}
 	elsif !$node<is_rooted> && !$node.namespace() {
 		# Unqualified name: prefer local candidate (rule 2a, above).
@@ -264,20 +264,20 @@ method _type_resolve_type_specifier($node) {
 	unless $resolved {
 		my @names := Array::empty();
 		
-		NOTE("Attaching an ambiguous type error");
+		NOTEold("Attaching an ambiguous type error");
 		ADD_ERROR($node,
 			"Ambiguous type specifier '", $type_name,
 			"' resolves to ", +@types, " different types.",
 		);
 	}
 
-	DUMP($resolved);
+	DUMPold($resolved);
 
 	my $original := $node<noun><apparent_type>;
 	
 	unless $original {
 		$original := $node<noun>;
-		NOTE("No original type stored for ", $original.name());
+		NOTEold("No original type stored for ", $original.name());
 	}
 	
 	$node<noun> := $resolved;
@@ -285,8 +285,8 @@ method _type_resolve_type_specifier($node) {
 	if !( $original =:= $resolved ) {
 		# This is NOT an error. If the grammar wasn't ambiguous, 
 		# there would never have been an original.
-		NOTE("Attaching a type-name-changed-resolution warning");
-		DUMP(:original($original), :new($resolved));
+		NOTEold("Attaching a type-name-changed-resolution warning");
+		DUMPold(:original($original), :new($resolved));
 		
 		ADD_WARNING($node, 
 			"Type specifier '", $type_name, 
@@ -299,8 +299,8 @@ method _type_resolve_type_specifier($node) {
 	# We need to return an array of something.
 	my @results := Array::new($node);
 	
-	NOTE("done");
-	DUMP(@results);
+	NOTEold("done");
+	DUMPold(@results);
 	return @results;
 }
 
@@ -313,28 +313,28 @@ Traverses the PAST tree, resolving all of the type names.
 =cut
 
 sub resolve_types($past) {
-	NOTE("Resolving types in PAST tree");
-	DUMP($past);
+	NOTEold("Resolving types in PAST tree");
+	DUMPold($past);
 
 	my @result;
 	
-	if Slam::Config::query('Compiler', name(0), 'disabled') {
-		NOTE("Configured off - skipping");
+	if Registry<CONFIG>.query('Compiler', name(0), 'disabled') {
+		NOTEold("Configured off - skipping");
 	}
 	else {
-		NOTE("Resolving types");
+		NOTEold("Resolving types");
 		$SUPER := Slam::Visitor.new();
-		NOTE("Created SUPER-visitor");
-		DUMP($SUPER);
+		NOTEold("Created SUPER-visitor");
+		DUMPold($SUPER);
 		
 		my $visitor := Slam::TypeResolutionVisitor.new();
-		NOTE("Created visitor");
-		DUMP($visitor);
+		NOTEold("Created visitor");
+		DUMPold($visitor);
 
 		@result := $visitor.visit($past);
 	}
 	
-	NOTE("done");
-	DUMP(@result);
+	NOTEold("done");
+	DUMPold(@result);
 	return @result;
 }

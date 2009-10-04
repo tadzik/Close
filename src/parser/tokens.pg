@@ -56,7 +56,7 @@ token WS_ALL {
 	[ \h+				# WS
 	| \n	[ {*} #= start_heredoc
 			[
-				<?{{	$P0 = get_hll_global [ 'close' ; 'Grammar' ; 'Actions' ], '$Heredocs_open'
+				<?{{	$P0 = get_hll_global [ 'Slam' ; 'Grammar' ; 'Actions' ], '$Heredocs_open'
 					$I0 = $P0
 					.return($I0)
 				}}>
@@ -305,7 +305,7 @@ token BREAK			{ 'break'		>> }
 token BUT			{ 'but'			>> }
 token CASE			{ 'case'			>> }
 token CLASS			{ 'class'		>> }
-token CONST			{ 'const'		>> }
+token CONST			{ 'const'		>> 	{*} }
 token CONTINUE		{ 'continue'		>> }
 token DEFAULT		{ 'default'		>> }
 token DO			{ 'do'			>> }
@@ -343,7 +343,7 @@ token UNLESS		{ 'unless'		>> }
 token UNTIL			{ 'until'		>> }
 token USING			{ 'using'		>> }
 token VOID			{ 'void' 		>> }
-token VOLATILE		{ 'volatile'		>> }
+token VOLATILE		{ 'volatile'		>> 	{*} }
 token WHILE			{ 'while'		>> }
 
 =head3 Identifiers
@@ -363,6 +363,23 @@ token BAREWORD {
 	<!RESERVED> 
 	<.ident>
 	{*}
+}
+
+=token BASIC_TYPE
+
+The basic types are reserved words, but we need to recognize them specially
+when parsing type specifiers.
+
+=cut
+
+token BASIC_TYPE {
+	[ <.AUTO> 
+	| <.FLOAT> 
+	| <.INT> 
+	| <.PMC> 
+	| <.STRING> 
+	| <.VOID> 
+	]				{*}
 }
 
 =pod
@@ -392,23 +409,40 @@ Adverbs are not reserved words because they are distinguished by the colon.
 
 =cut
 
-token	ADV_ANON		{ ':anon'	>> }
-token	ADV_EXTENDS	{ ':extends'	>> }
-token	ADV_FLAT		{ ':flat'		>> }
-token	ADV_INIT		{ ':init'		>> }
-token	ADV_LOAD		{ ':load'	>> }
-token	ADV_MAIN		{ ':main'	>> }
-token	ADV_METHOD	{ ':method'	>> }
-token	ADV_MULTI		{ ':multi'	>> }
-token	ADV_NAMED	{ ':named'	>> }
+token	ADV_ANON		{ ':anon'	>>	{*} }
+token	ADV_FLAT		{ ':flat'		>>	{*} }
+token	ADV_INIT		{ ':init'		>>	{*} }
+token	ADV_LOAD		{ ':load'	>>	{*} }
+token	ADV_MAIN		{ ':main'	>>	{*} }
+token	ADV_METHOD	{ ':method'	>>	{*} }
+
+# NOTE: 'rule'
+rule ADV_MULTI {
+	':multi' '(' ~ ')'  <signature=string_literal: ')'> {*}
+}
+
+# NOTE: 'rule'
+rule ADV_NAMED {
+	':named' [ '(' ~ ')' <named=QUOTED_LIT> ]? {*}
+}
+
 token	ADV_OPTIONAL	{ [ ':optional'	>>
-				| '?'		] }
-token	ADV_OPT_FLAG	{ ':opt_flag'	>> }
-token	ADV_PHYLUM	{ ':phylum'	>> }
-token	ADV_REG_CLASS	{ ':register_class' >> }
+				| '?'		]	{*} }
+
+# NOTE: 'rule'
+rule ADV_REG_CLASS {
+	':register_class' '(' ~ ')' <register_class=QUOTED_LIT> {*}
+}
+
 token	ADV_SLURPY 	{ [ ':slurpy'	>> 
-				| '...'		] }
-token	ADV_VTABLE	{ ':vtable'	>> }
+				| '...'		]	{*} }
+token	ADV_VTABLE	{ ':vtable'	>>	{*} }
+#tokenADV_EXTENDS	{ ':extends'	>>	{*} }
+#tokenADV_OPT_FLAG	{ ':opt_flag'	>>	{*} }
+#tokenADV_PHYLUM	{ ':phylum'	>>	{*} }
+
+# TODO: Add adverbs :outer, :subid
+
 
 =head3 Preprocessing Tokens
 

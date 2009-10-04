@@ -2,167 +2,439 @@
 
 class Dumper;
 
+our %Already_in;
 our %Bits;
-%Bits<NOTE>	:= 1;	
-%Bits<DUMP>	:= 2;
-%Bits<ASSERT>	:= 4;
-
 our $Prefix;
 
-our %Already_in;
-%Already_in<ASSERT>	:= 0;
-%Already_in<DIE>		:= 0;
-%Already_in<DUMP>	:= 0;
-%Already_in<INFO>	:= 0;
-%Already_in<NOTE>	:= 0;
+_onload();
 
-sub ASSERT(@info, $condition, @message) {
-	unless %Already_in<ASSERT> {
-		%Already_in<ASSERT>++;
+sub _onload() {
+	if our $onload_done { return 0; }
+	$onload_done := 1;
+
+	say("Dumper::_onload");
 	
-		if $condition {
-			if @info[0] && @info[0] % 8 >= 4 {
-				@message.unshift("ASSERT PASSED: ");
-				NOTE(@info, @message);
-			}
+	%Already_in<ASSERTold>	:= 0;
+	%Already_in<ASSERT>	:= 0;
+	%Already_in<DIE>		:= 0;
+	%Already_in<DUMP>	:= 0;
+	%Already_in<INFO>	:= 0;
+	%Already_in<NOTE>	:= 0;
+
+	%Bits<NOTE>	:= 1;	
+	%Bits<DUMP>	:= 2;
+	%Bits<ASSERT>	:= 4;
+}
+
+sub ASSERTold(@info, $condition, @message) {
+	if %Already_in<ASSERTold> { return $condition; }
+	%Already_in<ASSERTold>++;
+
+	if $condition {
+		if @info[0] && @info[0] % 8 >= 4 {
+			@message.unshift("ASSERT PASSED: ");
+			NOTEold(@info, @message);
 		}
-		else {
-			@message.unshift("ASSERT FAILED: ");
-			DIE(@info, @message);
-		}
-		
-		%Already_in<ASSERT>--;
 	}
+	else {
+		@message.unshift("ASSERT FAILED: ");
+		DIE(@info, @message);
+	}
+	
+	%Already_in<ASSERTold>--;
 }
 
-sub BACKTRACE() {
-	Q:PIR {{
-		backtrace
-	}};
-}
-
-sub DIE(@info, @msg) {
-	unless %Already_in<DIE> {
-		%Already_in<DIE>++;
-
-		my $message := @info[2] ~ '::' ~ @info[3]
-			~ ': ' ~ Array::join('', @msg);
-			
+sub ASSERT($condition, *@message, :$caller_level?) {
+	if %Already_in<ASSERT> { return $condition; }
+	%Already_in<ASSERT>++;
+	
+	my $message;
+	
+	if +@message {
+		$message := Array::join('', @message);
+	}
+	else {
+		$message := "ASSERTION FAILED";
+	}
+	
+	unless $condition {
 		Q:PIR {
 			$P0 = find_lex '$message'
 			$S0 = $P0
 			die $S0
 		};
-		
-		%Already_in<DIE>--;
-	}
-}
-
-sub DUMP(@info, @pos, %named) {
-	unless %Already_in<DUMP> {
-		%Already_in<DUMP>++;
-
-		if @info[0] && @info[0] % 4 > 1 {
-			$Prefix := make_prefix(@info[1]);
-			
-			if +@pos {
-				print($Prefix);
-				PCT::HLLCompiler.dumper(@pos, @info[2] ~ '::' ~ @info[3]);
-			}
-			
-			if +%named {
-				print($Prefix);
-				PCT::HLLCompiler.dumper(%named, @info[2] ~ '::' ~ @info[3]);
-			}
-		}
-		
-		%Already_in<DUMP>--;
-	}
-}
-
-sub DUMP_(*@what) {
-	for @what {
-		PCT::HLLCompiler.dumper($_, '');
-	}
-}
-
-sub NOTE(@info, @parts) {
-	unless %Already_in<NOTE> {
-		%Already_in<NOTE>++;
-
-		if @info[0] && @info[0] % 2 {
-			$Prefix := make_prefix(@info[1]);
-			$Prefix := $Prefix ~ @info[2] ~ '::' ~ @info[3];
-
-			say($Prefix, ': ', Array::join('', @parts));
-		}
-		
-		%Already_in<NOTE>--;
-	}
-}
-
-our @Info_rejected := Array::new(0, -1, 'null', 'null');
-
-sub info() {
-	my @result := @Info_rejected;
-	
-	unless %Already_in<INFO> {
-		%Already_in<INFO>++;
-			
-		my $caller_name	:= '<null>';
-		my $class_name	:= '<null>';
-		my $stack_depth	:= -1;
-		my $proceed		:= 0;
-	
-		Q:PIR {
-			.local pmc caller, key, namespace
-			.local int depth
-			$P0= getinterp
-			depth = 2		# How far up the stack to start looking
-			
-		find_named_caller:
-			inc depth
-			key = new 'Key'
-			key = 'sub'
-			$P1 = new 'Key'
-			$P1 = depth
-			push key, $P1
-			caller = $P0[ key ]
-			
-			$S0 = caller
-			$S1 = substr $S0, 0, 6
-			if '_block' == $S1 goto find_named_caller
-			
-			$P1 = box $S0
-			store_lex '$caller_name', $P1
-
-			namespace = caller.'get_namespace'()
-			$P1 = namespace.'get_name'()
-			$P2 = pop $P1
-			store_lex '$class_name', $P2
-		};
-
-		$proceed := get_config($class_name, $caller_name);
-		
-		if $proceed {
-			# Foo calls NOTE(), calls info(), calls stack_depth() : subtract 3
-			$stack_depth	:= stack_depth() - 3;
-			@result := Array::new($proceed, $stack_depth, $class_name, $caller_name);
-		}
-		
-		%Already_in<INFO>--;
 	}
 	
-	return @result;
+	%Already_in<ASSERT>--;
+	return $condition;
 }
 
-sub get_config($class, $sub) {	
-	my @keys := Array::new('Dump', $class, $sub);
-	my $result := Slam::Config::query_array(@keys);
+sub BACKTRACE() {
+	Q:PIR {
+		backtrace
+	};
+}
+
+sub DIE(*@msg) {
+	if %Already_in<DIE> { return 0; }
+	%Already_in<DIE>++;
+
+	my $message := 'DIE: ' ~ Array::join('', @msg);
+		
+	Q:PIR {
+		$P0 = find_lex '$message'
+		$S0 = $P0
+		die $S0
+	};
+	
+	%Already_in<DIE>--;
+}
+
+sub DUMP(*@pos, :$caller_level?, :@info?, *%named) {
+	if %Already_in<DUMP> { return 0; }
+	%Already_in<DUMP>++;
+
+	unless $caller_level {
+		$caller_level := 0;
+	}
+
+	unless @info {
+		# $caller_level + 2 for DUMP(), unless-block()
+		@info := info(:caller_level($caller_level + 2));
+	}
+
+	if @info[0] && @info[0] % 4 > 1 {
+		$Prefix := make_bare_prefix(@info[1]);
+		
+		if +@pos {
+			print($Prefix);
+			PCT::HLLCompiler.dumper(@pos, @info[2]);
+		}
+		
+		if +%named {
+			print($Prefix);
+			PCT::HLLCompiler.dumper(%named, @info[2]);
+		}
+	}
+	
+	%Already_in<DUMP>--;
+}
+
+sub DUMPold(@info, @pos, %named) {
+	DUMP(@pos, %named,
+		:caller_level(+1),
+		:info(@info));
+}
+
+sub DUMP_(*@what, :$label?, :$prefix?) {
+	unless $label { $label := '$VAR'; }
+	print($prefix);
+	PCT::HLLCompiler.dumper(@what, $label);
+}
+
+sub NOTE(*@parts, :$caller_level?, :@info?) {
+	if %Already_in<NOTE> { return 0; }
+	%Already_in<NOTE>++;
+
+	unless $caller_level {
+		$caller_level := 0;
+	}
+	
+	unless @info {
+		# $caller_level + 2 for NOTE(), unless-block()
+		@info := info(:caller_level($caller_level + 2));
+	}
+	
+	if @info[0] && @info[0] % 2 {
+		$Prefix := make_named_prefix(@info);
+		say($Prefix, ': ', Array::join('', @parts));
+	}
+	
+	%Already_in<NOTE>--;
+}
+
+sub NOTEold(@info, @parts) {
+	NOTE(Array::join('', @parts), 
+		:caller_level(+1), 
+		:info(@info));
+}
+
+=sub caller_depth_below($namespace, $name, :$limit?)
+
+Computes the number of "named" subs (name != '_blockNNN') between
+the caller and the sub identified by $namespace::$name on the current
+call stack. If more than $limit (default: 80) named subs are seen,
+$limit is returned.
+
+=cut
+
+sub caller_depth_below($namespace, $name, :$starting, :$limit?) {
+	unless $limit {
+		$limit := 80;
+	}
+
+	my $depth := Q:PIR {
+		.local pmc interp
+		interp = getinterp
+		
+		.local int depth, show_depth, show_limit
+		$P0 = find_lex '$starting'
+		depth = $P0
+
+		show_depth = 1
+		$P0 = find_lex '$limit'
+		show_limit = $P0
+		
+		.local string sub_name, nsp_name
+		$P0 = find_lex '$name'
+		sub_name = $P0
+		$P0 = find_lex '$namespace'
+		nsp_name = $P0
+		
+		.local pmc key, namespace, caller
+		.local string caller_name
+		
+	while_not_root:
+		
+		inc depth
+		
+		# Make a [ 'sub' , $depth ] key
+		key = new 'Key'
+		key = 'sub'
+		$P0 = new 'Key'
+		$P0 = depth
+		push key, $P0
+		
+		caller = interp[ key ]
+		
+		caller_name = caller
+		$S1 = substr caller_name, 0, 6
+
+		if $S1 == '_block' goto while_not_root
+
+		inc show_depth		
+		if show_depth >= show_limit goto  done
+
+		unless caller_name == sub_name goto while_not_root
+		
+		namespace = caller.'get_namespace'()
+		
+		$P0 = namespace.'get_name'()
+		$S0 = join '::', $P0
+
+		unless $S0 == nsp_name goto while_not_root
+		
+	done:
+		# Done: depth indicates depth from "parrot::Slam::main" to present.
+		%r = box show_depth
+	};
+
+	return $depth;
+}
+
+our $caller_depth := 0;
+
+sub find_named_caller(:$nth?, :$starting?) {
+	unless $nth { $nth := 1; }
+	
+	$starting := 0 + $starting;
+	
+	my $caller := Q:PIR {
+		.local pmc interp
+		interp = getinterp
+		
+		.local int how_many
+		$P0 = find_lex '$nth'
+		how_many = $P0
+		
+		.local int num_found
+		num_found = 0
+
+		.local int depth
+		$P0 = find_lex '$starting'
+		depth = $P0
+		
+		.local pmc caller, key, namespace
+		.local string caller_name		
+	
+	find_named_caller:
+	
+	skip_over_blocks:	# Skip over '_block...' lexical scopes
+		inc depth
+		
+		# Make a [ 'sub'; $depth ] key
+		key = new 'Key'
+		key = 'sub'
+		$P0 = new 'Key'
+		$P0 = depth
+		push key, $P0
+		
+		caller = interp [ key ]
+		caller_name = caller
+		$S0 = substr caller_name, 0, 6
+		
+		if $S0 == '_block' goto skip_over_blocks
+		
+		# Found one. Is that enough?
+		inc num_found
+		if num_found < how_many goto done
+		
+	done:		
+		# Cache the caller depth for stack_depth
+		$P0 = get_global '$caller_depth'
+		$P0 = depth
+		
+		# Now we have a sub named other than '_block'
+		%r = caller
+	};
+
+	return $caller;
+}
+
+sub get_address_of($what) {
+	my $address := Q:PIR {
+		$P0 = find_lex '$what'
+		if null $P0 goto null_object
+		$I0 = get_addr $P0
+		goto done
+	null_object:
+		$I0 = 0
+	done:
+		%r = box $I0
+	};
+	return $address;
+}
+
+sub get_caller($level?, :$attr?) {
+	$level := 1 + $level;
+	
+	unless $attr {
+		$attr := 'sub';
+	}
+	
+	my $caller := Q:PIR {
+		.local string attr
+		$P0 = find_lex '$attr'
+		attr = $P0
+		
+		.local pmc interp, key
+		interp = getinterp
+		
+		key = new 'Key'
+		key = attr
+		
+		.local int level
+		$P0 = find_lex '$level'
+		level = $P0
+		
+		$P0 = new 'Key'
+		$P0 = level
+		
+		push key, $P0
+		
+		%r = interp [ key ]
+	};
+
+	return $caller;
+}
+
+sub get_config(*@key) {
+	my $result;
+
+	if Registry<CONFIG> {
+		$result := Registry<CONFIG>.query(Array::join('::', @key));
+	}
+
 	return $result;
 }
 
-sub make_prefix($depth) {
+sub get_dumper_config($named_caller, :$starting) {
+	unless our %_dumper_config_cache {
+		%_dumper_config_cache := Hash::empty();
+	}
+
+	my $addr := Q:PIR {
+		$P0 = find_lex '$named_caller'
+		$I0 = get_addr $P0
+		%r = box $I0
+	};
+
+	unless my @config := %_dumper_config_cache{$addr} {
+		my $name := ~ $named_caller;
+		
+		my @namespace := Array::clone($named_caller.get_namespace.get_name);
+		# Replace hll 'parrot' with 'Dump' for dumper config settings.
+		@namespace[0] := 'Dump';
+		@namespace.push($name);
+		
+		my $key := Array::join('::', @namespace);
+
+		@config := Array::new(
+			get_config($key),
+			0,
+			$key
+		);
+
+		%_dumper_config_cache{$addr} := @config;
+	}
+
+	# Even if cached, recompute stack depth. A function may
+	# be at different depths throughout the program. (Worse,
+	# it may recurse.)
+	if @config[0] {
+		@config[1] := stack_depth(:starting($starting + 2));
+	}
+		
+	return @config;
+}
+
+=sub info
+
+Returns an array of 4 items:
+
+=item * [0] = proceed, either 0 or the flags set in config file for caller name
+
+=item * [1] = depth, the stack depth of the caller
+
+=item * [2] = caller full name:  Path::To::Class::sub
+
+=cut 
+
+our @Info_rejected := Array::new(0, -1, 'null');
+
+our %Info_cache;
+
+sub info(:$caller_level) {
+	if %Already_in<INFO> { return @Info_rejected; }	
+	%Already_in<INFO>++;
+
+	unless $caller_level {
+		# The old dump and note code calls info direct.
+		$caller_level := +1;
+	}
+	
+	$caller_level ++;
+	our $last_lexpad_addr;
+	our @result;
+	
+	# If lexpad address is the same, it's the same call frame.
+	# Return identical result.
+	my $lexpad_addr := get_address_of(get_caller($caller_level, :attr('lexpad')));
+	
+	if $lexpad_addr && $lexpad_addr == $last_lexpad_addr {
+	}
+	else {
+		$last_lexpad_addr	:= $lexpad_addr;
+		my $caller		:= find_named_caller(:starting($caller_level + 1));
+
+		@result		:= get_dumper_config($caller, :starting($caller_depth));
+	}
+
+	%Already_in<INFO>--;
+	return @result;
+}
+
+sub make_bare_prefix($depth) {
 	if $depth < 1 {
 		$depth := 1;
 	}
@@ -170,75 +442,36 @@ sub make_prefix($depth) {
 	return String::repeat('| ', $depth - 1) ~ '+- ';
 }
 
-sub stack_depth() {
-	our $Stack_root;
+sub make_named_prefix(@info) {
+	my $prefix := make_bare_prefix(@info[1]) ~ @info[2];
+	return $prefix;
+}
+
+sub stack_depth(:$starting) {
 	our $Stack_root_offset;
 	our $Root_sub;
 	our $Root_nsp;
+
+	my $depth := 0;
 	
-	unless $Stack_root {
-		$Stack_root := get_config('Stack', 'Root');
-		$Stack_root_offset := 0 + get_config('Stack', 'Root_offset');
-		
-		unless $Stack_root {
-			$Stack_root := 'parrot::Slam::main';
-			$Stack_root_offset := 6; # 6 PCT subs on stack when parsing.
+	unless $Root_sub {
+		my $stack_root := get_config('Dump', 'Stack', 'Root');
+		$Stack_root_offset := 0 + get_config('Dump', 'Stack', 'Root_offset');
+
+		if $stack_root {
+			my @parts	:= String::split('::', $stack_root);
+			$Root_sub	:= @parts.pop();
+			$Root_nsp	:= Array::join('::', @parts);
 		}
-		
-		my @parts	:= String::split('::', $Stack_root);
-		$Root_sub	:= @parts.pop();
-		$Root_nsp	:= Array::join('::', @parts);
-		
-		#say("Stack root: ", $Stack_root);
-		#say("Stack root_offset: ", $Stack_root_offset);
 	}
 	
+	# If config doesn't know Root yet, we're probably in the early stages,
+	# before the config file loads. Return 0.
+	if $Root_sub {
+		$depth := caller_depth_below($Root_nsp, $Root_sub, 
+			:starting($starting + 2));
+		$depth := $depth - $Stack_root_offset;
+	}
 
-	my $depth := Q:PIR {
-		.local pmc interp
-		.local int depth, show_depth
-		.local pmc key, namespace, caller
-		.local string sub_name, nsp_name
-		
-		interp = getinterp
-		depth = 0
-		show_depth = 0
-		$P0 = get_global '$Root_sub'
-		sub_name = $P0
-		$P0 = get_global '$Root_nsp'
-		nsp_name = $P0
-		
-	while_not_root:
-		inc depth				# depth++
-			
-		key = new 'Key'			# key = new Key('sub' ; depth)
-		key = 'sub'
-		$P0 = new 'Key'
-		$P0 = depth
-		push key, $P0
-		caller = interp[ key ]		# caller = interp[ key ]
-		
-		$S0 = caller				# $S0 = caller.name()
-		$S1 = substr $S0, 0, 6
-
-		if $S1 == '_block' goto while_not_root
-
-		inc show_depth			# found a 'real' sub name
-		
-		unless $S0 == sub_name goto while_not_root
-		
-		namespace = caller.'get_namespace'()
-		
-		$P0 = namespace.'get_name'()
-		$S0 = join '::', $P0
-				
-		unless $S0 == nsp_name goto while_not_root
-		
-		# Done: depth indicates depth from "parrot::Slam::main" to present.
-		%r = box show_depth
-	};
-	
-	$depth := $depth - $Stack_root_offset;
-	
 	return $depth;
 }

@@ -1,6 +1,8 @@
 # $Id$
 
-class close::Grammar::Actions;
+module Slam::Grammar::Actions;
+
+our $Symbols;
 
 #method TOP($/, $key) { PASSTHRU($/, $key); }
 method TOP($/, $key) { 
@@ -9,11 +11,9 @@ method TOP($/, $key) {
 	unless Slam::IncludeFile::in_include_file() {
 		DUMP($past);
 
-		if get_config('Compiler', 'PrettyPrint') {
-			NOTE("Pretty-printing input");
-			my $prettified := Slam::PrettyPrintVisitor::print($past);
-			NOTE("Pretty print done\n", $prettified);
-		}
+		NOTE("Pretty-printing input");
+		my $prettified := Slam::PrettyPrintVisitor::print($past);
+		NOTE("Pretty print done\n", $prettified);
 
 		NOTE("Collecting declarations");
 		Slam::DeclarationCollectionVisitor::collect_declarations($past);
@@ -41,7 +41,7 @@ method TOP($/, $key) {
 		DUMP($past);
 	}	
 	
-	if get_config('Compiler', 'faketree') {
+	if Registry<CONFIG>.query('Compiler', 'faketree') {
 		NOTE("Replacing compiled tree with faketree() results");
 		$past := faketree();
 	}
@@ -61,87 +61,61 @@ this expression.
 method include_directive($/) {
 	NOTE("Processing include file: ", ~ $<file>);
 	my $past := parse_include_file($<file>.ast);
+	MAKE($past);
+}
+
+method _namespace_definition_close($/) {
+	my $past := $Symbols.leave_scope('Slam::Namespace');
+
+	for ast_array($<declaration_sequence><decl>) {
+		$_.attach_to($past);
+	}
 	
-	NOTE("done");
-	DUMP($past);
-	make $past;
+	MAKE($past);
 }
 
-method namespace_definition($/, $key) {
-	if $key eq 'open' {
-		my $past := Slam::Namespaces::fetch_namespace_of($<namespace_path>.ast);
-		Slam::Scopes::push($past);
-		NOTE("Pushed ", NODE_TYPE($past), " block for ", $past<display_name>);
-	}
-	elsif $key eq 'close' {
-		my $past := Slam::Scopes::pop('namespace_definition');
-		NOTE("Popped namespace_definition block: ", $past<display_name>);
-
-		for $<declaration_sequence><decl> {
-			my $decl := $_.ast;
-			NOTE("Adding ", NODE_TYPE($decl)," node: ", $decl<display_name>);
-			$past.push($decl);
-		}
-		
-		NOTE("done");
-		DUMP($past);
-		make $past;
-	}
-	else {
-		$/.panic("Unexpected value '", $key, "' for $key parameter");
-	}
+method _namespace_definition_open($/) {
+	$Symbols.enter_namespace_scope($<namespace_path>.ast);
 }
+
+# NQP currently generates get_hll_global for functions. So qualify them all.
+our %_namespace_definition;
+%_namespace_definition<close>		:= Slam::Grammar::Actions::_namespace_definition_close;
+%_namespace_definition<open>		:= Slam::Grammar::Actions::_namespace_definition_open;
+
+method namespace_definition($/, $key)	{ self.DISPATCH($/, $key, %_namespace_definition); }
 
 method _translation_unit_close($/) {
-	my $past;
-	
-	if Slam::IncludeFile::in_include_file() {
-		# NB: Don't pop, because this might be a #include
-		NOTE("Not popping - this is a #include");
-		$past := Slam::Scopes::current();
-	}
-	else {
-		NOTE("Popping namespace_definition block");
-		$past := Slam::Scopes::pop('namespace_definition');
-	}
-	
-	DUMP($past);
+	my $past := $Symbols.current_scope();
 	
 	NOTE("Adding declarations to translation unit context scope.");
-	for $<declaration_sequence><decl> {
-		$past.push($_.ast);
+	for ast_array($<declaration_sequence><decl>) {
+		$_.attach_to($past);
 	}
 	
-	NOTE("done");
-	DUMP($past);
-	make $past;		
+	unless Slam::IncludeFile::in_include_file() {
+		NOTE("Popping namespace_definition block");
+		$past := $Symbols.leave_scope('Slam::Namespace');
+	}
+
+	MAKE($past);
 }
 
 method _translation_unit_open($/) {
+	NOTE("Running global setup");
+	global_setup();
+	
 	unless Slam::IncludeFile::in_include_file() {
-		# Calling NOTE, etc., won't work before the config file is read.
-		Slam::Config::read('close.cfg');
-		NOTE("Finished reading config file.");
-
-		my $root_nsp := Slam::Namespaces::fetch(Array::new('close'));
-		Slam::Scopes::push($root_nsp);
-		DUMP($root_nsp);
+		NOTE("Not in an include file");
 	}
 }
 
 # NQP currently generates get_hll_global for functions. So qualify them all.
 our %_translation_unit;
-%_translation_unit<close>		:= close::Grammar::Actions::_translation_unit_close;
-%_translation_unit<open>		:= close::Grammar::Actions::_translation_unit_open;
+%_translation_unit<close>		:= Slam::Grammar::Actions::_translation_unit_close;
+%_translation_unit<open>		:= Slam::Grammar::Actions::_translation_unit_open;
 
-method translation_unit($/, $key) {
-	if %_translation_unit{$key} {
-		%_translation_unit{$key}(self, $/);
-	}
-	else {
-		$/.panic("Invalid $key '", $key, "' passed to translation_unit()");
-	}
-}
+method translation_unit($/, $key) { self.DISPATCH($/, $key, %_translation_unit); }
 
 sub faketree() {
 	my $sub := PAST::Block.new(:blocktype('declaration'), :name('compilation_unit'));

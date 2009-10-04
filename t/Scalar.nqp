@@ -2,8 +2,8 @@
 
 class Scalar;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
+sub ASSERTold($condition, *@message) {
+	Dumper::ASSERTold(Dumper::info(), $condition, @message);
 }
 
 sub BACKTRACE() {
@@ -16,19 +16,19 @@ sub DIE(*@msg) {
 	Dumper::DIE(Dumper::info(), @msg);
 }
 
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
+sub DUMPold(*@pos, *%what) {
+	Dumper::DUMPold(Dumper::info(), @pos, %what);
 }
 
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
+sub NOTEold(*@parts) {
+	Dumper::NOTEold(Dumper::info(), @parts);
 }
 
 ################################################################
 
 sub defined($what) {
-	NOTE("Checking if something is defined");
-	DUMP($what);
+	NOTEold("Checking if something is defined");
+	DUMPold($what);
 	
 	my $result := Q:PIR {{
 		$P0 = find_lex '$what'
@@ -36,7 +36,7 @@ sub defined($what) {
 		%r = box $I0
 	}};
 	
-	NOTE("Returning ", $result);
+	NOTEold("Returning ", $result);
 	return $result;
 }
 

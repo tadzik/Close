@@ -2,44 +2,8 @@
 
 class Slam::DeclarationCollectionVisitor;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
-}
-
-sub BACKTRACE() {
-	Q:PIR {{
-		backtrace
-	}};
-}
-
-sub DIE(*@msg) {
-	Dumper::DIE(Dumper::info(), @msg);
-}
-
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
-}
-
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
-}
-
-################################################################
-
-sub ADD_ERROR($node, *@msg) {
-	Slam::Messages::add_error($node,
-		Array::join('', @msg));
-}
-
-sub ADD_WARNING($node, *@msg) {
-	Slam::Messages::add_warning($node,
-		Array::join('', @msg));
-}
-
-sub NODE_TYPE($node) {
-	return $node.node_type;
-}
-
+Parrot::IMPORT('Dumper');
+	
 ################################################################
 
 our $SUPER;
@@ -83,7 +47,7 @@ our @Child_attribute_names := (
 );
 
 method _collect_declarations_UNKNOWN($node) {	
-	NOTE("No custom handler exists for '", NODE_TYPE($node), 
+	NOTE("No custom handler exists for '", $node.node_type, 
 		"' node '", $node.name(), "'. Passing through to children.");
 	DUMP($node);
 	return $SUPER.visit_node_generic_noresults(self, $node, @Child_attribute_names);
@@ -123,7 +87,7 @@ sub collect_declarations($past) {
 	NOTE("Collecting declarations in PAST tree");
 	DUMP($past);
 
-	if Slam::Config::query('Compiler', name(0), 'disabled') {
+	if Registry<CONFIG>.query('Compiler', name(0), 'disabled') {
 		NOTE("Configured off - skipping");
 	}
 	else {

@@ -8,8 +8,8 @@ This class is a template for visitor classes that build on top of Visitor.pm
 
 class Slam::GenericVisitor;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
+sub ASSERTold($condition, *@message) {
+	Dumper::ASSERTold(Dumper::info(), $condition, @message);
 }
 
 sub BACKTRACE() {
@@ -22,12 +22,12 @@ sub DIE(*@msg) {
 	Dumper::DIE(Dumper::info(), @msg);
 }
 
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
+sub DUMPold(*@pos, *%what) {
+	Dumper::DUMPold(Dumper::info(), @pos, %what);
 }
 
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
+sub NOTEold(*@parts) {
+	Dumper::NOTEold(Dumper::info(), @parts);
 }
 
 ################################################################
@@ -72,8 +72,8 @@ method visit($node) {
 	my @results;
 	
 	if $node {
-		NOTE("Visiting ", NODE_TYPE($node), " node: ", $node.name());
-		DUMP($node);
+		NOTEold("Visiting ", NODE_TYPE($node), " node: ", $node.name());
+		DUMPold($node);
 		
 		@results := $SUPER.visit(self, $node);
 	}
@@ -81,8 +81,8 @@ method visit($node) {
 		@results := Array::empty();
 	}
 	
-	NOTE("done");
-	DUMP(@results);
+	NOTEold("done");
+	DUMPold(@results);
 	return @results;
 }
 
@@ -94,22 +94,22 @@ the new code.
 =cut
 
 method visit_children($node) {
-	NOTE("Visiting ", +@($node), " children of ", NODE_TYPE($node), " node: ", $node.name());
-	DUMP($node);
+	NOTEold("Visiting ", +@($node), " children of ", NODE_TYPE($node), " node: ", $node.name());
+	DUMPold($node);
 
 	my @results := $SUPER.visit_children(self, $node);
 	
-	DUMP(@results);
+	DUMPold(@results);
 	return @results;
 }
 
 method visit_child_syms($node) {
-	NOTE("Visiting ", +@($node), " child_syms of ", NODE_TYPE($node), " node: ", $node.name());
-	DUMP($node);
+	NOTEold("Visiting ", +@($node), " child_syms of ", NODE_TYPE($node), " node: ", $node.name());
+	DUMPold($node);
 
 	my @results := $SUPER.visit_child_syms(self, $node);
 	
-	DUMP(@results);
+	DUMPold(@results);
 	return @results;
 }
 	
@@ -148,41 +148,41 @@ our @Child_attribute_names := (
 );
 
 method _generic_visit_UNKNOWN($node) {	
-	NOTE("No custom handler exists for node type: '", NODE_TYPE($node), 
+	NOTEold("No custom handler exists for node type: '", NODE_TYPE($node), 
 		"'. Passing through to children.");
-	DUMP($node);
+	DUMPold($node);
 
 	my @results := Array::empty();
 	
 	if $node.isa(Slam::Block) {
 		# Should I keep a list of push-able block types?
-		NOTE("Pushing this block onto the scope stack");
+		NOTEold("Pushing this block onto the scope stack");
 		Slam::Scopes::push($node);
 	
-		NOTE("Visiting child_sym entries");
+		NOTEold("Visiting child_sym entries");
 		Array::append(@results, self.visit_child_syms($node));
 	}
 
 	for @Child_attribute_names {
 		if $node{$_} {
-			NOTE("Visiting <", $_, "> attribute");
+			NOTEold("Visiting <", $_, "> attribute");
 			Array::append(@results,
 				self.visit($node{$_})
 			);
 		}
 	}
 	
-	NOTE("Visiting children");
+	NOTEold("Visiting children");
 	Array::append(@results,
 		self.visit_children($node)
 	);
 	
 	if $node.isa(Slam::Block) {
-		NOTE("Popping this block off the scope stack");
+		NOTEold("Popping this block off the scope stack");
 		Slam::Scopes::pop(NODE_TYPE($node));
 	}
 	
-	NOTE("done");
+	NOTEold("done");
 	return @results;
 }
 
@@ -196,22 +196,22 @@ to visit the PAST node that is passed from the compiler.
 =cut
 
 sub ENTREPOT($past) {
-	NOTE("Doing whatever it is that I do");
-	DUMP($past);
+	NOTEold("Doing whatever it is that I do");
+	DUMPold($past);
 
 	$SUPER := Slam::Visitor.new();
-	NOTE("Created SUPER-visitor");
-	DUMP($SUPER);
+	NOTEold("Created SUPER-visitor");
+	DUMPold($SUPER);
 	
 	my $visitor	:= Slam::GenericVisitor.new();
-	NOTE("Created visitor");
-	DUMP($visitor);
+	NOTEold("Created visitor");
+	DUMPold($visitor);
 	
 	my @results	:= $visitor.visit($past);
 	
-	DUMP(@results);
+	DUMPold(@results);
 		
-	NOTE("Post-processing results");
+	NOTEold("Post-processing results");
 	
 	# Do whatever it is you want to do here.
 	my $result := Array::join("\n", @results);
@@ -219,7 +219,7 @@ sub ENTREPOT($past) {
 	# If you edited the tree in place, just return the tree. 
 	#my $result := $past; 
 	
-	NOTE("done");
-	DUMP($result);
+	NOTEold("done");
+	DUMPold($result);
 	return $result;
 }

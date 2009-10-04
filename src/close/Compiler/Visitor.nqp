@@ -2,8 +2,8 @@
 
 class Slam::Visitor;
 
-sub ASSERT($condition, *@message) {
-	Dumper::ASSERT(Dumper::info(), $condition, @message);
+sub ASSERTold($condition, *@message) {
+	Dumper::ASSERTold(Dumper::info(), $condition, @message);
 }
 
 sub BACKTRACE() {
@@ -16,12 +16,12 @@ sub DIE(*@msg) {
 	Dumper::DIE(Dumper::info(), @msg);
 }
 
-sub DUMP(*@pos, *%what) {
-	Dumper::DUMP(Dumper::info(), @pos, %what);
+sub DUMPold(*@pos, *%what) {
+	Dumper::DUMPold(Dumper::info(), @pos, %what);
 }
 
-sub NOTE(*@parts) {
-	Dumper::NOTE(Dumper::info(), @parts);
+sub NOTEold(*@parts) {
+	Dumper::NOTEold(Dumper::info(), @parts);
 }
 
 ################################################################
@@ -66,10 +66,10 @@ method fetch_visit_method($visitor, $node) {
 	my $sub		:=%visit_methods{$visitor.name()}{$type};
 	my $caller_nsp	:= self.get_caller_namespace();
 	
-	#NOTE("Fetching visit_method: ", $sub_name);
+	#NOTEold("Fetching visit_method: ", $sub_name);
 	
 	unless $sub {
-		#NOTE("Not found in cache. Doing lookup.");
+		#NOTEold("Not found in cache. Doing lookup.");
 		
 		$sub := Q:PIR {
 			.local pmc caller_nsp
@@ -100,14 +100,14 @@ method fetch_visit_method($visitor, $node) {
 				"for Node class: ", $type);
 		}
 
-		#NOTE("Got sub: ", $sub);
-		#DUMP($sub);
+		#NOTEold("Got sub: ", $sub);
+		#DUMPold($sub);
 		
 		%visit_methods{$visitor.name()}{$type} := $sub;
-		#DUMP(%visit_methods);
+		#DUMPold(%visit_methods);
 	}
 	
-	#NOTE("Returning method '", $sub, "'");
+	#NOTEold("Returning method '", $sub, "'");
 	return $sub;
 }
 
@@ -153,23 +153,23 @@ method is_deleted($node) {
 my @Results_placeholder := Array::empty();
 
 method visit($visitor, $node) {
-	#NOTE("Visiting ", NODE_TYPE($node), " node on behalf of ", $visitor.name());
+	#NOTEold("Visiting ", NODE_TYPE($node), " node on behalf of ", $visitor.name());
 	
 	my @results;
 
 	if Scalar::defined($node) {
 		@results := self.already_visited($visitor, $node);
-		#DUMP(@results);
+		#DUMPold(@results);
 		
 		unless Scalar::defined(@results) {
-			#NOTE("Not visited yet. Inserting temporary marker.");
+			#NOTEold("Not visited yet. Inserting temporary marker.");
 			#self.already_visited($visitor, $node, Array::new($node));
 			self.already_visited($visitor, $node, @Results_placeholder);
 			
 			my &method := self.fetch_visit_method($visitor, $node);
 			@results	:= &method($visitor, $node);
 			
-			#NOTE("Visit complete. Storing results.");
+			#NOTEold("Visit complete. Storing results.");
 			if Scalar::defined(@results) {
 				self.already_visited($visitor, $node, @results);
 			}
@@ -179,8 +179,8 @@ method visit($visitor, $node) {
 		@results := Array::empty();
 	}
 
-	#NOTE("done");
-	#DUMP(@results);
+	#NOTEold("done");
+	#DUMPold(@results);
 	return @results;
 }
 
@@ -200,12 +200,12 @@ method _visit_array($visitor, @array) {
 		$index++;
 	}
 
-	NOTE("Visits over, now deleting");
-	DUMP(@delete);
+	NOTEold("Visits over, now deleting");
+	DUMPold(@delete);
 	# Note: Using unshift above creates backwards array: 3, 2, 1
 	# Deleting from rear prevents index slippage.
 	for @delete {
-		NOTE("Deleting index ", $_);
+		NOTEold("Deleting index ", $_);
 		Array::delete(@array, $_);
 	}
 	
@@ -219,8 +219,8 @@ method visit_children($visitor, $node) {
 		self._visit_array($visitor, @($node));
 	}
 
-	#NOTE("Returning ", +@results, " results");
-	#DUMP(@results);
+	#NOTEold("Returning ", +@results, " results");
+	#DUMPold(@results);
 	return @results;
 }
 
@@ -237,14 +237,14 @@ method visit_child_syms($visitor, $node) {
 		}
 	}
 
-	#NOTE("Returning ", +@results, " results");
-	#DUMP(@results);
+	#NOTEold("Returning ", +@results, " results");
+	#DUMPold(@results);
 	return @results;
 }
 
 method visit_node_generic_noresults($visitor, $node, @child_attrs) {
 	if $node.isa(Slam::Block) {
-		NOTE("Pushing this block onto the scope stack");
+		NOTEold("Pushing this block onto the scope stack");
 		Slam::Scopes::push($node);
 		self.visit_child_syms($visitor, $node);
 	}
@@ -268,7 +268,7 @@ method visit_node_generic_results($visitor, $node, @child_attrs) {
 	my @results := Array::empty();
 	
 	if $node.isa(Slam::Block) {
-		NOTE("Pushing this block onto the scope stack");
+		NOTEold("Pushing this block onto the scope stack");
 		Slam::Scopes::push($node);
 		Array::append(@results, self.visit_child_syms($visitor, $node));
 	}
