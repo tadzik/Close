@@ -90,7 +90,7 @@ COMPILER_LIBS_PIR := \
 	src/Slam/Symbols.pir			\
 	src/Slam/Type.pir			\
 	src/Slam/Visitors/TreeRewriteVisitor.pir	\
-	src/Slam/Visitors/TypeResolutionVisitor.pir	\
+	src/Slam/Visitors/TypeResolution.pir	\
 	src/Slam/Visitors/Visitor.pir
 
 DOCS := README

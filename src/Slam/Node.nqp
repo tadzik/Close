@@ -210,14 +210,11 @@ an init() method.
 			self.rebuild_display_name(1);
 		}
 
-		return PAST::Node::namespace(@value.shift);
+		return PAST::Node::namespace(self, @value.shift);
 	}
 
 	method node_type() {
-		my $class := Class::of(self);
-		my @parts := String::split(';', $class);
-		$class := Array::join('::', @parts);
-		return $class;
+		return Class::name_of(self);
 	}
 
 	method rebuild_display_name(*@value) { self.ATTR('rebuild_display_name', @value); }
@@ -616,12 +613,16 @@ module Slam::Block {
 	################################################################
 
 	method accept_visit($visitor) {
-		$visitor.visit(self, :start(1));
+		NOTE("Accepting visit to ", self, " from ", Class::of($visitor));
 		
+		$visitor.visit(self, :start(1));
+		Registry<SYMTAB>.enter_scope(self);
+
 		for @(self) {
 			$_.accept_visit($visitor);
 		}
-		
+
+		Registry<SYMTAB>.leave_scope(self.node_type);
 		$visitor.visit(self, :end(1));
 	}
 	

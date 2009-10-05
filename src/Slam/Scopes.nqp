@@ -53,6 +53,17 @@ Node.
 		NOTE("Now there are ", +self.using_namespaces, " entries");
 	}
 
+	method contains($name, :&satisfies) {
+		my $result := self.symbol($name) 
+			&& self.symbol($name)<declaration>;
+		
+		unless &satisfies($result) {
+			$result := Scalar::undef();
+		}
+		
+		return $result;
+	}
+	
 =method declare($symbol)
 
 Declares a Slam::Symbol in the scope. If two symbol declarations with the same name 
@@ -109,19 +120,43 @@ so ixnay.
 		}
 	}
 	
-	method lookup($reference) {
+	method lookup($reference, :&satisfies) {
 		my $name := $reference.name;
 		NOTE("Scope '", self, "' looking up ", $name);
 		DUMP(self);
 		DUMP($reference);
 		
-		my $result := self.symbol($name) && self.symbol($name)<declaration>;
+		my $result := self.contains($name, :satisfies(&satisfies));
 
+		unless $result {
+			NOTE("Searching using-namespaces");
+			my @results := Array::empty();
+			
+			for self.using_namespaces {
+				if my $found := $_.contains($name, &satisfies) {
+					@results.push($found);
+				}
+			}
+
+			if +@results > 1 {
+				NOTE("Multiple candidates found.");
+				$reference.warning(:warning(
+					"Multiple candidates found for this name. Consider specifying an explicit namespace."),
+				);
+
+				$result := @results.shift;
+			}
+			elsif +@results {
+				$result := @results.shift;
+			}
+		}
+		
 		NOTE("Done. Found: ", $result);
 		DUMP($result);
 		return $result;
 	}
 	
+	# TODO: Add init method, set this value there, stop checking each time.
 	method using_namespaces() {
 		unless self<using_namespaces> {
 			self<using_namespaces> := Array::empty();

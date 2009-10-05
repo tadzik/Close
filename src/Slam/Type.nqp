@@ -157,8 +157,8 @@ sub same_type($type1, $type2, *%options) {
 			}
 		}
 		else {
-			DUMPold($type1, $type2);
-			ASSERTold(0, 'Not reached unless types are horribly misconfigured');
+			DUMP($type1, $type2);
+			ASSERT(0, 'Not reached unless types are horribly misconfigured');
 		}
 		
 		$type1 := $type1<next>;
@@ -224,15 +224,15 @@ Returns the severity of the redefinition: 'error', 'harmless', or 'same'.
 sub update_redefined_symbol(*%args) {
 	my $original	:= %args<original>;
 	my $update	:= %args<redefinition>;
-	ASSERTold($original && $update, ':original() and :redefinition() parameters are required.');
-	ASSERTold(same_type($original, $update), 'PRECONDITION');
+	ASSERT($original && $update, ':original() and :redefinition() parameters are required.');
+	ASSERT(same_type($original, $update), 'PRECONDITION');
 	
 	my $severity := 'ignore';
 	
 	my $orig_spec := $original<etype>;
-	ASSERTold($orig_spec<is_specifier>, 'Symbol etype must link to type specifier');
+	ASSERT($orig_spec<is_specifier>, 'Symbol etype must link to type specifier');
 	my $upd_spec := $update<etype>;
-	ASSERTold($upd_spec<is_specifier>, 'Symbol etype must link to type specifier');
+	ASSERT($upd_spec<is_specifier>, 'Symbol etype must link to type specifier');
 
 	# Check initializers
 	my $init := $update<initializer>;
@@ -354,7 +354,15 @@ module Slam::Type::Array {
 ################################################################
 
 module Slam::Type::Declarator {
-
+	
+	method accept_visit($visitor) {
+		$visitor.visit(self);
+		
+		if self.nominal {
+			self.nominal.accept_visit($visitor);
+		}
+	}
+	
 	method attach(@others) {
 		my $last := self;
 		
@@ -517,22 +525,22 @@ module Slam::Type::Specifier {
 		
 		if $new_sc && $old_sc {
 			if $old_sc eq $new_sc {
-				NOTEold("Adding redundant-storage class warning.");
+				NOTE("Adding redundant-storage class warning.");
 				self.warning(:node($from),
 					:message("Redundant storage class specifier '",
 						$new_sc, "'"),
 				);
 			}
 			elsif $old_sc eq 'extern' && $new_sc eq 'lexical' {
-				NOTEold("extern+lexical is okay");
+				NOTE("extern+lexical is okay");
 				self.storage_class($new_sc)
 			}
 			elsif $old_sc eq 'lexical' && $new_sc eq 'extern' {
-				NOTEold("lexical+extern is okay, but don't overwrite lexical");
+				NOTE("lexical+extern is okay, but don't overwrite lexical");
 				self.is_extern(1);
 			}
 			else {
-				NOTEold("Adding conflicting storage class error.");
+				NOTE("Adding conflicting storage class error.");
 				self.error(:node($from),
 					:message("Conflicting storage class specifiers '",
 						$old_sc, "' and '", $new_sc, "'"));

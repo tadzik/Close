@@ -31,7 +31,7 @@ module Slam::Visitor {
 		return self{$name};
 	}
 
-	method already_visited($node, *@result) {
+	method already_visited($node, %options, *@value) {
 		my $cache	:= self.visit_cache;
 		ASSERT(Scalar::defined($cache), 
 			'Failed to init <visit_cache> hash.');
@@ -39,10 +39,13 @@ module Slam::Visitor {
 		my $id	:= $node.id;
 		ASSERT($id, "C'est impossible! Node with no id?");
 
-		if +@result {
-			NOTE("Setting already_visited status for ",
-				$id, " to ", @result[0]);
-			$cache{$id} := @result[0];
+		if %options<start> { $id := $id ~ ':start'; }
+		elsif %options<end> { $id := $id ~ ':end'; }
+		
+		if +@value {
+			NOTE("Setting already_visited status for ", $id, 
+				" to ", @value[0]);
+			$cache{$id} := @value[0];
 		}
 		
 		return $cache{$id};
@@ -53,6 +56,16 @@ module Slam::Visitor {
 			'Failed to init <wants_delete> hash.');
 
 		self<wants_delete>{$node.id} := 1;
+	}
+
+	method description()		{ DIE("NOT IMPLEMENTED IN SUBCLASS"); }
+	
+	method enabled() {
+		return ! Registry<CONFIG>.query(Class::name_of(self), 'disabled');
+	}
+	
+	method finish() {
+		NOTE(" ***** FINISHED *****");
 	}
 	
 	method init(@children, %attributes) {
@@ -85,6 +98,10 @@ module Slam::Visitor {
 		return self;
 	}
 	
+	method isa($type) {
+		my $result := self.HOW.isa(self, $type);
+	}
+	
 	method method_dispatch(*@value)	{ self.ATTR('method_dispatch', @value); }
 	
 	method new(*@children, *%attributes) {
@@ -106,13 +123,13 @@ module Slam::Visitor {
 		ASSERT($node.isa(Slam::VisitAcceptor), 
 			'Visitor only works with Slam::VisitAcceptor nodes');
 		ASSERT(self.method_dispatch, 
-			'Subclass failed to set up method_dispatch table');
+			'Slam::Visitor subclass ', Class::of(self), ' failed to set up method_dispatch table');
 
-		my $result := self.already_visited($node);
+		my $result := self.already_visited($node, %options);
 		
 		unless $result {
 			# Set this first, in case of a recursive structure.
-			self.already_visited($node, 1);
+			self.already_visited($node, %options, 1);
 			
 			my %dispatch := self.method_dispatch;
 			my $node_type := Class::of($node);

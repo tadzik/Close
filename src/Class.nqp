@@ -53,6 +53,13 @@ sub get_meta() {
 	return $meta;
 }
 
+sub name_of($object) {
+	my $class := Class::of($object);
+	my @parts := String::split(';', $class);
+	$class := Array::join('::', @parts);
+	return $class;
+}
+
 sub of($object) {
 	my $class := Q:PIR {
 		$P0 = find_lex '$object'

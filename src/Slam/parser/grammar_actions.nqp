@@ -11,19 +11,23 @@ method TOP($/, $key) {
 	unless Slam::IncludeFile::in_include_file() {
 		DUMP($past);
 
-		my $visitor;
-		
-		NOTE("Pretty-printing input");
-		$visitor := Slam::Visitor::PrettyPrint.new();
-		$past.accept_visit($visitor);
-		my $prettified := $visitor.result;
-		NOTE("Pretty print done\n", $prettified);
-
-		NOTE("Collecting declarations");
-		Slam::DeclarationCollectionVisitor::collect_declarations($past);
-		
-		NOTE("Resolving types");
-		Slam::TypeResolutionVisitor::resolve_types($past);
+		for (	
+			Slam::Visitor::PrettyPrint,
+			Slam::Visitor::TypeResolution,
+		) {
+			my $visitor := $_.new();
+			NOTE("Considering ", Class::name_of($visitor));
+			
+			if $visitor.enabled {
+				NOTE($visitor.description);
+				$past.accept_visit($visitor);
+				$visitor.finish;
+			}
+			else {
+				NOTE("Skipped: ", $visitor.description,
+					" because it is not enabled.");
+			}
+		}
 			
 		NOTE("Resolving symbols");
 		Slam::SymbolResolutionVisitor::resolve_symbols($past);

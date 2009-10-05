@@ -79,6 +79,11 @@ namespace functions.
 		
 		return @path;
 	}
+	
+	method pir_name(*@value) {
+		return self.ATTR('pir_name', @value)
+			|| self.name;
+	}
 }
 
 ################################################################
@@ -91,7 +96,7 @@ module Slam::Symbol::Declaration {
 
 	method add_type_info($type) {
 		ASSERT($type.isa(Slam::Type));
-		NOTE("Adding type info: ", $type.display_name, " to symbol: ", self.display_name);
+		NOTE("Adding type info: ", $type, " to symbol: ", self);
 		
 		if self.type {
 			self.last_type(self.last_type.attach($type))
@@ -119,7 +124,8 @@ module Slam::Symbol::Declaration {
 			
 		$parent.push(self);
 	}
-	
+
+	# Function def, CUES sub-symbol block
 	method definition(*@value)		{ self.ATTR('definition', @value); }
 	
 	method init(*@children, *%attributes) {
@@ -174,6 +180,10 @@ module Slam::Symbol::Declaration {
 		my $value := @value.shift;
 		return self.type.is_method($value);
 	}
+
+	method is_type() {
+		return self.is_typedef;
+	}
 	
 	method is_typedef()			{ self.storage_class eq 'typedef'; }
 	method is_volatile(*@value)		{ self.ATTR('is_volatile', @value); }
@@ -198,11 +208,6 @@ module Slam::Symbol::Declaration {
 		return $name;
 	}
 			
-	method pir_name(*@value) {
-		return self.ATTR('pir_name', @value)
-			|| self.name;
-	}
-
 	method scope() {
 		unless our %scopes {
 			NOTE("Initializing storage_class -> scope mapping");
@@ -276,14 +281,6 @@ module Slam::Symbol::Declaration {
 	}
 }
 
-module Slam::Symbol::DeclarationList {
-
-	#Parrot::IMPORT('Dumper');
-		
-	################################################################
-	
-}
-
 module Slam::Symbol::Namespace {
 
 	#Parrot::IMPORT('Dumper');
@@ -298,54 +295,31 @@ module Slam::Symbol::Reference {
 		
 	################################################################
 	
-	method isdecl(*@value)		{ return 0; }
-	
-	sub qualified_identifier(%attributes) {
-		my @parts := %attributes<parts>;
-		# This should never fail, because the qid grammar requires parts.
-		ASSERT(+@parts, 'A qualified_identifier has at least one part');
-
-		Hash::delete(%attributes, 'parts');
-		
-		my $symbol := symbol_from_parts('qualified_identifier', %attributes, :parts(@parts));
-		DUMP($symbol);
-		return $symbol;
-	}
-
-	sub symbol_from_parts($type, %attributes, :@parts!) {
-		my @part_values := Array::empty();
-		
-		for @parts {
-			@part_values.push($_.value());
-		}
+	method init(*@children, *%attributes) {
+		if %attributes<parts> {
+			my @part_values := Array::empty();
 			
-		%attributes<name> := @part_values.pop();
-		NOTE("Name will be: ", %attributes<name>);
-		
-		if %attributes<is_rooted> {
-			NOTE("Rooted: using namespace: ", Array::join("::", @part_values));
-			# Use exactly what we have left.
-			%attributes<namespace> := @part_values;
+			for %attributes<parts> {
+				@part_values.push($_.value());
+			}
+			
+			ASSERT( ! %attributes<name>,
+				'Cannot use :name() with :parts()');
+			
+			%attributes<name> := @part_values.pop;
+
+			# If rooted, use exactly @parts as namespace. 
+			# If not rooted, use @parts as partial namespace only
+			# if it is not empty. (An empty ns would mean rooted symbol).
+			if %attributes<is_rooted> || +@part_values {
+				%attributes<namespace> := @part_values;
+			}
 		}
-		elsif +@parts {
-			NOTE("NOT rooted, but with partial namespace: ", Array::join("::", @part_values));
-			%attributes<namespace> := @part_values;
-		}
-		# else, if not rooted and @parts is empty, then DO NOT set the namespace.
-		# That (empty ns) would mean "root symbol" instead of "local symbol"
-		
-		return symbol($type, %attributes);
-		DUMP(%attributes);
+
+		return Slam::Node::init_(self, @children, %attributes);
 	}
 
-	sub symbol($type, %attributes) {
-		unless %attributes<pir_name> {
-			%attributes<pir_name> := %attributes<name>;
-		}
+	method isdecl(*@value)		{ return 0; }
 
-		my $symbol := Slam::Node::create_from_hash($type, %attributes);
-		DUMP($symbol);
-		return $symbol;
-	}
-
+	method referent(*@value)		{ self.ATTR('referent', @value); }
 }

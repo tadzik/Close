@@ -39,8 +39,12 @@ method new_alias_name($/) {
 }
 
 method qualified_identifier($/) {
-	my %attrs := assemble_qualified_path($/);
-	my $past := Slam::Symbol::Reference.new(%attrs);
+	my $past := Slam::Symbol::Reference.new(
+		:hll($<hll_name> && ~ $<hll_name>[0]),
+		:is_rooted(+@($<root>)),
+		:node($/),
+		:parts(ast_array($<path>)),
+	);
 	MAKE($past);
 }
 
@@ -55,6 +59,7 @@ method type_name($/, $key) {
 	our $Symbols;
 	our $Is_valid_type;		# Global accessed by grammar rule.
 	my $past := $/{$key}.ast;
-	$Is_valid_type := $Symbols.query_type_name($past);
+	$Is_valid_type := $Symbols.lookup_type($past);
+	$past.referent($Is_valid_type);
 	MAKE($past);	
 }

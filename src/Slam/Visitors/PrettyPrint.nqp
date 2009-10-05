@@ -28,6 +28,17 @@ method append(*@parts) {
 
 method declarator(*@value)	{ self.ATTR('declarator', @value); }
 
+method description()		{ return 'Pretty-printing syntax tree'; }
+
+method enabled() {
+	return Registry<CONFIG>.query(Class::name_of(self), 'enabled');
+}
+	
+method finish() {
+	NOTE(" ***** FINISHED ******");
+	say(self.result);
+}
+
 sub format_access_qualifiers($node) {
 	my $quals := '';
 	
@@ -36,7 +47,11 @@ sub format_access_qualifiers($node) {
 	return $quals;
 }
 
-method indent($value)		{ self.indent_level(self.indent_level + $value); }
+method indent($value?) {
+	unless Scalar::defined($value) { $value := 4; }
+	self.indent_level(self.indent_level + $value); 
+}
+
 method indent_level(*@value)	{ self.ATTR('indent_level', @value); }
 
 method init(@children, %attributes) {
@@ -45,18 +60,18 @@ method init(@children, %attributes) {
 	self.indent_level(0);
 	
 	self.method_dispatch(Hash::new(
-		:DEFAULT(		Slam::Visitor::PrettyPrint::pp_DEFAULT),
-		:SlamLiteralInteger(	Slam::Visitor::PrettyPrint::pp_Literal),
-		:SlamNamespace(	Slam::Visitor::PrettyPrint::pp_Namespace),
+		:DEFAULT(		Slam::Visitor::PrettyPrint::vm_DEFAULT),
+		:SlamLiteralInteger(	Slam::Visitor::PrettyPrint::vm_Literal),
+		:SlamNamespace(	Slam::Visitor::PrettyPrint::vm_Namespace),
 		:SlamStatementSymbolDeclarationList(
-					Slam::Visitor::PrettyPrint::pp_DeclarationList),
+					Slam::Visitor::PrettyPrint::vm_DeclarationList),
 		:SlamSymbolDeclaration(
-					Slam::Visitor::PrettyPrint::pp_SymbolDeclaration),
-		:SlamTypeArray(	Slam::Visitor::PrettyPrint::pp_ArrayDeclarator),
-		:SlamTypePointer(	Slam::Visitor::PrettyPrint::pp_FunctionDeclarator),
-		:SlamTypePointer(	Slam::Visitor::PrettyPrint::pp_HashDeclarator),
-		:SlamTypePointer(	Slam::Visitor::PrettyPrint::pp_PointerDeclarator),
-		:SlamTypeSpecifier(	Slam::Visitor::PrettyPrint::pp_TypeSpecifier),
+					Slam::Visitor::PrettyPrint::vm_SymbolDeclaration),
+		:SlamTypeArray(	Slam::Visitor::PrettyPrint::vm_ArrayDeclarator),
+		:SlamTypePointer(	Slam::Visitor::PrettyPrint::vm_FunctionDeclarator),
+		:SlamTypePointer(	Slam::Visitor::PrettyPrint::vm_HashDeclarator),
+		:SlamTypePointer(	Slam::Visitor::PrettyPrint::vm_PointerDeclarator),
+		:SlamTypeSpecifier(	Slam::Visitor::PrettyPrint::vm_TypeSpecifier),
 	));
 	
 	self.output(Array::empty());
@@ -66,11 +81,15 @@ method leader()			{ return String::repeat(' ', self.indent_level); }
 method output(*@value)		{ self.ATTR('output', @value); }
 method result()			{ return Array::join('', self.output); }
 method specifier(*@value)		{ self.ATTR('specifier', @value); }
-method undent($value)		{ self.indent_level(self.indent_level - $value); }
+
+method undent($value?) { 
+	unless Scalar::defined($value) { $value := 4; }
+	self.indent_level(self.indent_level - $value); 
+}
 
 ################################################################
 
-method pp_DEFAULT($node) {
+method vm_DEFAULT($node) {
 	NOTE("Unrecognized node type: ", Class::of($node));
 	DUMP($node);
 	my $result := "\n" ~ self.leader
@@ -79,7 +98,7 @@ method pp_DEFAULT($node) {
 	return $result;
 }
 
-method pp_ArrayDeclarator($node) {
+method vm_ArrayDeclarator($node) {
 	my $declarator := self.declarator ~ '[';
 	
 	if Scalar::defined($node.elements) {
@@ -93,37 +112,37 @@ method pp_ArrayDeclarator($node) {
 	self.declarator($declarator);
 }
 
-method pp_DeclarationList($node) {
+method vm_DeclarationList($node) {
 	NOTE("Doing nothing - let the decls handle it.");
 	DUMP($node);
 }
 
-method pp_FunctionDeclarator($node) {
+method vm_FunctionDeclarator($node) {
 	my $declarator := self.declarator ~ '(';
 	$declarator := $declarator ~ ' /* need args, later. */ ';
 	$declarator := $declarator ~ ')';
 	self.declarator($declarator);
 }
 
-method pp_HashDeclarator($node) {
+method vm_HashDeclarator($node) {
 	my $declarator := self.declarator ~ '[ % ]';
 	self.declarator($declarator);
 }
 
-method pp_Literal($node) {
+method vm_Literal($node) {
 	self.append($node.value);
 }
 		
-method pp_Namespace($node, :$start?, :$end?) {
+method vm_Namespace($node, :$start?, :$end?) {
 	if $start {
 		NOTE("Entering namespace ", $node);
 		DUMP($node);
 		self.append(self.leader, 'namespace ', $node, " {\n");
-		self.indent(8);
+		self.indent();
 	}
 	elsif $end {
 		NOTE("Leaving namespace ", $node);
-		self.undent(8);
+		self.undent();
 		self.append(self.leader, "}\n");
 	}
 	else {
@@ -131,7 +150,7 @@ method pp_Namespace($node, :$start?, :$end?) {
 	}
 }
 
-method pp_PointerDeclarator($node) {
+method vm_PointerDeclarator($node) {
 	my $pointer		:= '*';
 	
 	if $node.has_access_qualifier {
@@ -145,14 +164,14 @@ method pp_PointerDeclarator($node) {
 	}
 }
 
-method pp_SymbolDeclaration($node, :$start?, :$end?) {
+method vm_SymbolDeclaration($node, :$start?, :$end?) {
 	NOTE("Declaring symbol.");
 	self.declarator($node.name);
 	
 	# Have to call this explicitly - symbols don't traverse type by default.
 	$node.type.accept_visit(self);
 
-	self.append(self.specifier, self.declarator);
+	self.append(self.leader, self.specifier, self.declarator);
 	
 	if $node.initializer {
 		self.append(' = ');
@@ -162,7 +181,7 @@ method pp_SymbolDeclaration($node, :$start?, :$end?) {
 	self.append(";\n");
 }
 
-method pp_TypeSpecifier($node) {
+method vm_TypeSpecifier($node) {
 	my $specifier := format_access_qualifiers($node)
 		~ $node.typename;
 	$specifier := $specifier ~ String::repeat(' ', 8 - (String::length($specifier) % 8));

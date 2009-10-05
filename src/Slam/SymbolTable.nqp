@@ -152,13 +152,16 @@ method leave_scope($node_type) {
 	return $old_scope;
 }
 
-method lookup($reference) {
+method lookup($reference, :&satisfies?) {
 	ASSERT($reference.isa(Slam::Symbol::Name),
 		'Can only look up Symbol::Names');
 	NOTE("Looking up ", $reference);
 	DUMP($reference);
+
+	unless &satisfies { &satisfies := Slam::SymbolTable::lookup_true; }
+
 	my $result;
-	
+
 	if $reference.is_namespace {
 		NOTE("I don't know if this is right. How do I differentiate between fetch/query?");
 		$result := self._fetch_namespace_of($reference);
@@ -166,21 +169,39 @@ method lookup($reference) {
 	elsif $reference.is_rooted {
 		NOTE("Looking up rooted name");
 		if my $nsp := self.namespace_root.query_child($reference.path) {
-			$result := $nsp.lookup($reference);
+			$result := $nsp.lookup($reference, :satisfies(&satisfies));
 		}
 	}
-	elsif ! ($result := self.pervasive_scope.lookup($reference)) {
+	elsif ! ($result := self.pervasive_scope.lookup($reference, :satisfies(&satisfies))) {
 		NOTE("Not in pervasive scope");
 		for self.stack {
 			NOTE("Looking in ", $_);
 			unless $result {
-				$result := $_.lookup($reference);
+				$result := $_.lookup($reference, :satisfies(&satisfies));
 			}
 		}
 	}
 	
 	NOTE("Returning: ", $result);
 	DUMP($result);
+	return $result;
+}
+
+sub lookup_is_type($node) {
+	my $result := $node.is_type;
+	NOTE("Testing is_type of ", $node, ", returning ", $result);
+	return $result;
+}
+
+sub lookup_true($node) {
+	return 1;
+}
+
+method lookup_type($reference) {
+	my $result := self.lookup($reference, 
+		:satisfies(Slam::SymbolTable::lookup_is_type),
+	);
+	
 	return $result;
 }
 
