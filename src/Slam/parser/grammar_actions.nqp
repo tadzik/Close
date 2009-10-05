@@ -11,8 +11,12 @@ method TOP($/, $key) {
 	unless Slam::IncludeFile::in_include_file() {
 		DUMP($past);
 
+		my $visitor;
+		
 		NOTE("Pretty-printing input");
-		my $prettified := Slam::PrettyPrintVisitor::print($past);
+		$visitor := Slam::Visitor::PrettyPrint.new();
+		$past.accept_visit($visitor);
+		my $prettified := $visitor.result;
 		NOTE("Pretty print done\n", $prettified);
 
 		NOTE("Collecting declarations");

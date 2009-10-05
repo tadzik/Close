@@ -37,17 +37,19 @@ Node.
 	################################################################
 
 	method can_merge($other)		{ DIE("NOT REACHED"); }
+	method has_access_qualifier()	{ return self.is_const || self.is_volatile; }
 	method is_array()			{ return 0; }
+	method is_const()			{ return 0; }
 	method is_declarator()			{ return 0; }
 	method is_function()			{ return 0; }
 	method is_hash()			{ return 0; }
 	method is_multi()			{ return 0; }
 	method is_pointer()			{ return 0; }
 	method is_pointer_type()		{ return self.is_pointer || self.is_array; }
-	method is_access_qualifier()		{ return 0; }
 	method is_specifier()			{ return 0; }
 	method is_type()				{ return 1; }
 	method is_typename_specifier()	{ return 0; }
+	method is_volatile()			{ return 0; }
 	
 	method nominal(*@value)		{ self.ATTR('nominal', @value); }
 	
@@ -475,7 +477,6 @@ module Slam::Type::Specifier {
 		DIE("NOT IMPLEMENTED");
 	}
 	
-	method has_access_qualifier()	{ return self.is_const || self.is_volatile; }
 	method has_storage_class()		{ return self.storage_class; }
 	
 	method is_builtin(*@value)		{ self.ATTR('is_builtin', @value); }

@@ -81,7 +81,7 @@ COMPILER_LIBS_PIR := \
 	src/Slam/Namespaces.pir		\
 	src/Slam/Node.pir			\
 	src/Slam/Visitors/PastCleanupVisitor.pir	\
-	src/Slam/Visitors/PrettyPrintVisitor.pir		\
+	src/Slam/Visitors/PrettyPrint.pir		\
 	src/Slam/Visitors/ScopeAssignmentVisitor.pir	\
 	src/Slam/Scopes.pir			\
 	src/Slam/Statements.pir			\

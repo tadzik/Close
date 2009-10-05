@@ -30,7 +30,8 @@ This code runs at initload time, creating subclasses.
 			'Slam::Stmts', 'Slam::Statement');
 		
 		NOTE("Creating class Slam::Statement::SymbolDeclarationList");
-		Class::SUBCLASS('Slam::Statement::SymbolDeclarationList', 'Slam::VarList');
+		Class::SUBCLASS('Slam::Statement::SymbolDeclarationList', 
+			'Slam::VarList', 'Slam::Statement');
 			
 		NOTE("Creating subclass Slam::Statement::UsingNamespace");
 		Class::SUBCLASS('Slam::Statement::UsingNamespace', 

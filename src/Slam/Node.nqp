@@ -33,8 +33,7 @@ PAST::Node.
 		my $base_name := 'Slam::Node';
 		
 		NOTE("Creating class ", $base_name);
-		#my $base := Class::NEW_CLASS($base_name);
-		my $base := Class::SUBCLASS($base_name, 'PAST::Node');
+		my $base := Class::SUBCLASS($base_name, 'PAST::Node', 'Slam::VisitAcceptor');
 
 		for ('Block', 'Control', 'Op', 'Stmts', 'Val', 'Var', 'VarList') {
 			my $subclass := 'Slam::' ~ $_;
@@ -616,6 +615,16 @@ module Slam::Block {
 		
 	################################################################
 
+	method accept_visit($visitor) {
+		$visitor.visit(self, :start(1));
+		
+		for @(self) {
+			$_.accept_visit($visitor);
+		}
+		
+		$visitor.visit(self, :end(1));
+	}
+	
 	sub _create_function_definition($node, %attributes) {
 		our @copy_attrs := (
 			'display_name',
@@ -783,4 +792,21 @@ module Slam::Var {
 	################################################################
 
 	method lvalue(*@value)	{ self.ATTR('value', @value); }
+}
+
+module Slam::VarList {
+	
+	Parrot::IMPORT('Dumper');
+		
+	################################################################
+
+	method accept_visit($visitor) {
+		$visitor.visit(self, :start(1));
+		
+		for @(self) {
+			$_.accept_visit($visitor);
+		}
+		
+		$visitor.visit(self, :end(1));
+	}
 }

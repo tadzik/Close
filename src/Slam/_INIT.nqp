@@ -25,6 +25,7 @@ sub _onload() {
 	
 	NOTE("Slam::_INIT::_onload");
 	
+	Slam::Visitor::_onload();
 	Slam::Node::_onload();
 	Slam::Scope::_onload();
 	Slam::Namespace::_onload();
