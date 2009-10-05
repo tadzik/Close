@@ -54,6 +54,6 @@ method vm_TypeSpecifier($node) {
 			"Type '", $node, "' resolves to a different target than initially expected."
 		));
 		
-		$node.referent($type);
+		$node.typename.referent($type);
 	}
 }

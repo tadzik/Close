@@ -11,9 +11,9 @@ method TOP($/, $key) {
 	unless Slam::IncludeFile::in_include_file() {
 		DUMP($past);
 
-		for (	
-			Slam::Visitor::PrettyPrint,
+		for (	Slam::Visitor::PrettyPrint,
 			Slam::Visitor::TypeResolution,
+			Slam::Visitor::SymbolResolution,
 		) {
 			my $visitor := $_.new();
 			NOTE("Considering ", Class::name_of($visitor));
@@ -29,9 +29,6 @@ method TOP($/, $key) {
 			}
 		}
 			
-		NOTE("Resolving symbols");
-		Slam::SymbolResolutionVisitor::resolve_symbols($past);
-
 		NOTE("Setting scopes");
 		Slam::ScopeAssignmentVisitor::assign_scopes($past);
 
