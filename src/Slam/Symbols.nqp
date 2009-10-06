@@ -2,7 +2,7 @@
 
 module Slam::Symbol::Name {
 
-	Parrot::IMPORT('Dumper');
+	#Parrot::IMPORT('Dumper');
 		
 	################################################################
 
@@ -15,6 +15,11 @@ This code runs at initload, and explicitly creates classes with parents.
 	_onload();
 
 	sub _onload() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+
+		Parrot::IMPORT('Dumper');
+
 		NOTE("Creating class Slam::Symbol::Name");
 		my $base := Class::SUBCLASS('Slam::Symbol::Name', 'Slam::Node');
 

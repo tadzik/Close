@@ -355,11 +355,11 @@ module Slam::Type::Array {
 
 module Slam::Type::Declarator {
 	
-	method accept_visit($visitor) {
+	method accept_visitor($visitor) {
 		$visitor.visit(self);
 		
 		if self.nominal {
-			self.nominal.accept_visit($visitor);
+			self.nominal.accept_visitor($visitor);
 		}
 	}
 	
@@ -400,8 +400,8 @@ module Slam::Type::Function {
 		return self.nominal.can_merge($other.nominal);
 	}
 	
-	method is_function()			{ return 1; }
-	method is_method(*@value)		{ self.ATTR('is_method', @value); }
+	method is_function()		{ return 1; }
+	method is_method(*@value)	{ self.ATTR('is_method', @value); }
 	method parameters(*@value)	{ self.ATTR('parameters', @value); }
 }
 

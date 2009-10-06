@@ -26,7 +26,7 @@ sub get_search_list_of($qualified_identifier) {
 	my @search_list;
 	
 	if $qualified_identifier<is_rooted> {
-		@search_list := Array::new(Slam::Namespace::fetch_root());
+		@search_list := Array::new(Slam::Scope::Namespace::fetch_root());
 	}
 	else {
 		@search_list := Slam::Scopes::get_search_list();

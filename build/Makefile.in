@@ -72,23 +72,27 @@ COMPILER_LIBS_PIR := \
 	src/Slam/_INIT.pir	\
 	src/Slam/Adverbs.pir			\
 	src/Slam/Config.pir			\
-	src/Slam/Visitors/DeclarationCollectionVisitor.pir	\
 	src/Slam/IncludeFile.pir			\
 	src/Slam/Literal.pir			\
 	src/Slam/Lookups.pir			\
 	src/Slam/Messages.pir			\
-	src/Slam/Visitors/MessageVisitor.pir		\
-	src/Slam/Namespaces.pir		\
 	src/Slam/Node.pir			\
-	src/Slam/Visitors/PastCleanupVisitor.pir	\
-	src/Slam/Visitors/PrettyPrint.pir		\
-	src/Slam/Visitors/ScopeAssignmentVisitor.pir	\
-	src/Slam/Scopes.pir			\
+	src/Slam/Scopes/Function.pir		\
+	src/Slam/Scopes/Local.pir			\
+	src/Slam/Scopes/Namespaces.pir		\
+	src/Slam/Scopes/Parameter.pir		\
+	src/Slam/Scopes/Pervasive.pir		\
+	src/Slam/Scopes/Scope.pir			\
 	src/Slam/Statements.pir			\
-	src/Slam/Visitors/SymbolResolutionVisitor.pir	\
 	src/Slam/SymbolTable.pir		\
 	src/Slam/Symbols.pir			\
 	src/Slam/Type.pir			\
+	src/Slam/Visitors/DeclarationCollectionVisitor.pir	\
+	src/Slam/Visitors/Message.pir		\
+	src/Slam/Visitors/PastCleanupVisitor.pir	\
+	src/Slam/Visitors/PrettyPrint.pir		\
+	src/Slam/Visitors/ScopeAssignmentVisitor.pir	\
+	src/Slam/Visitors/SymbolResolution.pir	\
 	src/Slam/Visitors/TreeRewriteVisitor.pir	\
 	src/Slam/Visitors/TypeResolution.pir	\
 	src/Slam/Visitors/Visitor.pir
@@ -138,12 +142,20 @@ XLANGUAGE_TESTS := \
 	
 	
 BUILD_CLEANUPS := \
-	close.pbc \
-	$(GEN_SOURCES) \
-	"src/*.pira" \
-	"src/*.pir" \
-	src/gen_grammar.pg \
-	src/gen_actions.nqp \
+	close.pbc 			\
+	$(GEN_SOURCES) 		\
+	"src/*.pir"			\
+	"src/*.pira"			\
+	src/gen_grammar.pg	\
+	src/gen_actions.nqp		\
+	"src/Slam/*.pir"		\
+	"src/Slam/*.pira"		\
+	"src/Slam/Scopes/*.pir"	\
+	"src/Slam/Scopes/*.pira" 	\
+	"src/Slam/Visitors/*.pir"	\
+	"src/Slam/Visitors/*.pira"	\
+	"src/Slam/parser/*.pir"	\
+	"src/Slam/parser/*.pira"	\
 	close@exe@ \
 #IF(win32):  parrot-close.exe \
 #IF(win32):  parrot-close.iss \

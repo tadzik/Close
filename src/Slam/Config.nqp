@@ -26,7 +26,7 @@ sub _onload() {
 	$config.store('Dump::Slam::Config::_onload', 0);
 	$config.store('Dump::Slam::Config::file', 1);
 	$config.store('Dump::Slam::Config::parse_config', 0);
-	$config.store('Dump::Slam::Config::query', 1);
+	$config.store('Dump::Slam::Config::query', 0);
 	$config.store('Dump::Slam::Config::store', 1);
 	
 	$config.store('Dump::Stack::Root', 'parrot::close::Compiler::main');
@@ -41,6 +41,7 @@ method file($filename?) {
 	if $filename && self<_filename> ne $filename {
 		NOTE("Reading filename: ", $filename);
 		my $data := File::slurp($filename);
+		self<_data> := Hash::empty();
 		self.parse_config($data);
 		self<_filename> := $filename;
 		DUMP(self);

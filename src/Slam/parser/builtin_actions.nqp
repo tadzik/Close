@@ -164,7 +164,7 @@ method builtin_issame($/) {
 # Given a past symbol, return the symbol hash.
 sub get_global_symbol_info($sym) {
 	my @path := namespace_path_of_var($sym);
-	my $block := Slam::Namespace::fetch(@path);
+	my $block := Slam::Scope::Namespace::fetch(@path);
 
 	#say("Found block: ", $block.name());
 	my $name := $sym.name();

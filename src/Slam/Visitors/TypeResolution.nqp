@@ -38,7 +38,7 @@ method init(@children, %attributes) {
 
 method vm_SymbolDeclaration($node) {
 	# Have to call this explicitly - symbols don't traverse their type info  by default.
-	$node.type.accept_visit(self);
+	$node.type.accept_visitor(self);
 }
 
 method vm_TypeSpecifier($node) {

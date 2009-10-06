@@ -402,8 +402,6 @@ Returns an array of 4 items:
 
 our @Info_rejected := Array::new(0, -1, 'null');
 
-our %Info_cache;
-
 sub info(:$caller_level) {
 	if %Already_in<INFO> { return @Info_rejected; }	
 	%Already_in<INFO>++;
@@ -422,6 +420,7 @@ sub info(:$caller_level) {
 	my $lexpad_addr := get_address_of(get_caller($caller_level, :attr('lexpad')));
 	
 	if $lexpad_addr && $lexpad_addr == $last_lexpad_addr {
+		# Do nothing - last result still in @result.
 	}
 	else {
 		$last_lexpad_addr	:= $lexpad_addr;

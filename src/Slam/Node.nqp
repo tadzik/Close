@@ -120,11 +120,11 @@ an init() method.
 	
 	method build_display_name() {
 		self.rebuild_display_name(0);
-
 		my $name := self.name;
-		unless $name { $name := ''; } # TT#1088
+		unless $name { $name := ''; } # Parrot TT#1088
 		
 		$name := $name ~ ' (' ~ self.id ~ ')';
+		# NB: This rarely prints because it happens inside another NOTE
 		NOTE("Display_name set to: ", $name);
 		return self.display_name($name);
 	}
@@ -154,7 +154,9 @@ an init() method.
 		unless $id {
 			if +@value	{ $id := self.ATTR('id', @value); }
 			else		{ $id := self.id(make_id(self.node_type)); }
-			
+
+			# Nodes (not Symbols) use their id as part 
+			# of their display_name. So rebuild.
 			self.rebuild_display_name(1);
 		}
 		
@@ -612,14 +614,15 @@ module Slam::Block {
 		
 	################################################################
 
-	method accept_visit($visitor) {
+	method accept_visitor($visitor) {
+say("Block accept_visitor for ", Class::name_of(self));	
 		NOTE("Accepting visit to ", self, " from ", Class::of($visitor));
 		
 		$visitor.visit(self, :start(1));
 		Registry<SYMTAB>.enter_scope(self);
 
 		for @(self) {
-			$_.accept_visit($visitor);
+			$_.accept_visitor($visitor);
 		}
 
 		Registry<SYMTAB>.leave_scope(self.node_type);
@@ -801,11 +804,11 @@ module Slam::VarList {
 		
 	################################################################
 
-	method accept_visit($visitor) {
+	method accept_visitor($visitor) {
 		$visitor.visit(self, :start(1));
 		
 		for @(self) {
-			$_.accept_visit($visitor);
+			$_.accept_visitor($visitor);
 		}
 		
 		$visitor.visit(self, :end(1));

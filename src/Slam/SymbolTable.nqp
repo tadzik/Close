@@ -59,11 +59,6 @@ method declare($symbol) {
 			$symbol.hll(Scalar::undef());
 			$symbol.namespace(Scalar::undef());
 		}
-		else {
-			NOTE("In scope: ", $scope);
-			$scope.declare($symbol);
-		}
-		DUMP(self.pervasive_scope);
 	}
 	else {
 		if $symbol.has_qualified_name {
@@ -74,10 +69,11 @@ method declare($symbol) {
 			NOTE("Using current scope");
 			$scope := self.current_scope;
 		}
-		
-		NOTE("In scope: ", $scope);
-		$scope.declare($symbol);
 	}
+
+	NOTE("In scope: ", $scope);
+	$scope.add_symbol($symbol);
+	DUMP($scope);
 }
 
 method default_hll(*@value)		{ self.ATTR('default_hll', @value); }
@@ -132,10 +128,10 @@ method init(*@children, *%attributes) {
 	self.stack(Array::empty());
 	
 	NOTE("Creating pervasive scope");
-	self.pervasive_scope(Slam::Scope.new(:display_name('<PERVASIVE>')));
+	self.pervasive_scope(Slam::Scope::Pervasive.new());
 		
 	NOTE("Installing namespace root");
-	self.namespace_root(Slam::Namespace::root());
+	self.namespace_root(Slam::Scope::Namespace::root());
 	
 	return self;
 }

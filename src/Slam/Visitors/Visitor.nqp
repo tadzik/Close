@@ -59,6 +59,24 @@ module Slam::Visitor {
 	}
 
 	method description()		{ DIE("NOT IMPLEMENTED IN SUBCLASS"); }
+
+	sub dispatch_by_class($object, %dispatch) {
+		my &method;
+		
+		if %dispatch {
+			my $classname := dispatch_classname($object);	
+			&method := %dispatch{$classname} || %dispatch<DEFAULT>;
+		}
+		
+		return &method;
+	}
+
+	sub dispatch_classname($object) {
+		my $classname := Class::of($object);
+		my @parts	:= String::split(';', $classname);
+		$classname	:= Array::join('', @parts);
+		return $classname;
+	}
 	
 	method enabled() {
 		return ! Registry<CONFIG>.query(Class::name_of(self), 'disabled');
@@ -130,29 +148,23 @@ module Slam::Visitor {
 		unless $result {
 			# Set this first, in case of a recursive structure.
 			self.already_visited($node, %options, 1);
-			
-			my %dispatch := self.method_dispatch;
-			my $node_type := Class::of($node);
-			my @parts	:= String::split(';', $node_type);
-			$node_type	:= Array::join('', @parts);
-			
-			my &method := %dispatch{$node_type}
-				|| %dispatch<DEFAULT>;
 
+			my &method := dispatch_by_class($node, self.method_dispatch);
+		
 			if &method {
-				NOTE("Visiting ", $node_type);
+				NOTE("Visiting ", Class::name_of($node));
 				$result := Q:PIR {
 					.local pmc self, method, node, options
 					self = find_lex 'self'
+					method = find_lex '&method'
 					node = find_lex '$node'
 					options = find_lex '%options'
-					method = find_lex '&method'
-					
+						
 					%r = self.method(node, options :flat :named)
 				};
 			}
 			else {
-				NOTE("No method (not even default) for node type ", $node_type);
+				NOTE("No method (not even default) for node type ", Class::name_of($node));
 			}
 		}
 		
@@ -177,10 +189,22 @@ module Slam::VisitAcceptor {
 
 	################################################################
 	
-	method accept_visit($visitor) {
-		my $result := $visitor.visit(self);
-		# NB: if you call visit on children, check for 
-		# $visitor.wants_delete($node) and delete them.
+	method visitor_dispatch(*@value)		{ self.ATTR('visitor_dispatch', @value); }
+
+	method accept_visitor($visitor) {
+	say("Default accept_visitor for ", Class::name_of(self));
+		my $result;
+		my &method := Slam::Visitor::dispatch_by_class($visitor, self.visitor_dispatch);
+		
+		if &method {
+			NOTE("Found dispatch method for ", Class::name_of($visitor));
+			$result := &method(self, $visitor);
+		}
+		else {
+			NOTE("Using default dispatch for visitor ", $visitor);
+			$result := $visitor.visit(self);
+		}
+
 		return $result;
 	}
 }

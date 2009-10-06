@@ -14,13 +14,14 @@ method TOP($/, $key) {
 		for (	Slam::Visitor::PrettyPrint,
 			Slam::Visitor::TypeResolution,
 			Slam::Visitor::SymbolResolution,
+			Slam::Visitor::Message,
 		) {
 			my $visitor := $_.new();
 			NOTE("Considering ", Class::name_of($visitor));
 			
 			if $visitor.enabled {
 				NOTE($visitor.description);
-				$past.accept_visit($visitor);
+				$past.accept_visitor($visitor);
 				$visitor.finish;
 			}
 			else {
@@ -29,11 +30,11 @@ method TOP($/, $key) {
 			}
 		}
 			
-		NOTE("Setting scopes");
-		Slam::ScopeAssignmentVisitor::assign_scopes($past);
+		#NOTE("Setting scopes");
+		#Slam::ScopeAssignmentVisitor::assign_scopes($past);
 
-		NOTE("Displaying messages");
-		Slam::MessageVisitor::show_messages($past);
+		#NOTE("Displaying messages");
+		#Slam::MessageVisitor::show_messages($past);
 
 		$past := get_compilation_unit();
 		
@@ -70,7 +71,7 @@ method include_directive($/) {
 }
 
 method _namespace_definition_close($/) {
-	my $past := $Symbols.leave_scope('Slam::Namespace');
+	my $past := $Symbols.leave_scope('Slam::Scope::Namespace');
 
 	for ast_array($<declaration_sequence><decl>) {
 		$_.attach_to($past);
@@ -100,7 +101,7 @@ method _translation_unit_close($/) {
 	
 	unless Slam::IncludeFile::in_include_file() {
 		NOTE("Popping namespace_definition block");
-		$past := $Symbols.leave_scope('Slam::Namespace');
+		$past := $Symbols.leave_scope('Slam::Scope::Namespace');
 	}
 
 	MAKE($past);

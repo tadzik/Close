@@ -27,8 +27,8 @@ sub _onload() {
 	
 	Slam::Visitor::_onload();
 	Slam::Node::_onload();
+	Slam::Symbol::Name::_onload();
 	Slam::Scope::_onload();
-	Slam::Namespace::_onload();
 	
 	# Needed to parse pervasive types.
 	Slam::IncludeFile::_onload();

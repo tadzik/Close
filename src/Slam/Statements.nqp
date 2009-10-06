@@ -73,6 +73,7 @@ module Slam::Statement::SymbolDeclarationList {
 		DUMP($parent);
 		
 		for @(self) {
+			NOTE($_);
 			Registry<SYMTAB>.declare($_);
 		}
 	}

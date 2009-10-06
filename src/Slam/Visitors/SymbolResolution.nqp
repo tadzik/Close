@@ -35,6 +35,10 @@ method init(@children, %attributes) {
 	DUMP(self);
 }
 
+method vm_SymbolDeclaration($node) {
+	# Fixme: Need to resolve types, or no?
+}
+
 method vm_SymbolReference($node) {
 	NOTE("Looking up referent for: ", $node);
 	my $ref := Registry<SYMTAB>.lookup($node);

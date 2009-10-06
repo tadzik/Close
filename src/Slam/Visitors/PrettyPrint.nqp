@@ -62,14 +62,16 @@ method init(@children, %attributes) {
 	self.method_dispatch(Hash::new(
 		:DEFAULT(		Slam::Visitor::PrettyPrint::vm_DEFAULT),
 		:SlamLiteralInteger(	Slam::Visitor::PrettyPrint::vm_Literal),
-		:SlamNamespace(	Slam::Visitor::PrettyPrint::vm_Namespace),
+		:SlamScopeNamespace(	
+					Slam::Visitor::PrettyPrint::vm_Namespace),
 		:SlamStatementSymbolDeclarationList(
 					Slam::Visitor::PrettyPrint::vm_DeclarationList),
 		:SlamSymbolDeclaration(
 					Slam::Visitor::PrettyPrint::vm_SymbolDeclaration),
 		:SlamTypeArray(	Slam::Visitor::PrettyPrint::vm_ArrayDeclarator),
-		:SlamTypePointer(	Slam::Visitor::PrettyPrint::vm_FunctionDeclarator),
-		:SlamTypePointer(	Slam::Visitor::PrettyPrint::vm_HashDeclarator),
+		:SlamTypeFunction(	Slam::Visitor::PrettyPrint::vm_FunctionDeclarator),
+		:SlamTypeHash(	Slam::Visitor::PrettyPrint::vm_HashDeclarator),
+		:SlamTypeMultiSub(	Slam::Visitor::PrettyPrint::vm_MultiSubDeclarator),
 		:SlamTypePointer(	Slam::Visitor::PrettyPrint::vm_PointerDeclarator),
 		:SlamTypeSpecifier(	Slam::Visitor::PrettyPrint::vm_TypeSpecifier),
 	));
@@ -150,6 +152,10 @@ method vm_Namespace($node, :$start?, :$end?) {
 	}
 }
 
+method vm_MultiSubDeclarator($node) {
+	DIE("I have no idea what to do here.");
+}
+
 method vm_PointerDeclarator($node) {
 	my $pointer		:= '*';
 	
@@ -169,13 +175,19 @@ method vm_SymbolDeclaration($node, :$start?, :$end?) {
 	self.declarator($node.name);
 	
 	# Have to call this explicitly - symbols don't traverse type by default.
-	$node.type.accept_visit(self);
+	$node.type.accept_visitor(self);
 
-	self.append(self.leader, self.specifier, self.declarator);
+	self.append(self.leader);
+	
+	if $node.storage_class ne Registry<SYMTAB>.current_scope.default_storage_class {
+		self.append($node.storage_class, ' ');
+	}
+	
+	self.append(self.specifier, self.declarator);
 	
 	if $node.initializer {
 		self.append(' = ');
-		$node.initializer.accept_visit(self);
+		$node.initializer.accept_visitor(self);
 	}
 	
 	self.append(";\n");
