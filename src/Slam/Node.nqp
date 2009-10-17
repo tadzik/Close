@@ -2,26 +2,14 @@
 
 module Slam::Node {
 
-	# Done in _onload
-	#Parrot::IMPORT('Dumper');
-		
-	################################################################
+	_ONLOAD();
 
-=sub _onload
-
-This code runs at initload, and explicitly creates this class as a subclass of
-PAST::Node.
-
-=cut
-
-	_onload();
-
-	sub _onload() {
+	sub _ONLOAD() {
 		if our $onload_done { return 0; }
 		$onload_done := 1;
 		
 		Parrot::IMPORT('Dumper');
-
+		
 		my $get_string := "
 .namespace [ 'Slam' ; 'Node' ]
 .sub 'get_string' :vtable :method
@@ -33,12 +21,12 @@ PAST::Node.
 		my $base_name := 'Slam::Node';
 		
 		NOTE("Creating class ", $base_name);
-		my $base := Class::SUBCLASS($base_name, 'PAST::Node', 'Slam::VisitAcceptor');
+		Class::SUBCLASS($base_name, 'PAST::Node', 'Visitor::Visitable');
 
 		for ('Block', 'Control', 'Op', 'Stmts', 'Val', 'Var', 'VarList') {
 			my $subclass := 'Slam::' ~ $_;
 			NOTE("Creating subclass ", $subclass);
-			Class::SUBCLASS($subclass, 'PAST::' ~ $_, $base);
+			Class::SUBCLASS($subclass, 'PAST::' ~ $_, 'Slam::Node');
 		}
 		
 		NOTE("done");
@@ -46,17 +34,28 @@ PAST::Node.
 
 	################################################################
 
-=method ATTR
+=method _ABSTRACT
+
+Single point of failure for abstract methods.
+
+=cut
+
+	method _ABSTRACT() {
+		DUMP(self);
+		DIE("Subclass(es) must override abstract methods.");
+	}
+	
+=method _ATTR
 
 This is the backstop method for a good number of accessor methods. If the 
 attribute being accessed is just a get/set attr, with no special handling, then
 a direct call to this method is all that is needed. For example:
 
-	method foo(*@value)	{ self.ATTR('foo', @value); }
+	method foo(*@value)	{ self._ATTR('foo', @value); }
 
 =cut
 
-	method ATTR($name, @value) {
+	method _ATTR($name, @value) {
 		if +@value {
 			self{$name} := @value.shift;
 		}
@@ -64,6 +63,96 @@ a direct call to this method is all that is needed. For example:
 		return self{$name};
 	}
 
+	method _ATTR_ARRAY($name, @value) {
+		if +@value { 
+			self{$name} := @value.shift;
+		}
+		elsif ! Scalar::defined(self{$name}) {
+			self{$name} := Array::empty();
+		}
+		
+		return self{$name};
+	}
+	
+	method _ATTR_HASH($name, @value) {
+		if +@value {
+			self{$name} := @value.shift;
+		}
+		elsif ! Scalar::defined(self{$name}) {
+			self{$name} := Hash::empty();
+		}
+		
+		return self{$name};
+	}
+	
+	method __dump($dumper, $label) {
+		my $subindent;
+		my $indent;
+
+		# (subindent, indent) = dumper."newIndent"()
+		Q:PIR {
+			.local string indent, subindent
+			$P0 = find_lex '$dumper'
+			(subindent, indent) = $P0.'newIndent'()
+			$P0 = box subindent
+			store_lex '$subindent', $P0
+			$P0 = box indent
+			store_lex '$indent', $P0
+		};
+		
+		my $brace := '{';
+		
+		my @keys;
+		
+		# Remember that for HashBased, self is a Hash.
+		for self.hash {
+			@keys.push(~$_);
+		}
+		
+		@keys.sort;
+		
+		for @keys {
+			print($brace, "\n", $subindent);
+			$brace := '';
+			
+			my $key	:= ~ $_;			
+			my $val	:= self{$key};
+		
+			print("<", $key, "> => ");
+			
+			if $key eq 'source' && String::length($val) > 20 {
+				$dumper.dump($label, String::substr($val, 0, 20) ~ ' ...');
+			}
+			else {
+				$dumper.dump($label, $val);
+			}
+		}
+		
+		my $index := 0;
+		my $num_elements := +self.list;
+
+		while $index < $num_elements {
+			print($brace, "\n", $subindent);
+			$brace := '';
+			
+			my $val	:= self[$index];
+			
+			print("[", $index, "] => ");
+			$dumper.dump($label, $val);
+			
+			$index++;
+		}
+		
+		if $brace {
+			print("(no attributes set)");
+		} 
+		else {
+			print("\n", $indent, '}');
+		}
+		
+		$dumper.deleteIndent();
+	}
+	
 =method INIT
 
 This method just PIR-calls the PCT::Node::init method, but with arg 
@@ -89,13 +178,13 @@ an init() method.
 
 	################################################################
 
-	method adverbs() {
-		unless self<adverbs> {
-			self<adverbs> := Hash::empty();
-		}
-		
-		return self<adverbs>;
+	method accept($visitor) {
+		NOTE("Node ", self, " accepting a visit from ", $visitor);
+		my $visit_method := 'visit_' ~ Class::name_of(self, :delimiter(''));
+		return Class::call_method($visitor, $visit_method, self);
 	}
+	
+	method adverbs(*@value)		{ self._ATTR_HASH('adverbs', @value); }
 
 	method add_adverb($adverb) {
 		my $name := $adverb.name;
@@ -113,9 +202,9 @@ an init() method.
 		NOTE("done");
 		DUMP(self);
 	}
-	
-	method attach_to($parent) {
-		$parent.push(self);
+
+	method attach($child) {
+		self.push($child);
 	}
 	
 	method build_display_name() {
@@ -136,7 +225,7 @@ an init() method.
 		}
 		
 		self.rebuild_display_name(0);
-		return self.ATTR('display_name', @value); 
+		return self._ATTR('display_name', @value); 
 	}
 
 	method error(*%options) {
@@ -152,7 +241,7 @@ an init() method.
 		my $id := self<id>;
 		
 		unless $id {
-			if +@value	{ $id := self.ATTR('id', @value); }
+			if +@value	{ $id := self._ATTR('id', @value); }
 			else		{ $id := self.id(make_id(self.node_type)); }
 
 			# Nodes (not Symbols) use their id as part 
@@ -191,418 +280,45 @@ an init() method.
 		return $message;
 	}
 	
-	method messages() {
-		unless self<messages> {
-			self<messages> := Array::empty();
-		}
-		
-		return self<messages>;
-	}
+	method messages(*@value)		{ self._ATTR_ARRAY('messages', @value); }
 	
 	method name(*@value) {
 		if +@value {
 			self.rebuild_display_name(1);
 		}
 
-		return self.ATTR('name', @value);
+		return self._ATTR('name', @value);
 	}
 
 	method namespace(*@value) {
 		if +@value {
 			self.rebuild_display_name(1);
 		}
-
-		return PAST::Node::namespace(self, @value.shift);
+		
+		return self._ATTR('namespace', @value);
 	}
 
 	method node_type() {
 		return Class::name_of(self);
 	}
 
-	method rebuild_display_name(*@value) { self.ATTR('rebuild_display_name', @value); }
+	method rebuild_display_name(*@value) { self._ATTR('rebuild_display_name', @value); }
 	
-	method warning(*%options) {
+	method warning(*@message, *%options) {
 		unless %options<node> {
 			%options<node> := self;
+		}
+		
+		unless +@message {
+			@message := %options<message>;
 		}
 		
 		return self.message(
 			Slam::Warning.new(
 				:node(%options<node>),
-				:message(%options<message>),
+				:message(Array::join('', @message)),
 			)
 		);
-	}
-	
-	
-	
-	
-	
-	
-	
-	
-
-	sub _create_goto_statement($node, %attributes) {
-		my $label := %attributes<label>;
-		ASSERT($label, 'Goto statement must have a :label()');
-		NOTE("Creating goto_statement: ", $label);
-		my $node := Slam::Op.new(
-			:inline('    goto ' ~ $label),
-			:name('goto ' ~ $label), 
-			:pasttype('inline'),
-		);
-		
-		set_attributes($node, %attributes);
-		
-		DUMP($node);
-		return $node;
-	}
-
-	sub _create_initload_sub($node, %attributes) {
-		NOTE("Creating init-load sub");
-		
-		ASSERT(%attributes<for>, 'Initload_sub requires a :for(namespace) arg');
-		my $for_namespace := %attributes<for>;
-		Hash::delete(%attributes, 'for');
-
-		Slam::Scopes::push($for_namespace);
-		
-		my $nsp_init := "void _nsp_init() :init :load { }";
-		Slam::IncludeFile::parse_internal_string($nsp_init,
-			'namespace init function');
-			
-		Slam::Scopes::pop($for_namespace.node_type);
-	}
-
-	sub _create_label_name($node, %attributes) {
-		%attributes<returns> := 'String';
-		%attributes<value> := %attributes<name>;
-	}
-
-	sub _create_namespace_definition($node, %attributes) {
-		NOTE("Creating new namespace_definition");	
-		
-		%attributes<default_scope> := 'package';
-		
-		ASSERT(Hash::exists(%attributes, 'path'),
-			'Caller must provide a :path() value');
-		my @namespace := Array::clone(%attributes<path>);
-		
-		if @namespace {
-			%attributes<hll>		:= @namespace.shift();
-		}
-		
-		%attributes<is_namespace> := 1;
-		%attributes<is_rooted>	:= 1;
-		%attributes<lexical>	:= 0;
-		%attributes<namespace>	:= @namespace;
-	}
-
-=sub _create_namespace_path
-
-Note that this creates a PAST Block because the only (declarative) use for the
-namespace_path target is in a namespace_definition.
-
-=cut
-
-	sub _create_namespace_path($node, %attributes) {
-		my @parts	:= %attributes<parts>;
-		
-		NOTE("Creating namespace_path [ ", Array::join(' ; ', @parts), " ]");
-		
-		unless %attributes<is_rooted> {
-			%attributes<is_rooted>	:= 1;
-			my $outer_nsp := Slam::Scopes::fetch_current_namespace();
-			my @namespace := Array::clone($outer_nsp.namespace());
-			@parts := Array::append(@namespace, @parts);
-			NOTE("Expanded path to [ ", Array::join(' ; ', @parts), " ]");
-		}
-		
-		# unless %attributes<hll> {
-			# %attributes<hll> := Slam::Scopes::fetch_current_hll();
-		# }
-		
-		%attributes<namespace>	:= @parts;
-	}
-
-	sub _create_parameter_declaration($node, %attributes) {
-		ASSERT(%attributes<from>, 'Parameter declaration must be created :from() a declarator.');
-		
-		%attributes<created_node>	:= %attributes<from>;
-		%attributes<scope>	:= 'parameter';
-		%attributes<isdecl>	:= 1;
-		
-		Hash::delete(%attributes, 'from');
-	}
-
-	################################################################
-
-	our %Node_types;
-	our $Default_node_type;
-
-	sub create($type, *%attributes) {
-		return create_from_hash($type, %attributes);
-	}
-
-	sub create_from_hash($type, %attributes) {
-		NOTE("Creating node of type: ", $type);
-		DUMP(%attributes);
-		
-		my $class := _get_node_type($type, %attributes);
-		my $node := $class.new();
-
-		my %defaults := _get_attrs_for_type($type);
-		
-		if %defaults {
-			Hash::merge(%attributes, %defaults);
-		}
-			
-		# Simple blocks default to immediate.
-		if $node.isa(Slam::Block) && ! %attributes<blocktype> {
-			%attributes<blocktype> := 'immediate';
-		}
-			
-		%attributes<id> := make_id($type);
-		
-		unless %attributes<name> {
-			%attributes<name> := %attributes<id>;
-		}
-		
-		%attributes<node_type> := $type;
-
-		my &code := get_factory($type);
-		
-		if &code {
-			NOTE("Running helper sub: ", &code);
-			%attributes<created_node> := $node;
-			&code($node, %attributes);
-			$node := %attributes<created_node>;
-			Hash::delete(%attributes, 'created_node');
-		}
-		
-		set_attributes($node, %attributes);
-		
-		if $node.isa(Slam::Block) && %attributes<default_scope> {
-			$node.symbol_defaults(:scope(%attributes<default_scope>));
-		}
-		
-		NOTE("done");
-		DUMP($node);
-		return $node;
-	}
-
-	sub _get_attrs_for_type($type) {
-		our %type_attrs;
-		
-		unless %type_attrs {
-			%type_attrs := _init_type_attrs();
-		}
-		
-		return %type_attrs{$type};
-	}
-
-	sub _get_node_type($type, %attributes) {
-		our %node_types;
-		
-		unless %node_types {
-			%node_types := _init_node_types();
-		}
-		
-		my $class;
-		
-		if %attributes<past_type> {
-			$class := %attributes<past_type>;
-		}
-		#elsif Hash::exists(%node_types, $type) {
-		elsif %node_types{$type} {
-			$class := %node_types{$type};
-		}
-		else {
-			$class := %node_types<DEFAULT>;
-		}
-		
-		return $class;
-	}
-		
-	sub _init_node_types() {
-		return Hash::new(
-			:DEFAULT(			Slam::Val),
-			:compilation_unit(		Slam::Stmts),
-			:compound_statement(	Slam::Block),
-			:decl_function_returning(	Slam::Block),
-			:decl_varlist(			Slam::VarList),
-			:declarator_name(		Slam::Var),
-			:expr_binary(		Slam::Op),
-			:expr_call(			Slam::Op),
-			:foreach_statement(		Slam::Block),
-			:function_definition(	Slam::Block),
-			:include_file(			Slam::Block),
-			:inline(			Slam::Op),
-			:namespace_definition(	Slam::Block),
-			:namespace_path(		Slam::Var),
-			:qualified_identifier(	Slam::Var),
-			:symbol(			Slam::Var),
-			:using_directive(		Slam::Stmts),
-		);
-	}
-
-	sub _init_type_attrs() {
-		# Don't split the functions. If there is a complex create sub, 
-		# nothing should be here. This is only for really simple nodes.
-		return Hash::new(
-			:bareword(		Hash::new(	:returns('String'))),
-			:expr_asm(		Hash::new(	:pasttype('inline'))),
-			:expr_call(		Hash::new(	:pasttype('call'))),
-			:float_literal(		Hash::new(	:returns('Num'))),
-			:integer_literal(	Hash::new(	:returns('Integer'))),
-			:quoted_literal(	Hash::new(	:returns('String'))),
-			:return_statement(	Hash::new(	:pasttype('pirop'),
-								:pirop('return'))),
-			:type_specifier(	Hash::new(	:is_specifier(1))),
-		);	
-	}
-
-	sub copy_adverbs($from, $to) {
-		for $from<adverbs> {
-			set_adverb($to, $from<adverbs>{$_});
-		}
-	}
-
-	sub copy_block($from, $to) {
-		for $from<child_sym> {
-			ASSERT( ! Hash::exists($to<child_sym>, $_), 'This works only for initial setups.');
-			
-			$to<child_sym>{$_} := $from<child_sym>{$_};
-		}
-
-		copy_adverbs($from, $to);
-
-		for @($from) {
-			$to.push($_);
-		}
-	}
-
-	sub format_path_of($node) {
-		my @path;
-		my $result := '';
-		
-		if $node.isa(Slam::Var) || $node.isa(Slam::Block) {
-			# If node has a 'namespace' method
-			@path := Array::clone($node.namespace());
-		}
-		elsif $node<namespace> {
-			@path := Array::clone($node<namespace>);
-		}
-		else {
-			@path := Array::empty();
-		}
-		
-		if $node<hll> {
-			@path.unshift($node<hll>);
-			$result := 'hll: ';
-		}
-		elsif $node<is_rooted> {
-			@path.unshift('');
-		}
-		
-		$result := $result ~ Array::join(' :: ', @path);
-		
-		NOTE("done");
-		DUMP($result);
-		return $result;
-	}
-
-	sub get_factory($type) {
-		NOTE("Looking up special create_node routine for type: ", $type);
-
-		our %dispatch;
-		
-		unless Hash::exists(%dispatch, $type) {
-			NOTE("Looking up factory for '", $type, "'");
-			
-			%dispatch{$type} := Q:PIR {
-				$S0 = '_create_'
-				$P0 = find_lex '$type'
-				$S1 = $P0
-				$S0 = concat $S0, $S1	# S0 = '_create_typename'
-				%r = get_global $S0
-				
-				unless null %r goto done
-				%r = root_new [ 'parrot' ; 'Undef' ]
-				
-			done:
-			};
-			
-			DUMP(%dispatch);
-		}
-
-		my $sub := %dispatch{$type};
-		
-		DUMP($sub);
-		return $sub;
-	}
-
-		
-	sub set_attributes($node, %attributes) {
-		my $set_name := 0;
-		
-		for %attributes {
-			if Scalar::defined(%attributes{$_}) {
-				# FIXME: Detect accessor methods with $node.can(...)
-				if $_ eq 'name' || $_ eq 'namespace' || $_ eq 'hll' {
-					$set_name := 1;
-					$node{$_} := %attributes{$_};
-				}
-				elsif $_ eq 'node' {
-					$node.node(%attributes{$_});
-				}
-				else {
-					$node{$_} := %attributes{$_};
-				}
-			}
-		}
-		
-		if $set_name {
-			$node.name($node.name);
-		}
-
-		if $node<source> {
-			$node<file>	:= Slam::IncludeFile::current();
-			$node<line>	:= String::line_number_of($node<source>, :offset($node<pos>));
-			$node<char>	:= String::character_offset_of($node<source>, :line($node<line>), :offset($node<pos>));
-		}
-	}
-	sub path_of($node) {
-		NOTE("Computing path of '", $node.node_type, "' node: ", $node.name());
-		DUMP($node);
-		
-		my @path;
-
-		if $node<path> {
-			@path := Array::clone($node<path>);
-		}
-		else {
-			if $node.isa(Slam::Var) || $node.isa(Slam::Block) {
-				# If node has a 'namespace' method
-				@path := Array::clone($node.namespace());
-			}
-			elsif $node<namespace> {
-				@path := Array::clone($node<namespace>);
-			}
-			else {
-				@path := Array::empty();
-			}
-			
-			if $node<hll> {
-				@path.unshift($node<hll>);
-			}
-			
-			$node<path> := Array::clone(@path);
-		}
-
-		NOTE("done");
-		DUMP(@path);
-		return @path;
 	}
 }
 
@@ -611,69 +327,6 @@ namespace_path target is in a namespace_definition.
 module Slam::Block {
 	
 	Parrot::IMPORT('Dumper');
-		
-	################################################################
-
-	method accept_visitor($visitor) {
-say("Block accept_visitor for ", Class::name_of(self));	
-		NOTE("Accepting visit to ", self, " from ", Class::of($visitor));
-		
-		$visitor.visit(self, :start(1));
-		Registry<SYMTAB>.enter_scope(self);
-
-		for @(self) {
-			$_.accept_visitor($visitor);
-		}
-
-		Registry<SYMTAB>.leave_scope(self.node_type);
-		$visitor.visit(self, :end(1));
-	}
-	
-	sub _create_function_definition($node, %attributes) {
-		our @copy_attrs := (
-			'display_name',
-			'etype',
-			'hll',
-			'lexical',
-			'name',
-			'namespace',
-			'pir_name',
-			'type',
-		);
-		
-		NOTE("Creating new function_definition");
-		my $from := %attributes<from>;
-		ASSERT($from && $from<type><is_function>,
-			'Function definition must be created :from() a function declarator');
-		
-		DUMP($from);
-		
-		%attributes<blocktype>	:= 'declaration';
-		%attributes<default_storage_class> := $from<type><default_storage_class>;
-		%attributes<is_rooted>	:= 1;
-		%attributes<lexical>	:= 0;	
-		%attributes<scope>		:= 'package';
-
-		copy_adverbs($from, $node);
-		Hash::merge_keys(%attributes, $from, :keys(@copy_attrs), :use_last(1));
-		
-		# unless Scalar::defined(%attributes<hll>) {
-			# %attributes<hll> := Slam::Scopes::fetch_current_hll();
-		# }
-		
-		unless Scalar::defined(%attributes<namespace>) {
-			my $nsp := Slam::Scopes::fetch_current_namespace();
-			%attributes<namespace> := Array::clone($nsp.namespace());
-		}
-		
-		copy_block($from<type>, $node);
-		
-		# Add every function, in order of creation, to the compilation_unit
-		Slam::Grammar::Actions::get_compilation_unit().push($node);
-			
-		Hash::delete(%attributes, 'from');
-	}
-
 }
 
 
@@ -683,13 +336,11 @@ module Slam::Op {
 	
 	Parrot::IMPORT('Dumper');
 		
-	################################################################
-
-	method inline(*@value)	{ self.ATTR('inline', @value); }
-	method lvalue(*@value)	{ self.ATTR('lvalue', @value); }
+	method inline(*@value)	{ self._ATTR('inline', @value); }
+	method lvalue(*@value)	{ self._ATTR('lvalue', @value); }
 	method opattr(%hash)	{ Slam::Op.opattr(self, %hash); }
-	method pasttype(*@value)	{ self.ATTR('pasttype', @value); }
-	method pirop(*@value)	{ self.ATTR('pirop', @value); }
+	method pasttype(*@value)	{ self._ATTR('pasttype', @value); }
+	method pirop(*@value)	{ self._ATTR('pirop', @value); }
 	
 	our %binary_pastops;
 	%binary_pastops{'&&'}	:= "if";
@@ -772,20 +423,28 @@ module Slam::Op {
 	}
 }
 
+module Slam::Stmts {
+	
+	Parrot::IMPORT('Dumper');
+		
+	################################################################
+
+}
+
 module Slam::Val {
 	
 	Parrot::IMPORT('Dumper');
 		
 	################################################################
 
-	method value(*@value)	{ self.ATTR('value', @value); }
+	method value(*@value)	{ self._ATTR('value', @value); }
 	method lvalue(*@value) {
 		if +@value {
 			# throws exception
 			return Slam::Val::lvalue(@value.shift);
 		}
 
-		self.ATTR('lvalue', @value);
+		self._ATTR('lvalue', @value);
 	}
 }
 
@@ -795,7 +454,7 @@ module Slam::Var {
 		
 	################################################################
 
-	method lvalue(*@value)	{ self.ATTR('value', @value); }
+	method lvalue(*@value)	{ self._ATTR('value', @value); }
 }
 
 module Slam::VarList {
@@ -804,13 +463,4 @@ module Slam::VarList {
 		
 	################################################################
 
-	method accept_visitor($visitor) {
-		$visitor.visit(self, :start(1));
-		
-		for @(self) {
-			$_.accept_visitor($visitor);
-		}
-		
-		$visitor.visit(self, :end(1));
-	}
 }

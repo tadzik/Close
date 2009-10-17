@@ -116,3 +116,15 @@ sub new(*@pos, *%pairs) {
 		
 	return %pairs;
 }
+
+sub sorted_keys(%hash) {
+	my @keys := Array::empty();
+	
+	for %hash {
+		@keys.push(~$_);
+	}
+	
+	@keys.sort;
+	return @keys;
+}
+

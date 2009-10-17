@@ -12,30 +12,30 @@ This code runs at initload time, creating subclasses.
 
 =cut
 
-	_onload();
+	_ONLOAD();
 
-	sub _onload() {
+	sub _ONLOAD() {
 		if our $onload_done { return 0; }
 		$onload_done := 1;
 
 		NOTE("Creating base class Slam::Statement");
 		my $stmts := Class::NEW_CLASS('Slam::Statement');
 
-		NOTE("Creating subclass Slam::Statement::Block");
-		Class::SUBCLASS('Slam::Statement::Block', 
-			'Slam::Block', 'Slam::Statement');
-
-		NOTE("Creating subclass Slam::Statement::Null");
-		Class::SUBCLASS('Slam::Statement::Null',
-			'Slam::Stmts', 'Slam::Statement');
+		my %statement_classes := Hash::new(
+			:Null(			'Slam::Stmts'),
+			:Return(		'Slam::Op'),
+			:SymbolDeclarationList('Slam::VarList'),
+			:UsingNamespace(	'Slam::Stmts'),
+		);
 		
-		NOTE("Creating class Slam::Statement::SymbolDeclarationList");
-		Class::SUBCLASS('Slam::Statement::SymbolDeclarationList', 
-			'Slam::VarList', 'Slam::Statement');
+		for %statement_classes {
+			my $class_name := 'Slam::Statement::' ~ $_;
+			my $parent_class := %statement_classes{$_};
 			
-		NOTE("Creating subclass Slam::Statement::UsingNamespace");
-		Class::SUBCLASS('Slam::Statement::UsingNamespace', 
-			'Slam::Stmts', 'Slam::Statement');
+			NOTE("Creating subclass ", $class_name);
+			Class::SUBCLASS($class_name, 
+				$parent_class, 'Slam::Statement');
+		}
 	}
 
 	################################################################
@@ -45,12 +45,12 @@ This code runs at initload time, creating subclasses.
 
 ################################################################
 
-module Slam::Statement::Block {
+module Slam::Statement::Null {
 }
 
 ################################################################
 
-module Slam::Statement::Null {
+module Slam::Statement::Return {
 }
 
 ################################################################
@@ -61,33 +61,10 @@ module Slam::Statement::SymbolDeclarationList {
 		
 	################################################################
 
-	method attach_to($parent) {
-		ASSERT($parent.isa(Slam::Scope), 
-			'Declarations must attach to a scope.');
-		ASSERT($parent =:= Registry<SYMTAB>.current_scope,
-			'Parent scope should still be current. Why not?');
-		
-		$parent.push(self);
-		
-		NOTE("Declaring symbols in ", $parent);
-		DUMP($parent);
-		
-		for @(self) {
-			NOTE($_);
-			Registry<SYMTAB>.declare($_);
-		}
-	}
 }
 
 ################################################################
 
 module Slam::Statement::UsingNamespace {
-	method attach_to($parent) {
-		ASSERT($parent.is_scope, 
-			'UsingNamespace statements may only attach to a scope.');
-		$parent.add_using_namespace(self);
-		$parent.push(self);
-	}
-	
-	method using_namespace(*@value) { self.ATTR('using_namespace', @value); }
+	method using_namespace(*@value) { self._ATTR('using_namespace', @value); }
 }

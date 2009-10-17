@@ -158,7 +158,7 @@ method INTEGER_LIT($/) {
 			"(zero, oh) prefix for octal literals."));
 	}
 	
-	if $<lu_part> {
+	if +@($<lu_part>) {
 		$past.warning(:message(
 			"Integer suffix '",  ~$<lu_part>, "' ignored"));
 	}

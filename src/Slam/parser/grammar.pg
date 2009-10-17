@@ -40,10 +40,9 @@ L<include_file>s and L<using_namespace_directive>s.
 =cut
 
 rule declarative_statement {
-{{say "Trying declarative_statement" }}
 	[ <include_directive>	{*} #= include_directive
 	| <namespace_definition>	{*} #= namespace_definition
-	| {{say "Trying declaration_stmt" }}<declaration_statement>	{*} #= declaration_statement
+	| <declaration_statement>	{*} #= declaration_statement
 	]
 }
 
@@ -71,7 +70,7 @@ declarations contained in the block.
 =cut
 
 rule namespace_definition {
-	<is_extern=EXTERN>? <.NAMESPACE> <namespace_path> 
+	<is_extern=EXTERN>? <.NAMESPACE> <namespace=namespace_path> 
 	'{'	{*} #= open
 		<declaration_sequence>
 	'}'	{*} #= close

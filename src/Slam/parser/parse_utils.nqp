@@ -32,29 +32,12 @@ our $Symbols;
 
 ################################################################
 
-sub ADD_ERROR($node, *@msg) {
-	Slam::Messages::add_error($node,
-		Array::join('', @msg));
-}
-
-sub ADD_WARNING($node, *@msg) {
-	Slam::Messages::add_warning($node,
-		Array::join('', @msg));
-}
-
-sub NODE_TYPE($node) {
-	return Slam::Node::type($node);
-}
-
-################################################################
-
 method DISPATCH($/, $key, %code) {
-	if %code{$key} {
-		%code{$key}(self, $/);
-	}
-	else {
+	unless %code{$key} {
 		$/.panic("Invalid $key '", $key, "' passed to dispatch");
 	}
+	
+	%code{$key}(self, $/);
 }
 
 method ERROR($/, $message) {
@@ -167,19 +150,14 @@ sub clean_up_heredoc($past, @lines) {
 	DUMP($past);
 }
 
-sub get_compilation_unit() {
-	our $compilation_unit;
-	
-	unless $compilation_unit {
-		$compilation_unit := Slam::Node::create('compilation_unit');
-	}
-	
-	return $compilation_unit;
-}
-
 sub global_setup() {
 	unless our $init_done {
 		$init_done := 1;
+		
+		NOTE("Creating function list");
+		Registry<FUNCLIST> := Slam::Stmts.new(
+			:name('compilation_unit'),
+		);
 		
 		NOTE("Initializing global variables");
 		$Config := Registry<CONFIG>;

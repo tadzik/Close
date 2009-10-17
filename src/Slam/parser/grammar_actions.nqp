@@ -4,13 +4,14 @@ module Slam::Grammar::Actions;
 
 our $Symbols;
 
-#method TOP($/, $key) { PASSTHRU($/, $key); }
 method TOP($/, $key) { 
 	my $past := $/{$key}.ast;
 		
 	unless Slam::IncludeFile::in_include_file() {
-		DUMP($past);
+		NOTE("Creating compilation unit");
 
+		DUMP($past);
+		
 		for (	Slam::Visitor::PrettyPrint,
 			Slam::Visitor::TypeResolution,
 			Slam::Visitor::SymbolResolution,
@@ -19,9 +20,9 @@ method TOP($/, $key) {
 			my $visitor := $_.new();
 			NOTE("Considering ", Class::name_of($visitor));
 			
-			if $visitor.enabled {
+			if $visitor.is_enabled {
 				NOTE($visitor.description);
-				$past.accept_visitor($visitor);
+				$visitor.visit($past);
 				$visitor.finish;
 			}
 			else {
@@ -29,33 +30,58 @@ method TOP($/, $key) {
 					" because it is not enabled.");
 			}
 		}
-			
-		#NOTE("Setting scopes");
-		#Slam::ScopeAssignmentVisitor::assign_scopes($past);
-
-		#NOTE("Displaying messages");
-		#Slam::MessageVisitor::show_messages($past);
-
-		$past := get_compilation_unit();
-		
-		NOTE("Rewriting tree for POSTing");
-		$past := Slam::TreeRewriteVisitor::rewrite_tree($past);
-			
-		NOTE("Cleaning up tree for POSTing");
-		Slam::PastCleanupVisitor::cleanup_past($past);
 
 		DUMP($past);
-	}	
-	
-	if Registry<CONFIG>.query('Compiler', 'faketree') {
-		NOTE("Replacing compiled tree with faketree() results");
-		$past := faketree();
+		
+		NOTE("Replacing tree with function list for POSTing");
+		$past := Registry<FUNCLIST>;
+		
+		my $visitor := Slam::Visitor::PastRewrite.new();
+		$visitor.visit($past);
+		
+		# Maybe chuck it all and replace it.
+		$past := faketree($past);
+		
+		NOTE("Post-processing complete.");
+		DUMP($past);
 	}
-	
+
 	make $past;
 }
 
 method declarative_statement($/, $key) { PASSTHRU($/, $key); }
+
+=sub faketree($past)
+
+Replaces the generated tree with a fake one, if a config switch is set. Used 
+to test arbitrary PAST structures, either because I'm bug-hunting or to 
+understand how they work. Not a "real" part of the compiler in any way. 
+
+=cut
+
+sub faketree($past) {
+	if Registry<CONFIG>.query('Compiler', 'faketree') {
+		NOTE("Replacing compiled tree with faketree() results");
+	
+		my $sub := PAST::Block.new(:blocktype('declaration'), :name('compilation_unit'));
+		$sub.push(
+			PAST::Op.new(:pasttype('call'),
+				PAST::Var.new(:name('say'), :scope('package')),
+				PAST::Op.new(
+					:lvalue(1),
+					:name('prefix:++'),
+					:pasttype('pirop'), 
+					:pirop('inc 0*'), 
+					PAST::Var.new(:scope('lexical'), :name('x')),
+				),
+			),
+		);
+		
+		$past := $sub;
+	}
+	
+	return $past;
+}
 
 =method include_file
 
@@ -71,17 +97,21 @@ method include_directive($/) {
 }
 
 method _namespace_definition_close($/) {
-	my $past := $Symbols.leave_scope('Slam::Scope::Namespace');
-
+	my $past := $<namespace>.ast;
+	
 	for ast_array($<declaration_sequence><decl>) {
-		$_.attach_to($past);
+		$past.attach($_);
 	}
+	
+	$Symbols.leave_scope('Slam::Scope::Namespace');
 	
 	MAKE($past);
 }
 
 method _namespace_definition_open($/) {
-	$Symbols.enter_namespace_scope($<namespace_path>.ast);
+	my $past := $<namespace>.ast;
+	$Symbols.enter_namespace_scope($past);
+	$past.namespace_scope($Symbols.current_scope);
 }
 
 # NQP currently generates get_hll_global for functions. So qualify them all.
@@ -96,7 +126,8 @@ method _translation_unit_close($/) {
 	
 	NOTE("Adding declarations to translation unit context scope.");
 	for ast_array($<declaration_sequence><decl>) {
-		$_.attach_to($past);
+		NOTE("Attaching ", $_);
+		$past.attach($_);
 	}
 	
 	unless Slam::IncludeFile::in_include_file() {
@@ -122,21 +153,3 @@ our %_translation_unit;
 %_translation_unit<open>		:= Slam::Grammar::Actions::_translation_unit_open;
 
 method translation_unit($/, $key) { self.DISPATCH($/, $key, %_translation_unit); }
-
-sub faketree() {
-	my $sub := PAST::Block.new(:blocktype('declaration'), :name('compilation_unit'));
-	$sub.push(
-		PAST::Op.new(:pasttype('call'),
-			PAST::Var.new(:name('say'), :scope('package')),
-			PAST::Op.new(
-				:lvalue(1),
-				:name('prefix:++'),
-				:pasttype('pirop'), 
-				:pirop('inc 0*'), 
-				PAST::Var.new(:scope('lexical'), :name('x')),
-			),
-		),
-	);
-		
-	return $sub;
-}

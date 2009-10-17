@@ -2,6 +2,15 @@
 
 module Parrot;
 
+_ONLOAD();
+
+sub _ONLOAD() {
+	if our $onload_done { return 0; }
+	$onload_done := 1;
+
+	# Nothing.
+}
+
 sub _get_parrot() {
 	unless our $parrot_compiler {
 		$parrot_compiler := Q:PIR {
@@ -17,6 +26,9 @@ sub IMPORT($namespace, $names?) {
 	my $caller_nsp := caller_namespace(2);
 	my $from_nsp := get_namespace($namespace);
 	
+	# Make sure the target namespace is finished loading
+	call_onload($from_nsp);
+	
 	my @names;
 	
 	if $names {
@@ -25,9 +37,9 @@ sub IMPORT($namespace, $names?) {
 	else {
 		for $from_nsp {
 			my $name := ~$_;
-			my $first_char := String::char_at($name, 0);
+			my $first_char := $name[0];
 			my $skip := 0;
-			
+		
 			if $first_char eq '$' 
 				|| $first_char eq '@' 
 				|| $first_char eq '%'
@@ -44,10 +56,29 @@ sub IMPORT($namespace, $names?) {
 			}
 		}
 	}
+
+	# NO OVERWRITING. 
+	my @new_names := Array::empty();
+	
+	for @names {
+		if $caller_nsp{~ $_} {
+			#NOTE("I will not overwrite namespace entry: " ~ $_);
+			say("I will not overwrite namespace entry: " ~ $_);
+		}
+		else {
+			@new_names.push(~ $_);
+		}
+	}
 	
 	$from_nsp.export_to($caller_nsp, @names);
 }
 
+sub call_onload($nsp) {
+	if my &onload := $nsp<_ONLOAD> {
+		&onload();
+	}
+}
+	
 sub caller_namespace($index?) {
 	unless $index {
 		$index := 1;
@@ -82,13 +113,125 @@ sub compile($string) {
 	return $result;
 }
 
+sub die($message) {
+	Q:PIR {
+		$P0 = find_lex '$message'
+		$S0 = $P0
+		die $S0
+	};
+}
+
+sub get_address_of($what) {
+	my $address := Q:PIR {
+		$P0 = find_lex '$what'
+		if null $P0 goto null_object
+		$I0 = get_addr $P0
+		goto done
+	null_object:
+		$I0 = 0
+	done:
+		%r = box $I0
+	};
+	return $address;
+}
+
+sub get_attribute($pmc, $attribute_name) {
+	my $result := Q:PIR {
+		$P0 = find_lex '$pmc'
+		$P1 = find_lex '$attribute_name'
+		$S0 = $P1
+		%r = getattribute $P0, $S0
+	};
+	
+	return $result;
+}
+
+sub get_class($pmc) {
+	my $result := Q:PIR {
+		$P0 = find_lex '$pmc'
+		%r = get_class $P0
+	};
+	return $result;
+}
+
 sub get_namespace($name) {
 	my @namespace := String::split('::', $name);
-	
+	my $namespace := get_hll_namespace(@namespace);
+	return $namespace;
+}
+
+sub get_hll_namespace(@parts) {
 	my $namespace := Q:PIR {
-		$P0 = find_lex '@namespace'
+		$P0 = find_lex '@parts'
 		%r = get_hll_namespace $P0
 	};
 	
 	return $namespace;
+}
+
+sub get_sub($path) {
+	my @parts := String::split('::', $path);
+	my $name := @parts.pop;
+	my $namespace := get_hll_namespace(@parts);
+	my $sub;
+	
+	if $namespace {
+		$sub := $namespace.find_sub($name);
+	}
+	
+	return $sub;
+}
+
+sub inspect($pmc, $key) {
+	my $result := Q:PIR {
+		$P0 = find_lex '$pmc'
+		$P1 = find_lex '$key'
+		$S1 = $P1
+		%r = inspect $P0, $S1
+	};
+	return $result;
+}
+
+sub isa($pmc, $class) {
+	my $result := Q:PIR {
+		$P0 = find_lex '$pmc'
+		$P1 = find_lex '$class'
+		$S1 = $P1
+		$I0 = isa $P0, $S1
+		%r = box $I0
+	};
+
+	return $result;
+}
+sub load_bytecode($file) {
+	Q:PIR {
+		$P0 = find_lex '$file'
+		$S0 = $P0
+		load_bytecode $S0
+	};
+}
+
+sub new_pmc($type) {
+	my $result := Q:PIR {
+		$P0 = find_lex '$type'
+		%r = new $P0
+	};
+	
+	return $result;
+}
+
+sub trace($value) {
+	Q:PIR {
+		$P0 = find_lex '$value'
+		$I0 = $P0
+		trace $I0
+	};
+}
+
+sub typeof($pmc) {
+	my $result := Q:PIR {
+		$P0 = find_lex '$pmc'
+		%r = typeof $P0
+	};
+	return $result;
 }

@@ -17,28 +17,8 @@ itself to the child results.
 
 class Slam::TreeRewriteVisitor;
 
-sub ASSERTold($condition, *@message) {
-	Dumper::ASSERTold(Dumper::info(), $condition, @message);
-}
-
-sub BACKTRACE() {
-	Q:PIR {{
-		backtrace
-	}};
-}
-
-sub DIE(*@msg) {
-	Dumper::DIE(Dumper::info(), @msg);
-}
-
-sub DUMPold(*@pos, *%what) {
-	Dumper::DUMPold(Dumper::info(), @pos, %what);
-}
-
-sub NOTEold(*@parts) {
-	Dumper::NOTEold(Dumper::info(), @parts);
-}
-
+Parrot::IMPORT('Dumper');
+	
 ################################################################
 
 sub ADD_ERROR($node, *@msg) {
@@ -81,8 +61,8 @@ method visit($node) {
 	my @results;
 	
 	if $node {
-		NOTEold("Visiting ", NODE_TYPE($node), " node: ", $node.name());
-		DUMPold($node);
+		NOTE("Visiting ", NODE_TYPE($node), " node: ", $node.name());
+		DUMP($node);
 		
 		@results := $SUPER.visit(self, $node);
 	}
@@ -90,8 +70,8 @@ method visit($node) {
 		@results := Array::empty();
 	}
 	
-	NOTEold("done");
-	DUMPold(@results);
+	NOTE("done");
+	DUMP(@results);
 	return @results;
 }
 
@@ -113,25 +93,25 @@ our @Child_attribute_names := (
 our @Fake_results := Array::empty();
 
 method _rewrite_tree_UNKNOWN($node) {	
-	NOTEold("No custom handler exists for '", NODE_TYPE($node), 
+	NOTE("No custom handler exists for '", NODE_TYPE($node), 
 		"' node '", $node.name(), "'. Passing through to children.");
-	DUMPold($node);
+	DUMP($node);
 	return $SUPER.visit_node_generic_results(self, $node, @Child_attribute_names);
 }
 
 method _rewrite_tree_initload_sub($node) {
-	NOTEold("Visiting initload_sub node: ", $node<display_name>);
+	NOTE("Visiting initload_sub node: ", $node<display_name>);
 
 	my @results := $SUPER.visit_node_generic_results(self, $node, @Child_attribute_names);
 
 	# For automatically generated subs, delete if empty.
 	if +@($node) == 1 {
-		NOTEold("Deleting empty initload sub");
+		NOTE("Deleting empty initload sub");
 		$SUPER.delete($node);
 	}
 	
-	NOTEold("done");
-	DUMPold(@results);
+	NOTE("done");
+	DUMP(@results);
 	return @results;	
  }
 
@@ -145,27 +125,27 @@ to visit the PAST node that is passed from the compiler.
 =cut
  
 sub rewrite_tree($past) {
-	NOTEold("Rewriting PAST tree into POSTable shape");
-	DUMPold($past);
+	NOTE("Rewriting PAST tree into POSTable shape");
+	DUMP($past);
 
 	my $result := $past;
 	
 	if Registry<CONFIG>.query('Compiler', name(0), 'disabled') {
-		NOTEold("Configured off - skipping");
+		NOTE("Configured off - skipping");
 	}
 	else {
 		$SUPER := Slam::Visitor.new();
-		NOTEold("Created SUPER-visitor");
-		DUMPold($SUPER);
+		NOTE("Created SUPER-visitor");
+		DUMP($SUPER);
 	
 		my $visitor	:= Slam::TreeRewriteVisitor.new();
-		NOTEold("Created visitor");
-		DUMPold($visitor);
+		NOTE("Created visitor");
+		DUMP($visitor);
 		
 		$visitor.visit($past);
 		
-		NOTEold("done");
-		DUMPold($result);
+		NOTE("done");
+		DUMP($result);
 	}
 	
 	return $result;

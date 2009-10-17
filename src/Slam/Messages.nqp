@@ -2,37 +2,17 @@
 
 module Slam::Message {
 
-	Parrot::IMPORT('Dumper');
-		
-	################################################################
+	_ONLOAD();
 
-=sub _onload
-
-This code runs at initload, and explicitly creates this class as a subclass of
-Node.
-
-=cut
-
-	# Don't run - dependency order conflict. Copied to Node.
-	_onload();
-
-	sub _onload() {
+	sub _ONLOAD() {
 		if our $onload_done { return 0; }
 		$onload_done := 1;
 		
-		my $base_name := 'Slam::Message';
+		Parrot::IMPORT('Dumper');
 		
-		NOTE("Creating class ", $base_name);
-		my $base := Class::SUBCLASS($base_name, 'Slam::Var');
-
-		for ('Error', 'Warning') {
-			my $subclass := 'Slam::' ~ $_;
-			NOTE("Creating subclass ", $subclass);
-			Class::SUBCLASS($subclass, $base);
-		}
+		NOTE("Creating Slam::Message");
+		Class::SUBCLASS('Slam::Message', 'Slam::Var');
 	}
-
-	################################################################
 
 	method format() {
 		my $result := '' ~ self.file ~ ':' 
@@ -51,7 +31,7 @@ Node.
 	method message(*@value) {
 		# TODO: I don't know if I'm getting an array-in-an-array, or what.
 		# Need to know what :message(a,b,c) does on .new()
-		self.ATTR('message', Array::new(Array::join('', @value))); 
+		self._ATTR('message', Array::new(Array::join('', @value))); 
 	}
 
 	method position($str, $offset) {
@@ -66,9 +46,35 @@ Node.
 }
 
 module Slam::Error {
+
+	_ONLOAD();
+
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+
+		Parrot::IMPORT('Dumper');
+		
+		NOTE("Creating Slam::Error");
+		Class::SUBCLASS('Slam::Error', 'Slam::Message');
+	}
+
 	method severity()			{ return 'error'; }
 }
 
 module Slam::Warning {
+
+	_ONLOAD();
+
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+
+		Parrot::IMPORT('Dumper');
+		
+		NOTE("Creating Slam::Warning");
+		Class::SUBCLASS('Slam::Warning', 'Slam::Message');
+	}
+
 	method severity()			{ return 'warning'; }
 }

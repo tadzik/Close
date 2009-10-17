@@ -2,38 +2,17 @@
 
 module Slam::Symbol::Name {
 
-	#Parrot::IMPORT('Dumper');
-		
-	################################################################
+	_ONLOAD();
 
-=sub _onload
-
-This code runs at initload, and explicitly creates classes with parents.
-
-=cut
-
-	_onload();
-
-	sub _onload() {
+	sub _ONLOAD() {
 		if our $onload_done { return 0; }
 		$onload_done := 1;
 
 		Parrot::IMPORT('Dumper');
 
 		NOTE("Creating class Slam::Symbol::Name");
-		my $base := Class::SUBCLASS('Slam::Symbol::Name', 'Slam::Node');
-
-		NOTE("Creating class Slam::Symbol::Reference");
-		Class::SUBCLASS('Slam::Symbol::Reference', 
-			'Slam::Var', $base);
-		
-		NOTE("Creating class Slam::Symbol::Declaration");
-		Class::SUBCLASS('Slam::Symbol::Declaration', 
-			'Slam::Var', $base);
-		
-		NOTE("Creating class Slam::Symbol::Namespace");
-		Class::SUBCLASS('Slam::Symbol::Namespace', 
-			'Slam::Symbol::Declaration');
+		Class::SUBCLASS('Slam::Symbol::Name', 
+			'Slam::Node');
 	}
 
 	################################################################
@@ -61,11 +40,11 @@ This code runs at initload, and explicitly creates classes with parents.
 			self.rebuild_display_name(1);
 		}
 		
-		return self.ATTR('hll', @value); 
+		return self._ATTR('hll', @value); 
 	}
 	
 	method is_namespace()		{ return 0; }
-	method is_rooted(*@value)		{ self.ATTR('is_rooted', @value); }
+	method is_rooted(*@value)		{ self._ATTR('is_rooted', @value); }
 	method parts(*@value)		{ return 'parts'; }
 	
 =method path
@@ -86,7 +65,7 @@ namespace functions.
 	}
 	
 	method pir_name(*@value) {
-		return self.ATTR('pir_name', @value)
+		return self._ATTR('pir_name', @value)
 			|| self.name;
 	}
 }
@@ -95,24 +74,57 @@ namespace functions.
 
 module Slam::Symbol::Declaration {
 
-	Parrot::IMPORT('Dumper');
-		
-	################################################################
+	_ONLOAD();
 
-	method add_type_info($type) {
-		ASSERT($type.isa(Slam::Type));
-		NOTE("Adding type info: ", $type, " to symbol: ", self);
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+
+		Parrot::IMPORT('Dumper');
+
+		my $class_name := 'Slam::Symbol::Declaration';
+		NOTE("Creating class ", $class_name);
+		Class::SUBCLASS($class_name, 
+			'Slam::Var', 'Slam::Symbol::Name');
 		
-		if self.type {
-			self.last_type(self.last_type.attach($type))
+		Class::MULTISUB($class_name, 'attach', :starting_with('_attach_'));
+		
+		NOTE("done");
+	}
+	
+	method _attach_Slam_Scope_Function($definition) {
+		self.definition($definition);
+		$definition.hll(self.hll);
+		$definition.namespace(self.namespace);
+		$definition.name(self.name);
+	}
+	
+	method _attach_Slam_Type($type) {
+		NOTE("Attaching type info: ", $type, " to symbol: ", self);
+		
+		if self.last_type {
+			self.last_type(self.last_type.attach($type));
 		}
 		else {
 			self.last_type(self.type($type));
 		}
-		
-		if $type.is_specifier {
-			$type.update_symbol(self);
+
+		if $type.isa(Slam::Type::Specifier) {
+			ASSERT( ! self.specifier, 
+				'A symbol cannot have two specifiers');
+			
+			self.specifier($type);
+			
+			if $type.storage_class {
+				self.storage_class($type.storage_class);
+			}
+			
+			if $type.is_extern {
+				self.is_extern(1);
+			}
 		}
+		
+		return $type;
 	}
 	
 	method alias(*@value) {
@@ -120,18 +132,11 @@ module Slam::Symbol::Declaration {
 			self.name(@value[0].name);
 		}
 		
-		return self.ATTR('alias', @value);
+		return self._ATTR('alias', @value);
 	}
 	
-	method attach_to($parent) {
-		ASSERT($parent.isa(Slam::Statement::SymbolDeclarationList),
-			'If not a declaration list, then what?');
-			
-		$parent.push(self);
-	}
-
 	# Function def, CUES sub-symbol block
-	method definition(*@value)		{ self.ATTR('definition', @value); }
+	method definition(*@value)		{ self._ATTR('definition', @value); }
 	
 	method init(*@children, *%attributes) {
 		%attributes := @children.shift;
@@ -159,13 +164,13 @@ module Slam::Symbol::Declaration {
 		return Slam::Node::init_(self, @children, %attributes);
 	}
 
-	method initializer(*@value)		{ self.ATTR('initializer', @value); }
+	method initializer(*@value)		{ self._ATTR('initializer', @value); }
 
-	method is_implicit(*@value)	{ self.ATTR('is_implicit', @value); }
-	method is_duplicate(*@value)	{ self.ATTR('is_duplicate', @value); }
-	method is_builtin(*@value)		{ self.ATTR('is_builtin', @value); }
-	method is_const(*@value)		{ self.ATTR('is_const', @value); }
-	method is_extern(*@value)		{ self.ATTR('is_extern', @value); }
+	method is_implicit(*@value)	{ self._ATTR('is_implicit', @value); }
+	method is_duplicate(*@value)	{ self._ATTR('is_duplicate', @value); }
+	method is_builtin(*@value)	{ self.specifier.is_builtin; }
+	method is_const(*@value)		{ self.type.is_const; }
+	method is_extern(*@value)		{ self._ATTR('is_extern', @value); }
 	
 	method is_function() {
 		unless self.type {
@@ -175,26 +180,17 @@ module Slam::Symbol::Declaration {
 		return self.type.is_function;
 	}
 			
-	method is_inline(*@value)		{ self.ATTR('is_inline', @value); }
-	
-	method is_method(*@value) {
-		unless self.type {
-			DIE("Cannot call is_method() before type is set.");
-		}
-
-		my $value := @value.shift;
-		return self.type.is_method($value);
-	}
+	method is_inline(*@value)		{ self.specifier.is_inline; }
+	method is_method(*@value)	{ self.specifier.is_method; }
 
 	method is_type() {
 		return self.is_typedef;
 	}
 	
 	method is_typedef()			{ self.storage_class eq 'typedef'; }
-	method is_volatile(*@value)		{ self.ATTR('is_volatile', @value); }
-
+	method is_volatile(*@value)	{ self.type.is_volatile; }
 	method isdecl(*@value)		{ return 1; }	
-	method last_type(*@value)		{ self.ATTR('last_type', @value); }
+	method last_type(*@value)		{ self._ATTR('last_type', @value); }
 	
 	# args is moved to .type().args(), I guess
 	#level - scope backlink for some reasons
@@ -231,11 +227,14 @@ module Slam::Symbol::Declaration {
 		return %scopes{self.storage_class};
 	}
 	
-	method storage_class(*@value)	{ self.ATTR('storage_class', @value); }
-	method type(*@value)			{ self.ATTR('type', @value); }
+	method specifier(*@value)		{ self._ATTR('specifier', @value); }
+	method storage_class(*@value)	{ self._ATTR('storage_class', @value); }
+	method type(*@value)		{ self._ATTR('type', @value); }
 
 
-
+	
+	
+	
 	# Make a symbol reference from a declarator.
 	sub make_reference_to($node) {
 		ASSERT($node.node_type eq 'declarator_name', 
@@ -284,47 +283,4 @@ module Slam::Symbol::Declaration {
 				Slam::Type::type_to_string($sym<type>));
 		}
 	}
-}
-
-module Slam::Symbol::Namespace {
-
-	#Parrot::IMPORT('Dumper');
-		
-	################################################################
-	
-}
-
-module Slam::Symbol::Reference {
-
-	#Parrot::IMPORT('Dumper');
-		
-	################################################################
-	
-	method init(*@children, *%attributes) {
-		if %attributes<parts> {
-			my @part_values := Array::empty();
-			
-			for %attributes<parts> {
-				@part_values.push($_.value());
-			}
-			
-			ASSERT( ! %attributes<name>,
-				'Cannot use :name() with :parts()');
-			
-			%attributes<name> := @part_values.pop;
-
-			# If rooted, use exactly @parts as namespace. 
-			# If not rooted, use @parts as partial namespace only
-			# if it is not empty. (An empty ns would mean rooted symbol).
-			if %attributes<is_rooted> || +@part_values {
-				%attributes<namespace> := @part_values;
-			}
-		}
-
-		return Slam::Node::init_(self, @children, %attributes);
-	}
-
-	method isdecl(*@value)		{ return 0; }
-
-	method referent(*@value)		{ self.ATTR('referent', @value); }
 }

@@ -1,201 +1,356 @@
 # $Id$
 
-module Slam::Visitor::PrettyPrint;
+module Slam::Visitor::PrettyPrint {
 
-Parrot::IMPORT('Dumper');
+	_ONLOAD();
 
-################################################################
-
-_onload();
-
-sub _onload() {
-	if our $onload_done { return 0; }
-	$onload_done := 1;
-	
-	Slam::Visitor::_onload();
-	
-	NOTE("Creating Slam::Visitor::PrettyPrint");
-	Class::SUBCLASS('Slam::Visitor::PrettyPrint', 'Slam::Visitor');
-	
-	NOTE("done");
-}
-
-################################################################
-
-method append(*@parts) {
-	self.output.push(Array::join('', @parts));
-}
-
-method declarator(*@value)	{ self.ATTR('declarator', @value); }
-
-method description()		{ return 'Pretty-printing syntax tree'; }
-
-method enabled() {
-	return Registry<CONFIG>.query(Class::name_of(self), 'enabled');
-}
-	
-method finish() {
-	NOTE(" ***** FINISHED ******");
-	say(self.result);
-}
-
-sub format_access_qualifiers($node) {
-	my $quals := '';
-	
-	if $node.is_const { $quals := $quals ~ 'const '; }
-	if $node.is_volatile { $quals := $quals ~ 'volatile '; }
-	return $quals;
-}
-
-method indent($value?) {
-	unless Scalar::defined($value) { $value := 4; }
-	self.indent_level(self.indent_level + $value); 
-}
-
-method indent_level(*@value)	{ self.ATTR('indent_level', @value); }
-
-method init(@children, %attributes) {
-	self.init_(@children, %attributes);
-	
-	self.indent_level(0);
-	
-	self.method_dispatch(Hash::new(
-		:DEFAULT(		Slam::Visitor::PrettyPrint::vm_DEFAULT),
-		:SlamLiteralInteger(	Slam::Visitor::PrettyPrint::vm_Literal),
-		:SlamScopeNamespace(	
-					Slam::Visitor::PrettyPrint::vm_Namespace),
-		:SlamStatementSymbolDeclarationList(
-					Slam::Visitor::PrettyPrint::vm_DeclarationList),
-		:SlamSymbolDeclaration(
-					Slam::Visitor::PrettyPrint::vm_SymbolDeclaration),
-		:SlamTypeArray(	Slam::Visitor::PrettyPrint::vm_ArrayDeclarator),
-		:SlamTypeFunction(	Slam::Visitor::PrettyPrint::vm_FunctionDeclarator),
-		:SlamTypeHash(	Slam::Visitor::PrettyPrint::vm_HashDeclarator),
-		:SlamTypeMultiSub(	Slam::Visitor::PrettyPrint::vm_MultiSubDeclarator),
-		:SlamTypePointer(	Slam::Visitor::PrettyPrint::vm_PointerDeclarator),
-		:SlamTypeSpecifier(	Slam::Visitor::PrettyPrint::vm_TypeSpecifier),
-	));
-	
-	self.output(Array::empty());
-}
-
-method leader()			{ return String::repeat(' ', self.indent_level); }
-method output(*@value)		{ self.ATTR('output', @value); }
-method result()			{ return Array::join('', self.output); }
-method specifier(*@value)		{ self.ATTR('specifier', @value); }
-
-method undent($value?) { 
-	unless Scalar::defined($value) { $value := 4; }
-	self.indent_level(self.indent_level - $value); 
-}
-
-################################################################
-
-method vm_DEFAULT($node) {
-	NOTE("Unrecognized node type: ", Class::of($node));
-	DUMP($node);
-	my $result := "\n" ~ self.leader
-		~ "/* Prettyprint: Unknown node: " ~ Class::of($node) 
-		~ ", id = " ~ $node.id ~ "  */\n";
-	return $result;
-}
-
-method vm_ArrayDeclarator($node) {
-	my $declarator := self.declarator ~ '[';
-	
-	if Scalar::defined($node.elements) {
-		$declarator := $declarator ~ $node.elements;
-	}
-	else {
-		$declarator := $declarator ~ ' ';
-	}
-	
-	$declarator := $declarator ~ ']';
-	self.declarator($declarator);
-}
-
-method vm_DeclarationList($node) {
-	NOTE("Doing nothing - let the decls handle it.");
-	DUMP($node);
-}
-
-method vm_FunctionDeclarator($node) {
-	my $declarator := self.declarator ~ '(';
-	$declarator := $declarator ~ ' /* need args, later. */ ';
-	$declarator := $declarator ~ ')';
-	self.declarator($declarator);
-}
-
-method vm_HashDeclarator($node) {
-	my $declarator := self.declarator ~ '[ % ]';
-	self.declarator($declarator);
-}
-
-method vm_Literal($node) {
-	self.append($node.value);
-}
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
 		
-method vm_Namespace($node, :$start?, :$end?) {
-	if $start {
-		NOTE("Entering namespace ", $node);
-		DUMP($node);
-		self.append(self.leader, 'namespace ', $node, " {\n");
+		Parrot::IMPORT('Dumper');
+		
+		my $class_name := 'Slam::Visitor::PrettyPrint';
+		NOTE("Creating class ", $class_name);
+		Class::SUBCLASS($class_name, 
+			'Visitor::Combinator::Defined',
+			'Slam::Visitor');
+		NOTE("done");
+	}
+
+	################################################################
+	
+	method append(*@parts) {
+		Array::append(self.output, @parts);
+	}
+
+	method declarator(*@value)	{ self._ATTR('declarator', @value); }
+	method expression(*@value)	{ self._ATTR('expression', @value); }
+	
+	method indent($value?) {
+		unless Scalar::defined($value) { $value := 4; }
+		self.indent_level(self.indent_level + $value); 
+	}
+
+	method description()		{ return 'Pretty-printing syntax tree'; }
+
+	method finish() {
+		NOTE(" ***** FINISHED ******");
+		say(self.result);
+	}
+
+	method indent_level(*@value)	{ self._ATTR('indent_level', @value); }
+
+	method init(@children, %attributes) {
+		self.indent_level(0);
+		
+		# NB: Self provides a central store for indentation data
+		# for begin/end
+		self.definition(
+			Visitor::Combinator::VisitOnce.new(
+				Visitor::Combinator::Sequence.new(
+					Slam::Visitor::PrettyPrint::BeginVisitor.new(self),
+					Visitor::Combinator::All.new(self),
+					Slam::Visitor::PrettyPrint::EndVisitor.new(self),
+				),
+			),
+		);
+	}
+
+	method is_enabled() {
+		return Registry<CONFIG>.query(Class::name_of(self), 'enabled');
+	}
+	
+	method leader()			{ return String::repeat(' ', self.indent_level); }
+	method output(*@value)		{ self._ATTR_ARRAY('output', @value); }
+	method result()			{ return Array::join('', self.output); }
+	method specifier(*@value)		{ self._ATTR('specifier', @value); }
+
+	method undent($value?) { 
+		unless Scalar::defined($value) { $value := 4; }
+		self.indent_level(self.indent_level - $value); 
+	}
+
+}
+
+################################################################
+
+module Slam::Visitor::PrettyPrint::BeginVisitor {
+
+	_ONLOAD();
+
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+		
+		Parrot::IMPORT('Dumper');
+		
+		my $class_name := 'Slam::Visitor::PrettyPrint::BeginVisitor';
+		NOTE("Creating class ", $class_name);
+		Class::SUBCLASS($class_name, 
+			'Visitor::Combinator');
+		NOTE("Creating multisub 'visit'");
+		Class::MULTISUB($class_name, 'visit', :starting_with('_visit_'));
+		NOTE("done");
+	}
+
+	################################################################
+
+	method central(*@value)		{ self._ATTR('central', @value); }
+	method emit(*@args)		{ self.central.append(@args.join); }
+
+	sub format_access_qualifiers($node) {
+		my $quals := '';
+		
+		if $node.is_const { $quals := $quals ~ 'const '; }
+		if $node.is_volatile { $quals := $quals ~ 'volatile '; }
+		return $quals;
+	}
+
+	method indent()			{ self.central.indent(); }
+	
+	method init(@children, %attributes) {
+		if +@children {
+			self.central(@children.shift);
+		}
+	}
+	
+	method leader()			{ self.central.leader(); }
+	
+	method UNKNOWN($node) {
+		self.emit("\n",
+			self.leader,
+			"/* Unknown node: ", $node, " */\n",
+		);
+		
+		return $node;
+	}
+	
+	################################################################
+
+	method _visit_Slam_Literal($node) {
+		my $expression := self.central.expression ~ $node.value;
+		self.central.expression($expression);
+		return $node;
+	}
+			
+	method _visit_Slam_Scope_Function($node) {
+		NOTE("Visiting function: ", $node);
+		self.emit(self.leader, 'function scope: ', ~ $node, "\n");
+
+		self.PASS;
+		return $node;
+	}
+
+	method _visit_Slam_Scope_Local($node) {
+		NOTE("Visiting Local: ", $node);
+		self.emit(self.leader, "{\t// Local scope: ", ~$node, "\n");
 		self.indent();
+
+		self.PASS;
+		return $node;
 	}
-	elsif $end {
-		NOTE("Leaving namespace ", $node);
+
+	method _visit_Slam_Scope_Namespace($node) {
+		NOTE("Visiting namespace: ", $node);
+		self.emit(self.leader, 'namespace ', ~ $node, " {\n");
+		self.indent();
+
+		self.PASS;
+		return $node;
+	}
+
+	method _visit_Slam_Scope_Parameter($node) {
+		NOTE("Visiting parameter scope: ", $node);
+		self.emit("(");
+
+		self.PASS;
+		return $node;
+	}
+
+	method _visit_Slam_Statement($node) {
+		NOTE("Visiting statement: ", $node);
+		return self.UNKNOWN($node);
+	}
+	
+	method _visit_Slam_Statement_Return($node) {
+		self.central.expression('');
+		self.PASS;
+		return $node;
+	}
+
+	method _visit_Slam_Symbol_Declaration($node) {
+		NOTE("Declaring symbol.");
+		self.central.declarator($node.name);
+		self.central.expression('');
+		self.central.specifier('');
+		return $node;
+	}
+
+	method _visit_Slam_Symbol_Reference($node) {
+		NOTE("Visiting symbol reference: ", $node);
+		self.central.expression(self.central.expression ~ $node);
+		return $node;
+	}
+	
+	method _visit_Slam_Type_Array($node) {
+		my $elements := $node.elements;
+		
+		unless Scalar::defined($elements) {
+			$elements := ' ';
+		}
+		
+		my $declarator := self.central.declarator ~ '[' ~ $elements ~ ']';
+		self.central.declarator($declarator);
+		return $node;
+	}
+
+	method _visit_Slam_Type_Function($node) {
+		my $declarator := self.central.declarator ~ '(';
+		$declarator := $declarator ~ ' /* need args, later. */ ';
+		$declarator := $declarator ~ ')';
+		self.central.declarator($declarator);
+		return $node;
+	}
+
+	method _visit_Slam_Type_Hash($node) {
+		my $declarator := self.central.declarator ~ '[ % ]';
+		self.central.declarator($declarator);
+		return $node;
+	}
+
+	method _visit_Slam_Type_MultiSub($node) {
+		DIE("I have no idea what to do here.");
+	}
+
+	method _visit_Slam_Type_Pointer($node) {
+		my $pointer		:= '*';
+		
+		if $node.has_access_qualifier {
+			$pointer := '* ' ~ format_access_qualifiers($node);
+		}
+		
+		my $declarator := $pointer ~ self.central.declarator;
+		
+		if $node.nominal.is_declarator && !node.nominal.is_pointer {
+			$declarator := '(' ~ $declarator ~ ')';
+		}
+		
+		return $node;
+	}
+	
+	method _visit_Slam_Type_Specifier($node) {
+		NOTE("Visiting type specifier: ", $node);
+		my $specifier := format_access_qualifiers($node)
+			~ $node.typename;
+		$specifier := $specifier ~ String::repeat(' ', 8 - (String::length($specifier) % 8));
+		self.central.specifier($specifier);
+		return $node;
+	}
+}
+
+################################################################
+
+module Slam::Visitor::PrettyPrint::EndVisitor {
+
+	_ONLOAD();
+
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+		
+		Parrot::IMPORT('Dumper');
+		
+		my $class_name := 'Slam::Visitor::PrettyPrint::EndVisitor';
+		NOTE("Creating class ", $class_name);
+		Class::SUBCLASS($class_name, 
+			'Visitor::Combinator');
+		NOTE("Creating multisub 'visit'");
+		Class::MULTISUB($class_name, 'visit', :starting_with('_visit_'));
+		NOTE("done");
+	}
+
+	################################################################
+
+	method central(*@value)		{ self._ATTR('central', @value); }
+	method emit(*@args)		{ self.central.append(@args.join); }
+
+	method init(@children, %attributes) {
+		if +@children {
+			self.central(@children.shift);
+		}
+	}
+	
+	method leader()			{ self.central.leader(); }
+	method undent()			{ self.central.undent(); }
+	
+	################################################################
+
+	method _visit_Slam_Node($node) {
+		NOTE("Default: nothing to do for ", 
+			Class::name_of($node), " node: ", $node);
+			
+		self.PASS;
+		return $node;
+	}
+	
+	method _visit_Slam_Scope($node) {
+		NOTE("Visiting scope: ", $node);
 		self.undent();
-		self.append(self.leader, "}\n");
-	}
-	else {
-		DIE("Must pass :start(1) or :end(1) to visit.");
-	}
-}
+		self.emit(self.leader, "}\n");
 
-method vm_MultiSubDeclarator($node) {
-	DIE("I have no idea what to do here.");
-}
+		self.PASS;
+		return $node;
+	}
 
-method vm_PointerDeclarator($node) {
-	my $pointer		:= '*';
-	
-	if $node.has_access_qualifier {
-		$pointer := '* ' ~ format_access_qualifiers($node);
+	method _visit_Slam_Scope_Function($node) {
+		NOTE("Closing out function scope: ", $node);
+		
+		self.PASS;
+		return $node;
 	}
 	
-	my $declarator := $pointer ~ self.declarator;
-	
-	if $node.nominal.is_declarator && !node.nominal.is_pointer {
-		$declarator := '(' ~ $declarator ~ ')';
-	}
-}
+	method _visit_Slam_Scope_Parameter($node) {
+		NOTE("Visiting scope: ", $node);
+		self.emit(")");
 
-method vm_SymbolDeclaration($node, :$start?, :$end?) {
-	NOTE("Declaring symbol.");
-	self.declarator($node.name);
-	
-	# Have to call this explicitly - symbols don't traverse type by default.
-	$node.type.accept_visitor(self);
-
-	self.append(self.leader);
-	
-	if $node.storage_class ne Registry<SYMTAB>.current_scope.default_storage_class {
-		self.append($node.storage_class, ' ');
+		self.PASS;
+		return $node;
 	}
 	
-	self.append(self.specifier, self.declarator);
-	
-	if $node.initializer {
-		self.append(' = ');
-		$node.initializer.accept_visitor(self);
+	method _visit_Slam_Statement_Return($node) {
+		self.PASS;
+		self.emit(self.leader, 'return');
+		
+		if self.central.expression {
+			self.emit(' ', self.central.expression);
+		}
+		
+		self.emit(";\n");
+			
+		return $node;
+	}
+
+	method _visit_Slam_Symbol_Declaration($node) {
+		NOTE("Done with symbol declaration of ", $node);
+		
+		self.emit(self.leader);
+		self.emit($node.storage_class, ' ');
+		self.emit(self.central.specifier, self.central.declarator);
+		NOTE("Spec: '", self.central.specifier, "', Decl: '", self.central.declarator, "'");
+		
+		if $node.initializer {
+			NOTE("Emitting initializer: ", self.central.expression);
+			self.emit(' = ', self.central.expression);
+		}
+		
+		unless $node.definition {
+			self.emit(';');
+		}
+		
+		self.emit("\n");
+		self.PASS;
+		return $node;
 	}
 	
-	self.append(";\n");
-}
-
-method vm_TypeSpecifier($node) {
-	my $specifier := format_access_qualifiers($node)
-		~ $node.typename;
-	$specifier := $specifier ~ String::repeat(' ', 8 - (String::length($specifier) % 8));
-	self.specifier($specifier);
 }

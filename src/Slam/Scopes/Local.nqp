@@ -3,28 +3,23 @@
 module Slam::Scope::Local;	
 # extends Slam::Scope
 
-#Parrot::IMPORT('Dumper');
-	
-################################################################
+_ONLOAD();
 
-_onload();
-
-sub _onload() {
+sub _ONLOAD() {
 	if our $onload_done { return 0; }
 	$onload_done := 1;
 
-	Slam::Scope::_onload();
-	
 	Parrot::IMPORT('Dumper');
 	
 	NOTE("Declaring subclass Slam::Scope::Local");
-	Class::SUBCLASS('Slam::Scope::Local', 
+	my $class_name := 'Slam::Scope::Local';
+	Class::SUBCLASS($class_name,
 		'Slam::Scope');
+	
+	Class::MULTISUB($class_name, 'attach', :starting_with('_attach_'));
 }
 
-################################################################
-
-method add_using_namespace($directive) {
+method _attach_Slam_Statement_UsingNamespace($directive) {
 	ASSERT($directive.isa(Slam::Statement::UsingNamespace),
 		'$directive parameter must be a UsingNamespace statement');
 	
@@ -54,6 +49,7 @@ method default_storage_class()		{ return 'register'; }
 method lookup($reference, :&satisfies) {
 	my $name := $reference.name;
 	NOTE("Looking up ", $name, " in ", self);
+	DUMP(self);
 	
 	my $result := self.contains($reference, :satisfies(&satisfies));
 	
@@ -63,6 +59,8 @@ method lookup($reference, :&satisfies) {
 			:satisfies(&satisfies));
 	}
 
+	NOTE("done");
+	DUMP($result);
 	return $result;
 }
 

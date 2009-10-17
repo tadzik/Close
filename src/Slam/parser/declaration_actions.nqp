@@ -89,7 +89,7 @@ method declarator($/) {
 
 	NOTE(+@postfix_dclrs, " postfix declarators");
 	for @postfix_dclrs {
-		$symbol.add_type_info($_);
+		$symbol.attach($_);
 	}
 	
 	# Prefix declarators go on in reverse order: *volatile *const X
@@ -98,7 +98,7 @@ method declarator($/) {
 	
 	NOTE(+@prefix_dclrs, " prefix declarators");
 	for @prefix_dclrs {
-		$symbol.add_type_info($_);
+		$symbol.attach($_);
 	}
 
 	NOTE("Declarator fixed up (specifiers not added yet)");
@@ -131,21 +131,48 @@ method _declarator_part_after_declarator($/) {
 	# No make here. See _done
 }
 
-method _declarator_part_close_block($/) {
-		# Now there is a block.
-		Q:PIR {{
-			$P0 = box 1
-			set_hll_global [ 'Slam' ;'Grammar'], '$!Decl_block', $P0
-		}};
+method _declarator_part_block_close($/) {
+	our $Symbols;
+	my $declarator := $<declarator>.ast;
+	
+	if $declarator.type.isa(Slam::Type::Function) {
+		NOTE("Closing function-definition block");
+		my $block := $Symbols.leave_scope('Slam::Scope::Function');
+		$declarator.attach($block);
+		$block.attach($<body>[0].ast);
+	}
+	else {
+		# Currently no support for aggregate types.
+		DIE("NOT REACHED");
+	}
 		
-		NOTE("Closing decl block");
-		my $past := Slam::Scopes::pop('function_definition');
-		
-		# Merge the <body> block with $past
-		Slam::Node::copy_block($<body>[0].ast, $past);
-		$past<using_namespaces> := $<body>[0].ast<using_namespaces>;
+	NOTE("Flagging last declaration as semicolon-optional.");
+	Q:PIR {{
+		$P0 = box 1
+		set_hll_global [ 'Slam' ;'Grammar'], '$!Decl_block', $P0
+	}};
 }
 
+method _declarator_part_block_open($/) {
+	our $Symbols;
+	NOTE("Opening declaration block");
+	my $declarator := $<declarator>.ast;
+	
+	if $declarator.type.isa(Slam::Type::Function) {
+		NOTE("Creating new definition block for code");
+		my $definition := Slam::Scope::Function.new(
+			:node($/),
+			:parameter_scope($declarator.type.parameter_scope),
+		);
+		
+		NOTE("Pushing new block on stack.");
+		$Symbols.enter_scope($definition);
+	}
+	else {
+		DIE("NOT REACHED"); # Struct, class, etc.
+	}
+}
+	
 method _declarator_part_done($/) {
 	my $past := $<declarator>.ast;
 	MAKE($past);
@@ -159,36 +186,13 @@ method _declarator_part_initializer($/) {
 	$past<initializer> := $initializer;
 }
 
-method _declarator_part_open_block($/) {
-	NOTE("Opening decl block");
-	# Push the params block on stack
-	my $declarator := $<declarator>.ast;
-	
-	# NB: This won't be true when struct's get added.
-	ASSERT($declarator<type><is_function>,
-		'Open block should only happen for functions');
-	
-	if $declarator<type><is_function> {
-		NOTE("Block is function definition. Pushing new block on stack.");
-		
-		my $definition := Slam::Node::create('function_definition',
-			:from($declarator),
-		);
-		$declarator<definition> := $definition;
-		Slam::Scopes::push($definition);
-	}
-	else {
-		DIE("NOT REACHED"); # Struct, class, etc.
-	}
-}
-	
 # NQP currently generates get_hll_global for functions. So qualify them all.
 our %_decl_part;
-%_decl_part<close_block>		:= Slam::Grammar::Actions::_declarator_part_close_block;
 %_decl_part<after_declarator>	:= Slam::Grammar::Actions::_declarator_part_after_declarator;
+%_decl_part<block_close>		:= Slam::Grammar::Actions::_declarator_part_block_close;
+%_decl_part<block_open>		:= Slam::Grammar::Actions::_declarator_part_block_open;
 %_decl_part<done>			:= Slam::Grammar::Actions::_declarator_part_done;
 %_decl_part<initializer>		:= Slam::Grammar::Actions::_declarator_part_initializer;
-%_decl_part<open_block>		:= Slam::Grammar::Actions::_declarator_part_open_block;
 
 method declarator_part($/, $key) { self.DISPATCH($/, $key, %_decl_part); }
 
@@ -259,55 +263,56 @@ parameter scope.
 
 =cut
 
-method parameter_list($/, $key) {
-	if $key eq 'open' {
-		NOTE("Creating new parameter list");
-		my $past := Slam::Type::function_returning(:node($/));
-		Slam::Scopes::push($past);
-		
-		NOTE("Pushed new scope on stack: ", $past.name());
-		DUMP($past);
-	}
-	elsif $key eq 'close' {
-		NOTE("Popping parameter list from stack");
-		my $past	:= Slam::Scopes::pop('declarator');
-		my $params	:= $past<parameters>;
-		my $slurpy	:= 0;
-		
-		for ast_array($<param_list>) {
-			$params.push($_);
-			Slam::Scopes::add_declarator_to($_, $past);
-			
-			if $_<adverbs><slurpy> {
-				$slurpy := 1;
-			}
+method _parameter_list_close($/) {
+	our $Symbols;
+
+	my $slurpy	:= 0;
+	
+	for ast_array($<param_list>) {
+		$Symbols.declare($_);
+
+		if $_.adverbs<slurpy> {
+			$slurpy := 1;
 		}
-		
-		unless $slurpy {
-			$past.arity(+$params);
-		}
-		
-		NOTE('End function parameter list: ', +@($past), ' parameters');
-		DUMP($past);
-		make $past;
 	}
-	else {
-		$/.panic('Unrecognized $key in action dclr_param_list: ' ~ $key);
-	}
+
+	NOTE("Popping parameter list from stack");
+	my $params := $Symbols.leave_scope('Slam::Scope::Parameter');
+	$params.arity(+@($params));
+	
+	NOTE("Creating function-returning declarator");
+	my $past := Slam::Type::Function.new(:node($/), 
+		:parameter_scope($params),
+	);
+	MAKE($past);
 }
 
+method _parameter_list_open($/) {
+	our $Symbols;
+	NOTE("Creating new parameter list scope");
+	my $scope := Slam::Scope::Parameter.new(:node($/));
+	$Symbols.enter_scope($scope);
+	DUMP($scope);
+}
+
+our %_param_list := Hash::new(
+	:close(	Slam::Grammar::Actions::_parameter_list_close),
+	:open(	Slam::Grammar::Actions::_parameter_list_open),
+);
+
+method parameter_list($/, $key) { self.DISPATCH($/, $key, %_param_list); }
+
 method specifier_list($/) {
-	NOTE("Assembling specifier list");
-	
+	NOTE("Assembling specifier list");	
 	my @specs := ast_array($<specs>);
 	ASSERT(+@specs, 'Specifier list requires at least one item');
+
+	my $past := @specs.shift;
+	for @specs {
+		$past := $past.attach($_);
+	}
 	
-	my $past := @specs.shift();
-	$past.attach(@specs);
-	
-	NOTE("done");
-	DUMP($past);
-	make $past;
+	MAKE($past);
 }
 
 =method symbol_declaration_list
@@ -325,8 +330,9 @@ method symbol_declaration_list($/) {
 	
 	for ast_array($<symbol>) {
 		NOTE($_);
-		$_.add_type_info($specs);
-		$_.attach_to($past);
+		DUMP($specs);
+		$_.attach($specs);
+		$past.attach($_);
 	}
 	
 	MAKE($past);

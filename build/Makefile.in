@@ -71,31 +71,53 @@ COMPILER_LIBS_PIR := \
 	src/String.pir		\
 	src/Slam/_INIT.pir	\
 	src/Slam/Adverbs.pir			\
-	src/Slam/Config.pir			\
+	src/Slam/Config.pir				\
 	src/Slam/IncludeFile.pir			\
-	src/Slam/Literal.pir			\
+	src/Slam/Literal.pir				\
 	src/Slam/Lookups.pir			\
 	src/Slam/Messages.pir			\
-	src/Slam/Node.pir			\
+	src/Slam/Node.pir				\
 	src/Slam/Scopes/Function.pir		\
 	src/Slam/Scopes/Local.pir			\
-	src/Slam/Scopes/Namespaces.pir		\
+	src/Slam/Scopes/Namespace.pir		\
 	src/Slam/Scopes/Parameter.pir		\
 	src/Slam/Scopes/Pervasive.pir		\
 	src/Slam/Scopes/Scope.pir			\
 	src/Slam/Statements.pir			\
-	src/Slam/SymbolTable.pir		\
-	src/Slam/Symbols.pir			\
-	src/Slam/Type.pir			\
+	src/Slam/SymbolTable.pir			\
+	src/Slam/Symbols/Declaration.pir		\
+	src/Slam/Symbols/Name.pir		\
+	src/Slam/Symbols/Namespace.pir		\
+	src/Slam/Symbols/Reference.pir		\
+	src/Slam/Types/Type.pir			\
+	src/Slam/Types/Declarator.pir		\
+	src/Slam/Types/Specifier.pir		\
 	src/Slam/Visitors/DeclarationCollectionVisitor.pir	\
 	src/Slam/Visitors/Message.pir		\
-	src/Slam/Visitors/PastCleanupVisitor.pir	\
+	src/Slam/Visitors/PastRewrite.pir		\
 	src/Slam/Visitors/PrettyPrint.pir		\
 	src/Slam/Visitors/ScopeAssignmentVisitor.pir	\
+	src/Slam/Visitors/ScopeTracker.pir	\
 	src/Slam/Visitors/SymbolResolution.pir	\
 	src/Slam/Visitors/TreeRewriteVisitor.pir	\
 	src/Slam/Visitors/TypeResolution.pir	\
-	src/Slam/Visitors/Visitor.pir
+	src/Slam/Visitors/Visitor.pir		\
+	src/Visitors/Combinators/All.pir		\
+	src/Visitors/Combinators/Child.pir	\
+	src/Visitors/Combinators/Choice.pir	\
+	src/Visitors/Combinators/Combinator.pir	\
+	src/Visitors/Combinators/Composite.pir	\
+	src/Visitors/Combinators/Defined.pir	\
+	src/Visitors/Combinators/Factory.pir	\
+	src/Visitors/Combinators/Fail.pir		\
+	src/Visitors/Combinators/Forward.pir	\
+	src/Visitors/Combinators/Identity.pir	\
+	src/Visitors/Combinators/IfElse.pir	\
+	src/Visitors/Combinators/Sequence.pir	\
+	src/Visitors/Combinators/VisitOnce.pir	\
+	src/Visitors/Visitable.pir	\
+	src/Visitors/Visitor.pir	\
+	
 
 DOCS := README
 
@@ -140,7 +162,6 @@ XLANGUAGE_TESTS := \
 	t/language/06-bitwise-expr.t \
 	t/language/07-logical-expr.t
 	
-	
 BUILD_CLEANUPS := \
 	close.pbc 			\
 	$(GEN_SOURCES) 		\
@@ -152,6 +173,8 @@ BUILD_CLEANUPS := \
 	"src/Slam/*.pira"		\
 	"src/Slam/Scopes/*.pir"	\
 	"src/Slam/Scopes/*.pira" 	\
+	"src/Slam/Types/*.pir"	\
+	"src/Slam/Types/*.pira"	\
 	"src/Slam/Visitors/*.pir"	\
 	"src/Slam/Visitors/*.pira"	\
 	"src/Slam/parser/*.pir"	\
@@ -232,6 +255,14 @@ src/gen_library.pir: $(COMPILER_LIBS_PIR) Makefile
 	@echo "Files: " $(COMPILER_LIBS_PIR)
 	$(CAT) $(COMPILER_LIBS_PIR) > src/gen_library.pir
 
+src/gen_hierarchy.txt:
+	$(PERL) build/class_hierarchy.pl --list > $@.new
+#IF(win32):	fc $@.new $@ >NUL || copy $@.new $@
+#IF(not(win32)):	if diff $@.new $@ >/dev/null ; then mv -f $@.new $@; fi
+
+#src/Slam/Visitors/HierarchyVisitor.nqp: src/gen_hierarchy.txt
+#	$(PERL) build/class_hierarchy.pl $@
+	
 $(CLOSE_GROUP): $(PMC_DEPS)
 #	$(MAKE) $(PMC_DIR)
 
@@ -412,3 +443,25 @@ hll_close: $(HLL_CLOSE_PIR)
 
 hll_close_clean: 
 	$(RM_F) $(HLL_CLOSE_CLEAN_RM_FILES)
+
+CLASSTEST_LIBS_PIR := \
+	src/Array.pir		\
+	src/Class.pir		\
+	src/Config.pir	\
+	src/Dumper.pir	\
+	src/Hash.pir		\
+	src/Parrot.pir 	\
+	src/Scalar.pir 	\
+	src/String.pir 	\
+	src/gen_builtins.pir	\
+	src/test.pir
+	
+classtest: classtest.pbc
+	@echo "Running classtest.pbc"
+	$(PARROT) $(PARROT_ARGS) classtest.pbc
+
+classtest.pbc: $(CLASSTEST_LIBS_PIR) Makefile
+	@echo "**** Assembling gen_library.pir from compiler libs"
+	@echo "Files: " $(CLASSTEST_LIBS_PIR)
+	$(CAT) $(CLASSTEST_LIBS_PIR) > src/gen_classtest.pir
+	$(PARROT) $(PARROT_ARGS) -o classtest.pbc src/gen_classtest.pir

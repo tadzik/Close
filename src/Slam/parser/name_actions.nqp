@@ -27,8 +27,13 @@ method namespace_name($/, $key) { PASSTHRU($/, $key); }
 
 method namespace_path($/) {
 	NOTE("Creating namespace path");
-	my %attrs := assemble_qualified_path($/);
-	my $past := Slam::Symbol::Namespace.new(%attrs);
+	my $past := Slam::Symbol::Namespace.new(
+		:hll($<hll_name> && ~ $<hll_name>[0]),
+		:is_rooted($<root>),
+		:node($/),
+		:parts(ast_array($<path>)),
+	);
+	
 	MAKE($past);
 }
 
@@ -41,7 +46,7 @@ method new_alias_name($/) {
 method qualified_identifier($/) {
 	my $past := Slam::Symbol::Reference.new(
 		:hll($<hll_name> && ~ $<hll_name>[0]),
-		:is_rooted(+@($<root>)),
+		:is_rooted(+$<root>),
 		:node($/),
 		:parts(ast_array($<path>)),
 	);

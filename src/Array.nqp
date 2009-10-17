@@ -249,3 +249,121 @@ sub unique(@original) {
 	
 	return @result;
 }
+
+################################################################
+
+module ResizablePMCArray {
+sub append(@dest, @append) {
+	for @append {
+		@dest.push($_);
+	}
+	
+	return @dest;
+}
+
+	method clone() {
+		my @clone := Q:PIR {
+			$P0 = find_lex 'self'
+			%r = clone $P0
+		};
+		
+		return @clone;
+	}
+
+	method elements(*@value) {
+		my $elements;
+		
+		if +@value {
+			$elements := @value.shift;
+			
+			Q:PIR {
+				$P0 = find_lex '$elements'
+				$I0 = $P0
+				$P0 = find_lex 'self'
+				$P0 = $I0
+			};
+		}
+		else {
+			$elements := Q:PIR {
+				$P0 = find_lex 'self'
+				$I0 = elements $P0
+				%r = box $I0
+			};
+		}
+		
+		return $elements;
+	}
+			
+			
+	method join(*@delim) {
+		@delim.push('');
+		my $delim := @delim.shift;
+		
+		my $result := Q:PIR {
+			.local pmc array
+			array = find_lex 'self'
+			.local string delim
+			$P0 = find_lex '$delim'
+			delim = $P0
+			$S0 = join delim, array
+			%r = box $S0
+		};
+		
+		return $result;
+	}
+}
+
+################################################################
+
+module ResizableStringArray {
+	method clone() {
+		my @clone := Q:PIR {
+			$P0 = find_lex 'self'
+			%r = clone $P0
+		};
+		
+		return @clone;
+	}
+
+	method elements(*@value) {
+		my $elements;
+		
+		if +@value {
+			$elements := @value.shift;
+			
+			Q:PIR {
+				$P0 = find_lex '$elements'
+				$I0 = $P0
+				$P0 = find_lex 'self'
+				$P0 = $I0
+			};
+		}
+		else {
+			$elements := Q:PIR {
+				$P0 = find_lex 'self'
+				$I0 = elements $P0
+				%r = box $I0
+			};
+		}
+		
+		return $elements;
+	}
+			
+			
+	method join(*@delim) {
+		@delim.push('');
+		my $delim := @delim.shift;
+		
+		my $result := Q:PIR {
+			.local pmc array
+			array = find_lex 'self'
+			.local string delim
+			$P0 = find_lex '$delim'
+			delim = $P0
+			$S0 = join delim, array
+			%r = box $S0
+		};
+		
+		return $result;
+	}
+}

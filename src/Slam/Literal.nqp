@@ -13,9 +13,9 @@ Node.
 
 =cut
 
-	_onload();
+	_ONLOAD();
 
-	sub _onload() {
+	sub _ONLOAD() {
 		if our $onload_done { return 0; }
 		$onload_done := 1;
 

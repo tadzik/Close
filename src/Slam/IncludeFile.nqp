@@ -6,22 +6,15 @@ module Slam::IncludeFile;
 
 ################################################################
 
-_onload();
+_ONLOAD();
 
-sub _onload() {
+sub _ONLOAD() {
 	if our $onload_done { return 0; }
 	$onload_done := 1;
 
 	Parrot::IMPORT('Dumper');
 	
-	NOTE("running.");
-}
-
-################################################################
-
-sub ADD_ERROR($node, *@msg) {
-	Slam::Messages::add_error($node,
-		Array::join('', @msg));
+	NOTE("done");
 }
 
 ################################################################
@@ -69,7 +62,7 @@ sub get_file_contents($file) {
 	}
 	else {
 		NOTE("Bogus include file - not found");
-		ADD_ERROR($file, "Include file ", $file.name(), " not found.");
+		$file.error("Include file ", $file.name(), " not found.");
 		$success := 0;
 	}
 	

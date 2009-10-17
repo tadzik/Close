@@ -12,9 +12,9 @@ This code runs at initload time, creating subclasses.
 
 =cut
 
-_onload();
+_ONLOAD();
 
-sub _onload() {
+sub _ONLOAD() {
 	if our $onload_done { return 0; }
 	$onload_done := 1;
 
@@ -72,15 +72,16 @@ method declare($symbol) {
 	}
 
 	NOTE("In scope: ", $scope);
-	$scope.add_symbol($symbol);
+	#$scope.add_symbol($symbol);
+	$scope.attach($symbol);
 	DUMP($scope);
 }
 
-method default_hll(*@value)		{ self.ATTR('default_hll', @value); }
+method default_hll(*@value)		{ self._ATTR('default_hll', @value); }
 
-method enter_block_scope(:$node) {
-	NOTE("Creating new compound_statement block");
-	my $block := Slam::Statement::Block.new(:node($node));
+method enter_local_scope(:$node) {
+	NOTE("Creating & entering new local scope.");
+	my $block := Slam::Scope::Local.new(:node($node));
 	self.enter_scope($block);
 }
 
@@ -100,19 +101,20 @@ method enter_scope($scope) {
 	return $scope;
 }
 
-method _fetch_namespace_of($name) {
-	ASSERT($name.isa(Slam::Symbol::Name),
-		'$name parameter must be a symbol name');
-	NOTE("Fetching namespace of ", $name);
+method _fetch_namespace_of($symbol) {
+	ASSERT($symbol.isa(Slam::Symbol::Name),
+		'$symbol parameter must be a symbol name');
+	NOTE("Fetching namespace of ", $symbol);
+
 	my $result;
 	
-	if $name.is_rooted {
+	if $symbol.is_rooted {
 		NOTE("Fetching absolute namespace");
-		$result := self.namespace_root.fetch_child($name);
+		$result := self.namespace_root.fetch_child($symbol);
 	}
 	else {
 		NOTE("Fetching relative namespace");
-		$result := self.current_namespace.fetch_child($name);
+		$result := self.current_namespace.fetch_child($symbol);
 	}
 	
 	NOTE("done");
@@ -201,8 +203,8 @@ method lookup_type($reference) {
 	return $result;
 }
 
-method namespace_root(*@value)		{ self.ATTR('namespace_root', @value); }
-method pervasive_scope(*@value)		{ self.ATTR('pervasive_scope', @value); }
+method namespace_root(*@value)		{ self._ATTR('namespace_root', @value); }
+method pervasive_scope(*@value)		{ self._ATTR('pervasive_scope', @value); }
 method print_stack() {
 	NOTE("Scope stack:");
 	my $index := 0;
@@ -227,7 +229,7 @@ method query_type_name($name) {
 	return $symbol;
 }
 
-method stack(*@value)		{ self.ATTR('stack', @value); }
+method stack(*@value)		{ self._ATTR('stack', @value); }
 	
 ################################################################
 

@@ -13,9 +13,9 @@ Slam::Val.
 
 =cut
 
-	_onload();
+	_ONLOAD();
 
-	sub _onload() {
+	sub _ONLOAD() {
 		if our $onload_done { return 0; }
 		$onload_done := 1;
 		
@@ -97,7 +97,7 @@ module Slam::Adverb::Multi {
 	}
 
 	# TODO: Eventually, take apart the signatures so we can do call type checking.
-	method signature(*@value)		{ self.ATTR('signature', @value); }
+	method signature(*@value)		{ self._ATTR('signature', @value); }
 }
 
 module Slam::Adverb::Named {
@@ -107,7 +107,7 @@ module Slam::Adverb::Named {
 	################################################################
 
 	method named(*@value) {
-		return self.ATTR('named', @value) 
+		return self._ATTR('named', @value) 
 			|| 1;
 	}
 
@@ -139,7 +139,7 @@ module Slam::Adverb::RegisterClass {
 		return '';
 	}
 	
-	method register_class(*@value)	{ self.ATTR('register_class', @value); }
+	method register_class(*@value)	{ self._ATTR('register_class', @value); }
 }
 
 module Slam::Adverb::Slurpy {

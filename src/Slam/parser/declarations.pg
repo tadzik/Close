@@ -128,9 +128,9 @@ rule declarator_part {
 	[ '=' <initializer=expression>
 		{*} #= initializer
 	|  <?before '{' >	
-		{*} #= open_block
+		{*} #= block_open
 		<body=compound_statement>
-		{*} #= close_block
+		{*} #= block_close
 	]?
 	{*} #= done
 }

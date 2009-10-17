@@ -1,41 +1,70 @@
 # $Id$
 
-module Slam::Visitor::Message;
+module Slam::Visitor::Message {
+# extends Visitor::Combinator::Defined
 
-Parrot::IMPORT('Dumper');
+	_ONLOAD();
 
-################################################################
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+		
+		Parrot::IMPORT('Dumper');
+		Parrot::IMPORT('Visitor::Combinator::Factory');
 
-_onload();
+		my $class_name := 'Slam::Visitor::Message';
+		NOTE("Creating class ", $class_name);
+		Class::SUBCLASS($class_name, 
+			'Visitor::Combinator::Defined',
+			'Slam::Visitor');
+		
+		NOTE("done");
+	}
 
-sub _onload() {
-	if our $onload_done { return 0; }
-	$onload_done := 1;
+	################################################################
+
+	method description()			{ return 'Emitting messages'; }
 	
-	Slam::Visitor::_onload();
-	
-	NOTE("Creating Slam::Visitor::Message");
-	Class::SUBCLASS('Slam::Visitor::Message', 'Slam::Visitor');
-	
-	NOTE("done");
+	method init(@children, %attributes) {
+		my $impl := Slam::Visitor::Message::Impl.new(Identity());
+		
+		self.definition(
+			Slam::Visitor::ScopeTracker::TopDown.new($impl),
+		);
+	}
 }
 
 ################################################################
 
-method description()			{ return 'Emitting messages'; }
+module Slam::Visitor::Message::Impl {
+# extends Visitor::Combinator::Forward
 
-method init(@children, %attributes) {
-	self.init_(@children, %attributes);
-	
-	self.method_dispatch(Hash::new(
-		:SlamError(		Slam::Visitor::Message::vm_ShowMessage),
-		:SlamMessage(	Slam::Visitor::Message::vm_ShowMessage),
-		:SlamWarning(	Slam::Visitor::Message::vm_ShowMessage),
-	));
-	
-	DUMP(self);
-}
+	_ONLOAD();
 
-method vm_ShowMessage($node) {
-	say($node.format());
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+		
+		Parrot::IMPORT('Dumper');
+		
+		my $class_name := 'Slam::Visitor::Message::Impl';
+		NOTE("Creating class ", $class_name);
+		Class::SUBCLASS($class_name,
+			'Visitor::Combinator::Forward');
+		
+		Class::MULTISUB($class_name, 'visit', :starting_with('_visit_'));
+		NOTE("done");
+	}
+
+
+	method show_messages($node) {
+		say($node.format());
+		self.PASS;
+		return $node;
+	}
+
+	method _visit_Slam_Error($node)		{ self.show_messages($node); }
+	method _visit_Slam_Message($node)		{ self.show_messages($node); }
+	method _visit_Slam_Warning($node)		{ self.show_messages($node); }
+
 }

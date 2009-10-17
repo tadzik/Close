@@ -1,70 +1,642 @@
 # $Id:  $
 
-module Class;
-
-Parrot::IMPORT('Dumper');
+module Class {
+	_ONLOAD();
 	
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+
+		Parrot::load_bytecode('P6object.pir');
+		Dumper::_ONLOAD();
+		Parrot::IMPORT('Dumper');
+		
+		our %Class_info := Hash::empty();
+	}
+		
+	################################################################
+
+	sub IS_A($object, $type) {
+		return $object.HOW.isa($object, $type);
+	}
+
+	sub capture_namespace($nsp) {
+		my %sub_addrs := Hash::empty();
+		
+		for $nsp {
+			my $name := ~ $_;
+			my $addr := Parrot::get_address_of($nsp{$_});
+			%sub_addrs{$name} := $addr;
+		}
+		
+		return %sub_addrs;
+	}
+	
+	sub check_namespace(%before, %after) {
+		my %seen;
+		
+		for Hash::sorted_keys(%before) {
+			if Hash::exists(%after, ~ $_) {
+				if %before{$_} != %after{$_} {
+					say("Object '", $_, "' has different address: ",
+						%before{$_}, " -> ", %after{$_});
+				}
+			}
+			else {
+				say("Object '", $_, "' has been removed");
+			}
+			
+			%seen{$_} := 1;
+		}
+		
+		for Hash::sorted_keys(%after) {
+			unless %seen{$_} {
+				say("Object '", $_, "' was added");
+			}
+		}
+	}
+	
+	sub MULTISUB($class_name, $multi_name, :$starting_with) {
+		NOTE("Creating new multisub '", $multi_name, 
+			"' for class ", $class_name,
+			", out of methods starting with ", 
+			$starting_with);
+		
+		my $class_info := _class_info($class_name);
+		unless $class_info<created> {
+			DIE("Class '", $class_name, "' has not been created yet.");
+		}
+		
+		DUMP($class_info);
+		
+		my $nsp := Parrot::get_namespace($class_name);
+		my $prefix_len := String::length($starting_with);
+		
+		unless Scalar::defined($class_info<multisubs>{$multi_name}) {
+			Class::compile_default_multi($class_name, $multi_name);
+		}
+
+		for $nsp {
+			my $name := ~ $_;
+			
+			if String::substr($name, 0, $prefix_len) eq $starting_with {
+				my $param_class := String::substr($name, $prefix_len);
+				my @parts := String::split('_', $param_class);
+				my $param1_class := Array::join('::', @parts);
+				# Compile multisub for class name
+				NOTE("Compiling '", $multi_name, "' handler for (_, ", 
+					$param1_class, ")");
+				Class::compile_multi($class_name,
+					$multi_name,
+					$param1_class,
+					$name);
+			}
+		}
+	
+		NOTE("All matching trampolines built. Adding method to class.");
+		my $multi_sub := $nsp{$multi_name};
+		get_meta().add_method($class_name, $multi_name, $multi_sub);
+		NOTE("done");
+	}
+	
+	sub NEW_CLASS($class_name) {
+		my $class_info := _class_info($class_name);
+		
+		if $class_info<created> {
+			DIE("Class '", $class_name, "' already created.");
+		}
+		
+		$class_info<created> := 1;
+		my $new_class := get_meta().new_class($class_name);
+		return $new_class;
+	}
+
+	sub SUBCLASS($class_name, *@parents) {
+		my $class_info := _class_info($class_name);
+		
+		if $class_info<created> {
+			DIE("Class '", $class_name, "' already created.");
+		}
+		else {
+			$class_info<created> := 1;
+		}
+		
+		NOTE("Creating subclass ", $class_name, 
+			" with ", +@parents, " parents.");
+		my $meta := get_meta();
+
+		unless +@parents {
+			NOTE("Adding parent class 'Class::HashBased'");
+			@parents.push('Class::HashBased');
+		}
+
+		NOTE("Running _ONLOAD method of all parents");
+		for @parents {
+			NOTE($_);
+			call_onload_of_class($_);
+		}
+		
+		NOTE("Creating class with first parent");
+		my $class := $meta.new_class($class_name, 
+			:parent(@parents.shift));
+		
+		NOTE("Attaching other parents to new class");
+		while @parents {
+			$meta.add_parent($class, @parents.shift);
+		}
+		
+		return $class;
+	}
+
+	sub already_created($name) {
+		our %already_created;
+		return %already_created{$name}++;
+	}
+
+	sub call_method($object, $method, *@args, *%opts) {
+		return call_method_($object, $method, @args, %opts);
+	}
+
+	sub call_method_($object, $method, @args, %opts) {
+		my $result := Q:PIR {
+			.local pmc object, meth, args, opts
+			object	= find_lex '$object'
+			meth	= find_lex '$method'
+			args	= find_lex '@args'
+			opts	= find_lex '%opts'
+			
+			$I0 = isa meth, 'Sub'
+			unless $I0 goto call_string
+			
+			%r = object.meth(args :flat, opts :named :flat)
+			goto done
+			
+		call_string:
+			$S0 = meth
+			%r = object.$S0(args :flat, opts :named :flat)
+			
+		done:
+		};
+		
+		return $result;
+	}
+
+	sub call_onload_of_class($class) {
+		my $classname := ~ $class;
+
+		if $classname[-1] eq ')' {
+			$classname := String::substr($classname, 0, -2);
+		}
+		
+		my $sub_name := ~ $classname ~ '::_ONLOAD';
+		my &onload := Parrot::get_sub($sub_name);
+	
+		if &onload {
+			&onload();
+			NOTE("Onload-ed: ", $classname);
+		}
+		else {
+			NOTE("No onload sub for: ", $classname);
+		}
+	}
+
+	sub _class_info($class_name) {
+		our %Class_info;
+		
+		unless %Class_info{$class_name} {
+			%Class_info{$class_name} := Hash::new();
+			my $info := %Class_info{$class_name};
+			
+			$info<multisubs> := Hash::empty();
+		}
+		
+		return %Class_info{$class_name};
+	}
+
+	sub compile_default_multi($class_name, $multi_name) {
+		NOTE("Compiling default multi for: ", $class_name,
+			" :: ", $multi_name);
+	
+		my $class_info := _class_info($class_name);
+		
+		if $class_info<multisubs>{$multi_name}<_> {
+			NOTE("Already compiled.");
+			return 0;
+		}
+		else {
+			NOTE("Constructing a default multi");
+			$class_info<multisubs>{$multi_name}<_> := 1;
+		}
+		
+		my @parts := String::split('::', $class_name);
+		my $namespace_name := "'" 
+			~ Array::join("' ; '", @parts)
+			~ "'";
+
+		my @trampoline := Array::new(
+			".namespace [ " ~ $namespace_name ~ " ]\n",
+			".sub '" ~ $multi_name ~ "' :method :multi(_)",
+			"\t" ~ ".param pmc pos :slurpy",
+			"\t" ~ ".param pmc adv :slurpy :named",
+		);
+
+		NOTE("Looking for fallback method in parent class(es)");
+		my $default_method := Class::find_method_named($class_name, $multi_name);
+		
+		while Parrot::isa($default_method, 'MultiSub') {
+			NOTE("I don't think nesting multisubs is possible, but...");
+			$default_method := $default_method[0];
+		}
+	
+		if Scalar::defined($default_method) {
+			NOTE("Default multi will call ", $multi_name,
+				" method from parent class ", 
+				$default_method.get_namespace.get_name.join('::'));
+			@parts := $default_method.get_namespace.get_name;
+			@parts.shift;
+		
+			my $method_namespace_name := "'"
+				~ Array::join("' ; '", @parts)
+				~ "'";
+			
+			@trampoline.push(
+				"\t" ~ "$P0 = get_hll_global [ " 
+					~ $method_namespace_name 
+					~ " ], '" 
+					~ $multi_name
+					~ "'"
+			);
+			@trampoline.push(
+				"\t" ~ ".tailcall $P0(self, pos :flat, adv :flat :named)"
+			);
+		}
+		else {
+			NOTE("Could not find a ", $multi_name, 
+				" method in any parent class.");
+			@trampoline.push(
+				"\t" ~ "die 'No method available that will accept the parameters given'",
+			);
+		}
+		
+		@trampoline.push(".end");
+		my $trampoline := Array::join("\n", @trampoline);
+		NOTE("Trampoline is:\n", $trampoline);
+		Parrot::compile($trampoline);
+		NOTE("Trampoline compiled okay.");
+	}
+	
+=sub compile_multi
+
+Creates a multi-sub trampoline that invokes a given NQP function. When invoked 
+as `compile_multi('My::Class', 'foo', 'Parameter::Class', 'handler_method')` the
+generated trampoline looks like:
+
+    .namespace [ 'My' ; 'Class' ]
+    .sub 'foo' :method :multi(_, [ 'Parameter' ; 'Class' ])
+        .param pmc positionals :slurpy
+        .param pmc named :named :slurpy
+        .tailcall 'handler_method'(self, positionals :flat, named :named :flat)
+    .end
+
+But multimethod names block inherited multimethods, so a "default" multi
+has to be created that forwards calls to any parent class multimethods. Per
+pmichaud, a multi() or multi(_) (on self) will do the trick. So first check if 
+the default exists already, and if not, then check if the parent(s*) name
+resolves. 
+
+=cut
+
+	sub compile_multi($class_name, $multi_name, $param1_type, $actual_method_name) {
+		NOTE("Compiling multisub trampoline [", $class_name, "::", 
+			$multi_name, "(", $param1_type, ", ...) -> ",
+			$actual_method_name);
+		
+		my $class_info := _class_info($class_name);
+
+		unless $class_info<multisubs>{$multi_name}<_> {
+			compile_default_multi($class_name, $multi_name);
+		}
+
+		my $param1_namespace := "'" 
+			~ Array::join("' ; '", String::split('::', $param1_type))
+			~ "'";
+
+		my $signature := '_, [ ' ~ $param1_namespace ~ ' ]';
+
+		if $class_info<multisubs>{$multi_name}{$signature} {
+			return 0;
+		}
+		
+		$class_info<multisubs>{$multi_name}{$signature} := 1;
+		
+		my $namespace_name := "'" 
+			~ Array::join("' ; '", String::split('::', $class_name))
+			~ "'";
+		
+		my @trampoline := Array::new(
+			".namespace [ " ~ $namespace_name ~ " ]",
+			".sub '" ~ $multi_name ~ "' :method "
+				~ ":multi(" ~ $signature ~ ")",
+			"\t" ~ ".param pmc pos :slurpy",
+			"\t" ~ ".param pmc adv :slurpy :named",
+			"\t" ~ ".tailcall '" ~ $actual_method_name 
+				~ "'(self, pos :flat, adv :named :flat)",
+			".end",
+		);
+		my $trampoline := Array::join("\n", @trampoline);
+		NOTE("Trampoline is:\n", $trampoline);
+		Parrot::compile($trampoline);
+		NOTE("Trampoline compiled okay.");
+	}
+	
+	sub dispatch_method($object, %dispatch, @args, %opts) {
+		my $type;
+		NOTE("Dispatching method of ", $object, " based on type of first arg.");
+		DUMP($object, %dispatch, @args, %opts);
+		
+		if +@args {
+			$type := Class::name_of(@args[0], :delimiter(''));
+		}
+		else {
+			$type := 'NULLARY';
+		}
+		
+		unless my $method_name := %dispatch{$type} {
+			$method_name := %dispatch<DEFAULT>;
+		}
+		
+		ASSERT($method_name, 
+			'Unable to dispatch method for type ', $type);
+
+		return call_method_($object, $method_name, @args, %opts);
+	}
+
+	sub find_class_named($class_name) {
+		my $class := Parrot::get_class($class_name);
+		
+		unless Scalar::defined($class) {
+			$class := Parrot::get_class(
+				Parrot::get_namespace($class_name)
+			);
+		}
+		
+		return $class;
+	}
+	
+	sub find_method_named($class, $method) {
+		if Parrot::isa($class, 'String') {
+			NOTE("Got class name: ", $class);
+			$class := find_class_named($class);
+		}
+		elsif ! Parrot::isa($class, 'Class') {
+			NOTE("Got object PMC: ", $class);
+			$class := Parrot::typeof($class);
+			NOTE("Resolved to Class PMC: ", $class);
+		}
+		else {
+			NOTE("Got Class PMC: ", $class);
+		}
+		
+		my $result := $class.find_method($method);
+		return $result;
+	}
+	
+	sub get_meta() {
+		our $meta;
+		
+		unless Scalar::defined($meta) {
+			$meta := Q:PIR { %r = new 'P6metaclass' };
+		}
+
+		return $meta;
+	}
+
+	sub name_of($object, :$delimiter?) {
+		unless Scalar::defined($delimiter) {
+			$delimiter := '::';
+		}
+		
+		my $class := Class::of($object);
+		my @parts := String::split(';', $class);
+		$class := Array::join($delimiter, @parts);
+		return $class;
+	}
+
+	sub of($object) {
+		my $class := Q:PIR {
+			$P0 = find_lex '$object'
+			%r = typeof $P0
+		};
+		
+		return $class;
+	}
+}
+
 ################################################################
 
-=sub NEW_CLASS($name)
-
-Create a class.
-
-=cut
-
-sub NEW_CLASS($name) {
-	my $meta		:= get_meta();	
-	my $new_class	:= $meta.new_class($name);
-	return $new_class;
-}
-
-=sub SUBCLASS($name, *@parents) 
-
-Creates a subclass, and attaches the 1 or more parents to it.
-
-=cut
-
-sub SUBCLASS($name, *@parents) {
-	NOTE("Creating subclass ", $name, " with ", +@parents, " parents.");
-	my $meta := get_meta();
+module Class::ArrayBased {
+	_ONLOAD();
 	
-	unless +@parents {
-		NOTE("Adding parent class 'Hash'");
-		@parents.push('Hash');
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+
+		Parrot::IMPORT('Dumper');
+		#Class::SUBCLASS('Class::ArrayBased', 'Array', 'Class::BaseBehavior');
 	}
 	
-	my $class := $meta.new_class($name, 
-		:parent(@parents.shift));
-	
-	while @parents {
-		$meta.add_parent($class, @parents.shift);
-	}
-	
-	return $class;
-}
-
-sub get_meta() {
-	our $meta;
-	
-	unless Scalar::defined($meta) {
-		$meta := Q:PIR { %r = new 'P6metaclass' };
+	method init(*@children, *%attributes) {
+		DIE("NOT IMPLEMENTED. This class is but a shell.");
 	}
 
-	return $meta;
 }
 
-sub name_of($object) {
-	my $class := Class::of($object);
-	my @parts := String::split(';', $class);
-	$class := Array::join('::', @parts);
-	return $class;
-}
+################################################################
 
-sub of($object) {
-	my $class := Q:PIR {
-		$P0 = find_lex '$object'
-		%r = typeof $P0
-	};
+module Class::BaseBehavior {
+
+	_ONLOAD();
 	
-	return $class;
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+
+		my $get_bool := "
+.namespace [ 'Class' ; 'BaseBehavior' ]
+.sub '__get_bool' :vtable('get_bool') :method
+	$I0 = self.'get_bool'()
+	.return ($I0)
+.end";
+		Parrot::compile($get_bool);
+		
+		my $get_string := "
+.namespace [ 'Class' ; 'BaseBehavior' ]
+.sub '__get_string' :vtable('get_string') :method
+	$S0 = self.'get_string'()
+	.return ($S0)
+.end";
+		Parrot::compile($get_string);
+		
+		
+		Parrot::IMPORT('Dumper');
+		Class::NEW_CLASS('Class::BaseBehavior');
+	}
+
+	method _ABSTRACT_METHOD() {
+		DIE("A subclass must override this abstract method.");
+	}
+	
+	method _ATTR($name, @value)	{ self._ABSTRACT_METHOD(); }
+	
+	method _ATTR_ARRAY($name, @value) {
+		my $result := self._ATTR($name, @value);
+		
+		if ! Scalar::defined($result) {
+			$result := self._ATTR($name, 
+				Array::new(Array::empty())
+			);
+		}
+		
+		return $result;
+	}
+
+	method _ATTR_DEFAULT($name, @value, $default) {
+		my $result := self._ATTR($name, @value);
+		
+		if ! Scalar::defined($result) {
+			$result := self._ATTR($name,
+				Array::new($default)
+			);
+		}
+		
+		return $result;
+	}
+	
+	method _ATTR_HASH($name, @value) {
+		my $result := self._ATTR($name, @value);
+		
+		if ! Scalar::defined($result) {
+			$result := self._ATTR($name, 
+				Array::new(Hash::empty())
+			);
+		}
+		
+		return $result;
+	}
+
+	method get_bool() {
+		return 1;
+	}
+
+	method get_string() {
+		return Class::name_of(self) ~ ' @' ~ Parrot::get_address_of(self);
+	}
+	
+	method init(@children, %attributes) {
+		for %attributes {
+			Class::call_method(self, ~$_, %attributes{$_});
+		}
+	}
+	
+	method isa($type) {
+		return self.HOW.isa(self, $type);
+	}
+
+	method new(*@children, *%attributes) {
+		my $class := Parrot::get_attribute(self.HOW, 'parrotclass');
+		my $new_object := Parrot::new_pmc($class);
+		
+		# NB: I'm not flattening the params, because that forces
+		# everybody to do call_method or in-line pir to pass
+		# along flat args.
+		$new_object.init(@children, %attributes);
+		return $new_object;
+	}
+}
+
+################################################################
+
+module Class::HashBased {
+	_ONLOAD();
+	
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+
+		Parrot::IMPORT('Dumper');
+		Class::SUBCLASS('Class::HashBased',
+			'Class::BaseBehavior',
+			'Hash');
+	}
+
+	# override abstract Class::BaseBehavior::_ATTR
+	method _ATTR($name, @value) {
+		if +@value {
+			self{$name} := @value[0];
+		}
+		
+		return self{$name};
+	}
+	
+	method __dump($dumper, $label) {
+		my $subindent;
+		my $indent;
+
+		# (subindent, indent) = dumper."newIndent"()
+		Q:PIR {
+			.local string indent, subindent
+			$P0 = find_lex '$dumper'
+			(subindent, indent) = $P0.'newIndent'()
+			$P0 = box subindent
+			store_lex '$subindent', $P0
+			$P0 = box indent
+			store_lex '$indent', $P0
+		};
+		
+		my $brace := '{';
+		
+		my @keys;
+		
+		# Remember that for HashBased, self is a Hash.
+		for self {
+			@keys.push(~$_);
+		}
+		
+		@keys.sort;
+		
+		for @keys {
+			print($brace, "\n", $subindent);
+			$brace := '';
+			
+			my $key	:= ~ $_;			
+			my $val	:= self{$key};
+		
+			print("<", $key, "> => ");
+			$dumper.dump($label, $val);
+		}
+		
+		# my $index := 0;
+		# my $num_elements := +@(self);
+
+		# while $index < $num_elements {
+			# print($brace, "\n", $subindent);
+			# $brace := '';
+			
+			# my $val	:= self[$index];
+			
+			# print("[", $index, "] => ");
+			# $dumper.dump($label, $val);
+			
+			# $index++;
+		# }
+		
+		if $brace {
+			print("(no attributes set)");
+		} 
+		else {
+			print("\n", $indent, '}');
+		}
+		
+		$dumper.deleteIndent();
+	}
 }

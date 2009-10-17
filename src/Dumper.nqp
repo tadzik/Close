@@ -4,15 +4,17 @@ class Dumper;
 
 our %Already_in;
 our %Bits;
+our $Caller_depth;
 our $Prefix;
 
-_onload();
+_ONLOAD();
 
-sub _onload() {
+sub _ONLOAD() {
 	if our $onload_done { return 0; }
 	$onload_done := 1;
 
-	say("Dumper::_onload");
+	Parrot::_ONLOAD();
+	say("Dumper::_ONLOAD");
 	
 	%Already_in<ASSERTold>	:= 0;
 	%Already_in<ASSERT>	:= 0;
@@ -24,6 +26,10 @@ sub _onload() {
 	%Bits<NOTE>	:= 1;	
 	%Bits<DUMP>	:= 2;
 	%Bits<ASSERT>	:= 4;
+	
+	$Caller_depth := 0;
+	
+	Parrot::load_bytecode('dumper.pbc');
 }
 
 sub ASSERTold(@info, $condition, @message) {
@@ -232,8 +238,6 @@ sub caller_depth_below($namespace, $name, :$starting, :$limit?) {
 	return $depth;
 }
 
-our $caller_depth := 0;
-
 sub find_named_caller(:$nth?, :$starting?) {
 	unless $nth { $nth := 1; }
 	
@@ -281,7 +285,7 @@ sub find_named_caller(:$nth?, :$starting?) {
 		
 	done:		
 		# Cache the caller depth for stack_depth
-		$P0 = get_global '$caller_depth'
+		$P0 = get_global '$Caller_depth'
 		$P0 = depth
 		
 		# Now we have a sub named other than '_block'
@@ -289,20 +293,6 @@ sub find_named_caller(:$nth?, :$starting?) {
 	};
 
 	return $caller;
-}
-
-sub get_address_of($what) {
-	my $address := Q:PIR {
-		$P0 = find_lex '$what'
-		if null $P0 goto null_object
-		$I0 = get_addr $P0
-		goto done
-	null_object:
-		$I0 = 0
-	done:
-		%r = box $I0
-	};
-	return $address;
 }
 
 sub get_caller($level?, :$attr?) {
@@ -353,11 +343,7 @@ sub get_dumper_config($named_caller, :$starting) {
 		%_dumper_config_cache := Hash::empty();
 	}
 
-	my $addr := Q:PIR {
-		$P0 = find_lex '$named_caller'
-		$I0 = get_addr $P0
-		%r = box $I0
-	};
+	my $addr := Parrot::get_address_of($named_caller);
 
 	unless my @config := %_dumper_config_cache{$addr} {
 		my $name := ~ $named_caller;
@@ -417,7 +403,7 @@ sub info(:$caller_level) {
 	
 	# If lexpad address is the same, it's the same call frame.
 	# Return identical result.
-	my $lexpad_addr := get_address_of(get_caller($caller_level, :attr('lexpad')));
+	my $lexpad_addr := Parrot::get_address_of(get_caller($caller_level, :attr('lexpad')));
 	
 	if $lexpad_addr && $lexpad_addr == $last_lexpad_addr {
 		# Do nothing - last result still in @result.
@@ -426,19 +412,27 @@ sub info(:$caller_level) {
 		$last_lexpad_addr	:= $lexpad_addr;
 		my $caller		:= find_named_caller(:starting($caller_level + 1));
 
-		@result		:= get_dumper_config($caller, :starting($caller_depth));
+		@result		:= get_dumper_config($caller, :starting($Caller_depth));
 	}
 
 	%Already_in<INFO>--;
 	return @result;
 }
 
+our $Prefix_string := ':..';
+our $Prefix_string_len := String::length($Prefix_string);
+
 sub make_bare_prefix($depth) {
 	if $depth < 1 {
 		$depth := 1;
 	}
+
+	$depth --;
+	my $prefix := String::repeat($Prefix_string, ($depth / $Prefix_string_len));
 	
-	return String::repeat('| ', $depth - 1) ~ '+- ';
+	$prefix := $prefix ~ String::substr($Prefix_string, 0, $depth % 3);
+
+	return $prefix ~ '+-';
 }
 
 sub make_named_prefix(@info) {

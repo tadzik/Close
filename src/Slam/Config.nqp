@@ -2,20 +2,16 @@
 
 module Slam::Config;
 
-# Done inside _onload(), so Config can be loaded early by _INIT
-#Parrot::IMPORT('Dumper');
-		
-################################################################
+_ONLOAD();
 
-_onload();
-
-sub _onload() {
+sub _ONLOAD() {
 	if our $onload_done { return 0; }
 	$onload_done := 1;
 
 	Parrot::IMPORT('Dumper');
 	
-	Class::SUBCLASS('Slam::Config', 'Hash');	
+	Class::SUBCLASS('Slam::Config',
+		'Class::HashBased');	
 	
 	# Store an instance in the Registry
 	my $config := Slam::Config.new();

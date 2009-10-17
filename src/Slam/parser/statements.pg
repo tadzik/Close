@@ -8,7 +8,7 @@ $Rev$
 
 rule compound_statement {
 	'{'			{*} #= open
-		~ '}' <statements=local_statement>*
+	~ '}' <statements=local_statement>*
 				{*} #= close
 }
 
