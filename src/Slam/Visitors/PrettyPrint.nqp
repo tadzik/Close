@@ -152,7 +152,11 @@ module Slam::Visitor::PrettyPrint::BeginVisitor {
 	}
 
 	method _visit_Slam_Scope_Namespace($node) {
-		NOTE("Visiting namespace: ", $node);
+		DIE("I did not expect to find a Namespace scope block in the tree.");
+	}
+	
+	method _visit_Slam_Scope_Namespace_Definition($node) {
+		NOTE("Visiting namespace definition: ", $node);
 		self.emit(self.leader, 'namespace ', ~ $node, " {\n");
 		self.indent();
 

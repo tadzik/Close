@@ -41,6 +41,8 @@ method _attach_Slam_Scope($scope) {
 	self.push($scope);
 }
 
+method _attach_Slam_Scope_Namespace($node) { self.attach_ERROR($node); }
+method _attach_Slam_Scope_NamespaceDefinition($node) { self._attach_Slam_Scope($node); }
 method _attach_Slam_Scope_Parameter($node) { self.attach_ERROR($node); }
 method _attach_Slam_Scope_Pervasive($node)	{ self.attach_ERROR($node); }
 
@@ -65,14 +67,17 @@ method attach_DEFAULT($node) {
 }
 
 method attach_ERROR($node) {
-	NOTE("Invalid node type passed to attach. You can't attach that type of node here.");
+	NOTE("Invalid node type (", $node.node_type, ") passed to attach. ",
+		"You can't attach that type of node to a ", self.node_type, ".");
 	DUMP($node);
 	DUMP(self);
 	DIE("ERROR: Passed bogus node type to attach");
 }
 
 method attach_UNEXPECTED($node) {
-	NOTE("Unexpected node type. Make sure there isn't special processing required, then explicitly address this type in Scopes/*.nqp");
+	NOTE("Unexpected node type - ", $node.node_type, 
+		". Make sure there isn't special processing required, ",
+		"then explicitly address this type in Scopes/*.nqp");
 	DUMP($node);
 	DUMP(self);
 	DIE("Unexpected node type passed to attach.");
@@ -89,9 +94,7 @@ method contains($reference, :&satisfies) {
 	return $result;
 }
 
-method default_storage_class() {
-	DIE("Subclass ", Class::name_of(self), " fails to implement this abstract method");
-}
+method default_storage_class()		{ self._ABSTRACT_METHOD; }
 
 method lookup($reference, :&satisfies) {
 	my $result := self.contains($reference, :satisfies(&satisfies));

@@ -1,26 +1,29 @@
 # $Id$
 
+=module Slam::Scope::Namespace
+
+This is a 'simple' namespace scope. It is used by the SymbolTable to hold the 
+"real" namespace symbols. But this does not get used by the parser. See 
+Slam::Scope::NamespaceDefinition for that class, which delegates much
+work back to this one.
+
+=cut
+
 module Slam::Scope::Namespace;
 #	extends Slam::Scope::Local
 #	does Slam::Symbol::Name
 
-#Parrot::IMPORT('Dumper');
+_ONLOAD();
 
-################################################################
-
-_onload();
-
-sub _onload() {
+sub _ONLOAD() {
 	if our $onload_done { return 0; }
 	$onload_done := 1;
 
-	Slam::Scope::_onload();
-	Slam::Scope::Local::_onload();
-	
 	Parrot::IMPORT('Dumper');
-	
-	NOTE("Declaring subclass Slam::Scope::Namespace");
-	Class::SUBCLASS('Slam::Scope::Namespace', 
+
+	my $class_name := 'Slam::Scope::Namespace';
+	NOTE("Declaring class ", $class_name);
+	Class::SUBCLASS($class_name, 
 		'Slam::Scope::Local');
 }
 
@@ -117,7 +120,7 @@ method name(*@value) {
 		self.namespace.push($name);
 	}
 	
-	return self.ATTR('name', @value);
+	return self._ATTR('name', @value);
 }
 
 method query_child($name, :$path_index?) {

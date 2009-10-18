@@ -175,7 +175,7 @@ sub global_setup() {
 				:is_rooted(1))
 		);
 		
-		$Symbols.enter_namespace_scope($default_hll_name);
+		$Symbols.enter_namespace_definition_scope($default_hll_name);
 	
 		DUMP($Symbols);
 		NOTE("Loading internal types into pervasive scope");

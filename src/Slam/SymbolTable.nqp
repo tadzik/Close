@@ -85,9 +85,10 @@ method enter_local_scope(:$node) {
 	self.enter_scope($block);
 }
 
-method enter_namespace_scope($ns_path) {
+method enter_namespace_definition_scope($ns_path) {
 	NOTE("Entering scope of namespace ", $ns_path);
-	my $ns_scope := self._fetch_namespace_of($ns_path);
+	my $nsp := self._fetch_namespace_of($ns_path);
+	my $ns_scope := Slam::Scope::NamespaceDefinition.new($nsp);
 	DUMP($ns_scope);
 	self.enter_scope($ns_scope);
 }

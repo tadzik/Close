@@ -15,7 +15,6 @@ sub _ONLOAD() {
 	Class::SUBCLASS($class_name,
 		'Slam::Stmts', 'Slam::Symbol::Name');
 	
-	Class::MULTISUB($class_name, 'attach', :starting_with('_attach_'));
 	NOTE("done");
 }
 
@@ -23,26 +22,6 @@ sub _ONLOAD() {
 method alias(*@value) {
 	DIE("This code hasn't been written yet.");
 }
-
-method _attach_Slam_Symbol_Declaration($item) {
-	self.push($item);
-	# Need to add symbol name to backing namespace.
-	self.namespace_scope.add_symbol($item);
-}
-
-method _attach_Slam_Statement_SymbolDeclarationList($list) {
-	for @($list) {
-		if $_.is_builtin || $_.has_qualified_name {
-			NOTE("Asking symbol table to handle declaration of ", $_);
-			Registry<SYMTAB>.declare($_);
-		}
-		else {
-			NOTE("Attaching ", $_, " locally.");
-			self.attach($_);
-		}
-	}
-}
-
 
 method build_display_name() {
 	self.rebuild_display_name(0);
@@ -77,10 +56,6 @@ method init(*@children, *%attributes) {
 	return Slam::Node::init_(self, @children, %attributes);
 }
 
-method is_namespace()		{ return 1; }
-
 method name(*@value) {
 	DIE("Namespace has no name.");
 }
-
-method namespace_scope(*@value)	{ self._ATTR('namespace_scope', @value); }

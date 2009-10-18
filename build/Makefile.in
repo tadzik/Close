@@ -38,14 +38,10 @@ STRIP_PIRA	:= grep -v '^.annotate'
 #IF(darwin):
 #IF(darwin):# MACOSX_DEPLOYMENT_TARGET must be defined for OS X compilation/linking
 #IF(darwin):export MACOSX_DEPLOYMENT_TARGET := @osx_version@
+UPDATE_CLASSES := build/class_hierarchy.pl
 
-CLOSE_GROUP := $(PMC_DIR)/close_group$(LOAD_EXT)
-CLOSE_OPS := $(OPS_DIR)/close_ops$(LOAD_EXT)
 CLOSE_LIB_PIR := library/close/close_lib.pir
 CLOSE_LIB_PBC := library/close/close_lib.pbc
-
-#PMC_DEPS := build/src/pmc/Makefile.in $(PMC_DIR)/close.pmc
-#OPS_DEPS := build/src/ops/Makefile.in $(OPS_DIR)/close.ops
 
 ACTIONS_PM := \
 	src/Slam/parser/builtin_actions.nqp
@@ -57,6 +53,13 @@ BUILTINS_PIR := \
 	src/builtins/say.pir \
 	src/builtins/strings.pir
 
+CLASS_LIST := \
+	build/slam_classes.txt
+
+CLASS_DEPENDENT_SOURCES := \
+	src/Visitors/Combinators/All.nqp	\
+	src/Visitors/Combinators/Combinator.nqp
+	
 COMPILER_LIBS_PIR := \
 	src/Array.pir		\
 	src/Class.pir		\
@@ -80,6 +83,7 @@ COMPILER_LIBS_PIR := \
 	src/Slam/Scopes/Function.pir		\
 	src/Slam/Scopes/Local.pir			\
 	src/Slam/Scopes/Namespace.pir		\
+	src/Slam/Scopes/NamespaceDefinition.pir \
 	src/Slam/Scopes/Parameter.pir		\
 	src/Slam/Scopes/Pervasive.pir		\
 	src/Slam/Scopes/Scope.pir			\
@@ -238,6 +242,13 @@ close.pbc: $(SOURCES)
 close@exe@: close.pbc
 	$(PBC_TO_EXE) close.pbc
 
+$(CLASS_LIST): build/slam_classes.new
+#IF(win32):	fc $< $@ >NUL || copy $< $@
+#IF(not(win32)):	if diff $< $@ >/dev/null ; then true else mv -f $< $@; fi
+
+build/slam_classes.new:
+	$(PERL) ./build/class_hierarchy.pl --list > $@
+
 src/gen_actions.nqp: $(ACTIONS_PM) Makefile
 	@echo "**** Collecting gen_actions.nqp"
 	cat $(ACTIONS_PM) > src/gen_actions.nqp
@@ -255,20 +266,12 @@ src/gen_library.pir: $(COMPILER_LIBS_PIR) Makefile
 	@echo "Files: " $(COMPILER_LIBS_PIR)
 	$(CAT) $(COMPILER_LIBS_PIR) > src/gen_library.pir
 
-src/gen_hierarchy.txt:
-	$(PERL) build/class_hierarchy.pl --list > $@.new
-#IF(win32):	fc $@.new $@ >NUL || copy $@.new $@
-#IF(not(win32)):	if diff $@.new $@ >/dev/null ; then mv -f $@.new $@; fi
+src/Visitors/Combinators/All.nqp: $(CLASS_LIST)
+	$(PERL) $(UPDATE_CLASSES) $@
 
-#src/Slam/Visitors/HierarchyVisitor.nqp: src/gen_hierarchy.txt
-#	$(PERL) build/class_hierarchy.pl $@
+src/Visitors/Combinators/Combinator.nqp: $(CLASS_LIST)
+	$(PERL) $(UPDATE_CLASSES) $@
 	
-$(CLOSE_GROUP): $(PMC_DEPS)
-#	$(MAKE) $(PMC_DIR)
-
-$(CLOSE_OPS): $(OPS_DEPS)
-#	$(MAKE) $(OPS_DIR)
-
 $(CLOSE_LIB_PIR): $(LIBRARY_SRC)
 	$(PARROT) -r close.pbc --combine --target=pir --output=$(CLOSE_LIB_PIR) \
 		$(LIBRARY_SRC)

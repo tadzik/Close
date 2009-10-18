@@ -97,21 +97,19 @@ method include_directive($/) {
 }
 
 method _namespace_definition_close($/) {
-	my $past := $<namespace>.ast;
+	my $past := $Symbols.current_scope();
 	
 	for ast_array($<declaration_sequence><decl>) {
 		$past.attach($_);
 	}
 	
-	$Symbols.leave_scope('Slam::Scope::Namespace');
+	$Symbols.leave_scope('Slam::Scope::NamespaceDefinition');
 	
 	MAKE($past);
 }
 
 method _namespace_definition_open($/) {
-	my $past := $<namespace>.ast;
-	$Symbols.enter_namespace_scope($past);
-	$past.namespace_scope($Symbols.current_scope);
+	$Symbols.enter_namespace_definition_scope($<namespace>.ast);
 }
 
 # NQP currently generates get_hll_global for functions. So qualify them all.
@@ -132,7 +130,7 @@ method _translation_unit_close($/) {
 	
 	unless Slam::IncludeFile::in_include_file() {
 		NOTE("Popping namespace_definition block");
-		$past := $Symbols.leave_scope('Slam::Scope::Namespace');
+		$past := $Symbols.leave_scope('Slam::Scope::NamespaceDefinition');
 	}
 
 	MAKE($past);

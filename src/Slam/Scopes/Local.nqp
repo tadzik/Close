@@ -89,11 +89,4 @@ method lookup_in_using_namespaces($reference, :&satisfies) {
 	return $result;
 }
 
-# TODO: Add init method, set this value there, stop checking each time.
-method using_namespaces() {
-	unless self<using_namespaces> {
-		self<using_namespaces> := Array::empty();
-	}
-	
-	return self<using_namespaces>;
-}
+method using_namespaces(*@value)	{ self._ATTR_ARRAY('using_namespaces', @value); }
