@@ -2,6 +2,25 @@
 
 class Hash;
 
+method contains($key) {
+	my $result := Q:PIR {
+		$P0 = find_lex 'self'
+		$P1 = find_lex '$key'
+		$I0 = exists $P0[$P1]
+		%r = box $I0
+	};
+	
+	return $result;
+}
+	
+method delete($key) {
+	Q:PIR {{
+		$P0 = find_lex 'self'
+		$P1 = find_lex '$key'
+		delete $P0[$P1]
+	}};
+}
+
 sub delete(%hash, $key) {
 	Q:PIR {{
 		$P0 = find_lex '%hash'
@@ -26,21 +45,16 @@ sub empty() {
 }
 
 sub exists(%hash, $key) {
-	my %results;
+	my $result;
 	
 	if %hash {
-		%results := Q:PIR {{
-			$P0 = find_lex '%hash'
-			$P1 = find_lex '$key'
-			$I0 = exists $P0[$P1]
-			%r = box $I0
-		}};
+		$result := %hash.contains($key);
 	}
 	else {
-		%results := 0;
+		$result := 0;
 	}
 	
-	return %results;	
+	return $result;	
 }
 
 sub merge(%first, *@hashes, :%into?, :$use_last?) {

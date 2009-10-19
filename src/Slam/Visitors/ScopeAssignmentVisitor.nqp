@@ -34,12 +34,12 @@ sub NOTEold(*@parts) {
 
 sub ADD_ERROR($node, *@msg) {
 	Slam::Messages::add_error($node,
-		Array::join('', @msg));
+		@msg.join());
 }
 
 sub ADD_WARNING($node, *@msg) {
 	Slam::Messages::add_warning($node,
-		Array::join('', @msg));
+		@msg.join());
 }
 
 sub NODE_TYPE($node) {

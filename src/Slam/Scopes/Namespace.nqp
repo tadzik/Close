@@ -9,145 +9,262 @@ work back to this one.
 
 =cut
 
-module Slam::Scope::Namespace;
+module Slam::Scope::Namespace {
 #	extends Slam::Scope::Local
-#	does Slam::Symbol::Name
 
-_ONLOAD();
+	_ONLOAD();
 
-sub _ONLOAD() {
-	if our $onload_done { return 0; }
-	$onload_done := 1;
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
 
-	Parrot::IMPORT('Dumper');
+		Parrot::IMPORT('Dumper');
 
-	my $class_name := 'Slam::Scope::Namespace';
-	NOTE("Declaring class ", $class_name);
-	Class::SUBCLASS($class_name, 
-		'Slam::Scope::Local');
+		my $class_name := 'Slam::Scope::Namespace';
+		NOTE("Declaring class ", $class_name);
+		Class::SUBCLASS($class_name, 
+			'Slam::Scope::Local');
+	}
+
+	################################################################
+
+	method add_child($name) {
+		my $child := Slam::Scope::Namespace.new(
+			:hll(self.hll),
+			:name($name),
+			:namespace(self.namespace.clone),
+		);
+		
+		return self.child($name, $child);
+	}
+	
+	method build_display_name() {
+		self.rebuild_display_name(0);
+
+		my $display_name := self.format_hll
+			~ ' ' ~ self.format_namespace
+			~ '::' ~ self.format_name;
+
+		self.display_name($display_name);
+		
+		NOTE("Display name set to: ", self);
+		return self.display_name;
+	}
+
+	method child($name, *@value) {
+		if +@value {
+			self.child_nsp{$name} := @value.shift;
+		}
+		
+		return self.child_nsp{$name};
+	}
+
+	method child_nsp(*@value)		{ self._ATTR_HASH('child_nsp', @value); }
+	method default_storage_class()		{ return 'extern'; }
+
+	method fetch_child($name) {
+		unless my $child := self.has_child($name) {
+			$child := self.add_child($name);
+		}
+		
+		return $child;
+	}
+	
+	method fetch_namespace($name) {
+		ASSERT($name.isa(Slam::Symbol::Name),
+			'$name parameter must be a subclass of Slam::Symbol::Name');
+		NOTE("Namespace '", self, "' looking up namespace: ", $name);
+		
+		my @path	:= $name.path;
+		my $nsp	:= self;
+		
+		for @path {
+			$nsp := $nsp.fetch_child($name);
+		}
+		
+		NOTE("done");
+		DUMP($nsp);
+		return $nsp;
+	}
+
+	method format_hll() {
+		return 'hll:' ~ self.hll;
+	}
+
+	method format_name() {
+		return self.name;
+	}
+	
+	method format_namespace() {
+		return '::' ~ self.namespace.join('::');
+	}
+
+	method has_child($name) {
+		my $child := self.child($name);
+		return $child;
+	}
+	
+	method init(@children, %attributes) {
+		unless %attributes<hll> && Scalar::defined(%attributes<namespace>) {
+			DIE("Namespaces must be created with :hll() and :namespace()");
+		}
+		
+		return self.init_(@children, %attributes);
+	}
+
+	method is_namespace()		{ return 1; }
+
+	method query_namespace($name) {
+		ASSERT($name.isa(Slam::Symbol::Name),
+			'$name parameter must be a subclass of Slam::Symbol::Name');
+		NOTE("Namespace ", self, " looking up child: ", $name);
+		
+		my @path	:= $name.path;
+		my $nsp	:= self;
+		
+		for @path {
+			if my $child := $nsp.has_child(~ $_) {
+				$nsp := $child;
+			}
+			else {
+				return $child;
+			}
+		}
+		
+		return $nsp;
+				
+	}
 }
 
 ################################################################
 
-method build_display_name() {
-	self.rebuild_display_name(0);
-	
-	my @path := Array::clone(self.namespace);
-	# NOTE: Does not add .name right here.
-	
-	if my $hll := self.hll {
-		@path.unshift('hll:' ~ $hll ~ ' ');
+=module Slam::Scope::GlobalRoot
+
+This is a 'root' namespace scope. There should only be one instance of this 
+class, at the top of the namespace tree. It behaves slightly differently from 
+the Namespace and HllRoot scopes.
+
+=cut
+
+module Slam::Scope::GlobalRoot {
+#	extends Slam::Scope::HllRoot
+
+	_ONLOAD();
+
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+
+		Parrot::IMPORT('Dumper');
+
+		my $class_name := 'Slam::Scope::GlobalRoot';
+		NOTE("Declaring class ", $class_name);
+		Class::SUBCLASS($class_name, 
+			'Slam::Scope::HllRoot');
 	}
-	elsif self.is_rooted {
-		@path.unshift('');
-	}
+
+	################################################################
+
+	method add_child($name) {
+		my $child := Slam::Scope::HllRoot.new(
+			:name($name),
+		);
 		
-	self.display_name(Array::join('::', @path));
-	NOTE("Display name set to: ", self);
-	return self.display_name;
-}
-
-method child($name, *@value) {
-	unless self<child_nsp> {
-		self<child_nsp> := Hash::new();
+		return $child;
 	}
 	
-	if +@value {
-		self<child_nsp>{$name} := @value.shift;
+	method build_display_name() {
+		self.display_name(self.name);
+		NOTE("Display name set to: ", self);
+		return self.display_name;
+	}
+
+	method init(@children, %attributes) {
+		self.init_(@children, %attributes);
+		
+		self._ATTR('hll',		Array::new(Scalar::undef()));
+		self._ATTR('name',		Array::new('<GLOBAL ROOT>'));
+		self._ATTR('namespace',	Array::new(Scalar::undef()));
 	}
 	
-	return self<child_nsp>{$name};
-}
-
-method default_storage_class()		{ return 'extern'; }
-
-method fetch_child($name, :$path_index?) {
-	ASSERT($name.isa(Slam::Symbol::Name),
-		'$name parameter must be a subclass of Slam::Symbol::Name');
-	NOTE("Namespace '", self, "' looking up child: ", $name);
-
-	unless $path_index { $path_index := 0; }
-	
-	if +$name.path <= $path_index {
-	DUMP($name.path);
-		NOTE("This is it.");
-		return self;
-	}
-	
-	NOTE("Path index is: ", $path_index);
-	DUMP($name.path);
-	my $child_name := $name.path[$path_index];
-	my $child := self.child($child_name);
-	
-	unless $child {
-		if self.hll {
-			$child := Slam::Scope::Namespace.new(:hll(self.hll), 
-				:name($child_name),
-				:namespace(self.namespace), 
-			);
-		}
-		else {
-			$child := Slam::Scope::Namespace.new(:hll($child_name), 
-				:namespace(self.namespace),
-			);
+	method new(*@children, *%attributes) {
+		if +@children {
+			DIE("This class accepts no children.");
 		}
 		
-		
-		self.child($child_name, $child);
-	}
-
-	return $child.fetch_child($name, :path_index($path_index + 1));
-}
-
-method init(*@children, *%attributes) {
-	unless %attributes<hll> && Scalar::defined(%attributes<namespace>) {
-		DIE("Namespaces must be created with :hll() and :namespace()");
-	}
-	
-	return self.init_(@children, %attributes);
-}
-
-method is_namespace()		{ return 1; }
-
-method name(*@value) {
-	if +@value {
-		my $name := @value[0];
-		
-		if self.name {
-			self.namespace.pop();
+		if our $Instance {
+			return $Instance;
 		}
 		
-		self.namespace.push($name);
+		return Class::call_method_(self, 
+			Class::BaseBehavior::new, 
+			Array::empty(), 
+			%attributes);
 	}
-	
-	return self._ATTR('name', @value);
 }
 
-method query_child($name, :$path_index?) {
-	ASSERT($name.isa(Slam::Symbol::Name),
-		'$name parameter must be a subclass of Slam::Symbol::Name');
-	NOTE("Namespace ", self.display_name, " looking up child: ", $name.display_name);
+################################################################
 
-	if +$name.path <= $path_index {
-		return self;
-	}
-	
-	my $child_name	:= $name.path[$path_index];		
-	my $child		:= self.child($child_name);
-	
-	if $child {
-		$child := $child.fetch_child($name, :path_index($path_index + 1));
-	}
-	
-	return $child;
-}
+=module Slam::Scope::HllRoot
 
-sub root() {
-	unless our $root {
-		$root := Slam::Scope::Namespace.new(:hll('root'), :namespace(Array::empty()));
-		$root<hll> := Scalar::undef();
-		$root.display_name('<NAMESPACE ROOT>');
+This is an 'hll root' namespace scope. It behaves pretty much like a common 
+Namespace scope, but the rules for adding children and naming are changed a 
+bit.
+
+An HLL root namespace has an hll set - obviously - and has a namespace that 
+is an empty array. That is, this is the namespace you are in when you code (in
+PIR): 
+    .HLL 'foo'
+    .namespace []
+
+The 'name' of this namespace is the hll name, so that the global root can
+add a child named 'foo' and have the right thing happen. (The global root's
+children are all hllroot namespace scopes.) 
+
+=cut
+
+module Slam::Scope::HllRoot {
+#	extends Slam::Scope::Namespace
+
+
+	_ONLOAD();
+
+	sub _ONLOAD() {
+		if our $onload_done { return 0; }
+		$onload_done := 1;
+
+		Parrot::IMPORT('Dumper');
+
+		my $class_name := 'Slam::Scope::HllRoot';
+		NOTE("Declaring class ", $class_name);
+		Class::SUBCLASS($class_name, 
+			'Slam::Scope::Namespace');
 	}
+
+	################################################################
+
+	method build_display_name() {
+		self.rebuild_display_name(0);
+		self.display_name(self.format_hll);
+		NOTE("Display name set to: ", self);
+		return self.display_name;
+	}
+
+	method hll(*@value)			{ self._ATTR_CONST('hll', @value); }
 	
-	return $root;
+	method init(@children, %attributes) {
+		unless %attributes.contains('name') {
+			DIE("You must provide a :name() for new HllRoot objects");
+		}
+		
+		self._ATTR('name',		Array::new(%attributes<name>));
+		%attributes.delete('name');
+		self._ATTR('hll',		Array::new(self.name));
+		self._ATTR('namespace',	Array::new(Array::empty()));
+		
+		self.init_(@children, %attributes);		
+	}
+		
+	method name(*@value)		{ self._ATTR_CONST('name', @value); }
+	method namespace(*@value)	{ self._ATTR_CONST('namespace', @value); }
 }

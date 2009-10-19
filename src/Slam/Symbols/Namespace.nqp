@@ -35,10 +35,10 @@ method build_display_name() {
 		@path.unshift('');
 	}
 		
-	return self.display_name(Array::join('::', @path));
+	return self.display_name(@path.join('::'));
 }	
 
-method init(*@children, *%attributes) {
+method init(@children, %attributes) {
 	if %attributes<parts> {
 		my @part_values := Array::empty();
 		

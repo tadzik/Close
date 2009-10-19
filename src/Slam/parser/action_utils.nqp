@@ -143,7 +143,7 @@ sub clean_up_heredoc($past, @lines) {
 		}
 	}
 	else {
-		$text := Array::join('', @lines);
+		$text := @lines.join;
 	}
 	
 	$past.value($text);
@@ -169,10 +169,9 @@ sub global_setup() {
 		DUMP($Symbols);
 		
 		NOTE("Entering root namespace of default hll");
-		my $default_hll_name := Slam::Symbol::Declaration.new(
-			Hash::new(
+		my $default_hll_name := Slam::Symbol::Namespace.new(
 				:hll($hll), 
-				:is_rooted(1))
+				:is_rooted(1)
 		);
 		
 		$Symbols.enter_namespace_definition_scope($default_hll_name);

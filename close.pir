@@ -59,7 +59,7 @@ to the close compiler.
 .include 'src/Slam/parser/declaration_actions.pir'
 .include 'src/Slam/parser/expression_actions.pir'
 .include 'src/Slam/parser/name_actions.pir'
-.include 'src/Slam/parser/parse_utils.pir'
+.include 'src/Slam/parser/action_utils.pir'
 .include 'src/Slam/parser/statement_actions.pir'
 .include 'src/Slam/parser/token_actions.pir'
 .include 'src/gen_library.pir'

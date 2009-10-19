@@ -91,7 +91,7 @@ method parse_config($data) {
 			}
 			else {
 				
-				my $value := String::trim(Array::join('=', @kv));
+				my $value := String::trim(@kv.join('='));
 				
 				NOTE("Key:	", $key);
 				NOTE("Value:	", $value);
@@ -105,7 +105,7 @@ method parse_config($data) {
 }
 
 method query(*@keys) {
-	my $key := Array::join('::', @keys);
+	my $key := @keys.join('::');
 	NOTE('Querying for key: ', $key);
 	
 	my $value := self<_data>{$key};

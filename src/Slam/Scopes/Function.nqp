@@ -23,7 +23,7 @@ method _attach_Slam_Scope_Parameter($scope) {
 	self.parameter_scope($scope);
 }
 
-method init(*@children, *%attributes) {
+method init(@children, %attributes) {
 	self.init_(@children, %attributes);
 	Registry<FUNCLIST>.attach(self);
 }

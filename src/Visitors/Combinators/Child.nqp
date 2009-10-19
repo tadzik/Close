@@ -18,9 +18,6 @@ sub _ONLOAD() {
 	$onload_done := 1;
 		
 	Parrot::IMPORT('Dumper', 'ASSERT DIE DUMP DUMP_ NOTE');
-	say("Ohai!");
-	#Parrot::IMPORT('Visitor::Combinator');
-	say("Cheezburger");
 	
 	my $class_name := 'Visitor::Combinator::Child';
 	NOTE("Creating class ", $class_name);
@@ -28,7 +25,6 @@ sub _ONLOAD() {
 		'Visitor::Combinator::Defined');
 	
 	NOTE("done");
-	say("really done");
 }
 
 method init(*@children, *%attributes) {

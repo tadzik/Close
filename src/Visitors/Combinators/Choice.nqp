@@ -28,12 +28,10 @@ module Visitor::Combinator::Choice;
 _ONLOAD();
 
 sub _ONLOAD() {
-say("Visitor::Combinator::Choice");		
 	if our $onload_done { return 0; }
 	$onload_done := 1;
 
 	Parrot::IMPORT('Dumper');
-say("dumper imported");
 
 	my $class_name := 'Visitor::Combinator::Choice';
 	NOTE("Creating class ", $class_name);

@@ -19,7 +19,6 @@ module Visitor::Combinator::Defined;
 _ONLOAD();
 
 sub _ONLOAD() {
-say("Defined onload");
 	if our $onload_done { return 0; }
 	$onload_done := 1;
 		

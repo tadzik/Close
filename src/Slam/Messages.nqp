@@ -31,7 +31,7 @@ module Slam::Message {
 	method message(*@value) {
 		# TODO: I don't know if I'm getting an array-in-an-array, or what.
 		# Need to know what :message(a,b,c) does on .new()
-		self._ATTR('message', Array::new(Array::join('', @value))); 
+		self._ATTR('message', Array::new(@value.join)); 
 	}
 
 	method position($str, $offset) {

@@ -81,8 +81,7 @@ module Class {
 			
 			if String::substr($name, 0, $prefix_len) eq $starting_with {
 				my $param_class := String::substr($name, $prefix_len);
-				my @parts := String::split('_', $param_class);
-				my $param1_class := Array::join('::', @parts);
+				my $param1_class := String::split('_', $param_class).join('::');
 				# Compile multisub for class name
 				NOTE("Compiling '", $multi_name, "' handler for (_, ", 
 					$param1_class, ")");
@@ -228,9 +227,8 @@ module Class {
 			$class_info<multisubs>{$multi_name}<_> := 1;
 		}
 		
-		my @parts := String::split('::', $class_name);
 		my $namespace_name := "'" 
-			~ Array::join("' ; '", @parts)
+			~ String::split('::', $class_name).join(q<' ; '>) 
 			~ "'";
 
 		my @trampoline := Array::new(
@@ -252,12 +250,10 @@ module Class {
 			NOTE("Default multi will call ", $multi_name,
 				" method from parent class ", 
 				$default_method.get_namespace.get_name.join('::'));
-			@parts := $default_method.get_namespace.get_name;
+			my @parts := $default_method.get_namespace.get_name;
 			@parts.shift;
 		
-			my $method_namespace_name := "'"
-				~ Array::join("' ; '", @parts)
-				~ "'";
+			my $method_namespace_name := "'" ~ @parts.join(q<' ; '>) ~ "'";
 			
 			@trampoline.push(
 				"\t" ~ "$P0 = get_hll_global [ " 
@@ -279,7 +275,7 @@ module Class {
 		}
 		
 		@trampoline.push(".end");
-		my $trampoline := Array::join("\n", @trampoline);
+		my $trampoline := @trampoline.join("\n");
 		NOTE("Trampoline is:\n", $trampoline);
 		Parrot::compile($trampoline);
 		NOTE("Trampoline compiled okay.");
@@ -318,7 +314,7 @@ resolves.
 		}
 
 		my $param1_namespace := "'" 
-			~ Array::join("' ; '", String::split('::', $param1_type))
+			~ String::split('::', $param1_type).join(q<' ; '>)
 			~ "'";
 
 		my $signature := '_, [ ' ~ $param1_namespace ~ ' ]';
@@ -330,7 +326,7 @@ resolves.
 		$class_info<multisubs>{$multi_name}{$signature} := 1;
 		
 		my $namespace_name := "'" 
-			~ Array::join("' ; '", String::split('::', $class_name))
+			~ String::split('::', $class_name).join("' ; '")
 			~ "'";
 		
 		my @trampoline := Array::new(
@@ -343,7 +339,7 @@ resolves.
 				~ "'(self, pos :flat, adv :named :flat)",
 			".end",
 		);
-		my $trampoline := Array::join("\n", @trampoline);
+		my $trampoline := @trampoline.join("\n");
 		NOTE("Trampoline is:\n", $trampoline);
 		Parrot::compile($trampoline);
 		NOTE("Trampoline compiled okay.");
@@ -417,8 +413,7 @@ resolves.
 		}
 		
 		my $class := Class::of($object);
-		my @parts := String::split(';', $class);
-		$class := Array::join($delimiter, @parts);
+		$class := String::split(';', $class).join($delimiter);
 		return $class;
 	}
 
@@ -472,6 +467,7 @@ module Class::BaseBehavior {
 		my $get_string := "
 .namespace [ 'Class' ; 'BaseBehavior' ]
 .sub '__get_string' :vtable('get_string') :method
+	say 'basic get_string'
 	$S0 = self.'get_string'()
 	.return ($S0)
 .end";
@@ -512,6 +508,14 @@ module Class::BaseBehavior {
 		return $result;
 	}
 	
+	method _ATTR_CONST($name, @value) {
+		if +@value {
+			DIE("You cannot set the value of the '", $name, "' attribute.");
+		}
+		
+		return self._ATTR($name, @value);
+	}
+	
 	method _ATTR_HASH($name, @value) {
 		my $result := self._ATTR($name, @value);
 		
@@ -534,6 +538,7 @@ module Class::BaseBehavior {
 	
 	method init(@children, %attributes) {
 		for %attributes {
+			NOTE("Setting attribute: '", ~$_, "'");
 			Class::call_method(self, ~$_, %attributes{$_});
 		}
 	}

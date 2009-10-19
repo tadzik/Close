@@ -30,7 +30,7 @@ method build_display_name() {
 		@path.unshift('');
 	}
 		
-	return self.display_name(Array::join('::', @path));
+	return self.display_name(@path.join('::'));
 }
 
 method has_qualified_name()	{ return self.hll || self.namespace; }

@@ -53,9 +53,6 @@ BUILTINS_PIR := \
 	src/builtins/say.pir \
 	src/builtins/strings.pir
 
-CLASS_LIST := \
-	build/slam_classes.txt
-
 CLASS_DEPENDENT_SOURCES := \
 	src/Visitors/Combinators/All.nqp	\
 	src/Visitors/Combinators/Combinator.nqp
@@ -147,7 +144,7 @@ GEN_SOURCES :=				\
 	src/Slam/parser/declaration_actions.pir	\
 	src/Slam/parser/expression_actions.pir	\
 	src/Slam/parser/name_actions.pir	\
-	src/Slam/parser/parse_utils.pir		\
+	src/Slam/parser/action_utils.pir		\
 	src/Slam/parser/statement_actions.pir	\
 	src/Slam/parser/token_actions.pir	\
 	src/gen_builtins.pir			\
@@ -236,18 +233,27 @@ $(CLext).pira:
 	
 all: build close@exe@ installable
 
+CLASS_LIST = build/slam_classes
+
+classes: $(CLASS_LIST).new
+#IF(win32):	fc $(CLASS_LIST).new $(CLASS_LIST).txt >NUL \
+#IF(win32):	|| ( $(CP) $(CLASS_LIST).new $(CLASS_LIST).txt ) & \
+#IF(win32):	     $(PERL) $(UPDATE_CLASSES) $(CLASS_DEPENDENT_SOURCES) \
+#IF(win32):	)
+#IF(not(win32)):	if diff $(CLASS_LIST).new $(CLASS_LIST).txt > /dev/null; \
+#IF(not(win32)):	then echo "No changes to class hierarchy." ;		\
+#IF(not(win32)):	else $(CP) $(CLASS_LIST).new $(CLASS_LIST).txt ;	\
+#IF(not(win32)):	$(PERL) $(UPDATE_CLASSES) $(CLASS_DEPENDENT_SOURCES) ;\
+#IF(not(win32)):	fi
+
+build/slam_classes.new:
+	$(PERL) ./build/class_hierarchy.pl --list > $@
+
 close.pbc: $(SOURCES)
 	$(PARROT) $(PARROT_ARGS) -o close.pbc close.pir
 
 close@exe@: close.pbc
 	$(PBC_TO_EXE) close.pbc
-
-$(CLASS_LIST): build/slam_classes.new
-#IF(win32):	fc $< $@ >NUL || copy $< $@
-#IF(not(win32)):	if diff $< $@ >/dev/null ; then true else mv -f $< $@; fi
-
-build/slam_classes.new:
-	$(PERL) ./build/class_hierarchy.pl --list > $@
 
 src/gen_actions.nqp: $(ACTIONS_PM) Makefile
 	@echo "**** Collecting gen_actions.nqp"
@@ -266,12 +272,6 @@ src/gen_library.pir: $(COMPILER_LIBS_PIR) Makefile
 	@echo "Files: " $(COMPILER_LIBS_PIR)
 	$(CAT) $(COMPILER_LIBS_PIR) > src/gen_library.pir
 
-src/Visitors/Combinators/All.nqp: $(CLASS_LIST)
-	$(PERL) $(UPDATE_CLASSES) $@
-
-src/Visitors/Combinators/Combinator.nqp: $(CLASS_LIST)
-	$(PERL) $(UPDATE_CLASSES) $@
-	
 $(CLOSE_LIB_PIR): $(LIBRARY_SRC)
 	$(PARROT) -r close.pbc --combine --target=pir --output=$(CLOSE_LIB_PIR) \
 		$(LIBRARY_SRC)

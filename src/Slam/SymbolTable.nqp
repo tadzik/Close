@@ -23,7 +23,8 @@ sub _ONLOAD() {
 	my $base_name := 'Slam::SymbolTable';
 	
 	NOTE("Creating base class ", $base_name);
-	Class::SUBCLASS($base_name, 'Slam::Node');
+	#Class::SUBCLASS($base_name, 'Slam::Stmts');
+	Class::SUBCLASS($base_name, 'Class::HashBased');
 }
 
 ################################################################
@@ -86,6 +87,8 @@ method enter_local_scope(:$node) {
 }
 
 method enter_namespace_definition_scope($ns_path) {
+	ASSERT($ns_path.isa(Slam::Symbol::Namespace),
+		"$ns_path parameter must be a namespace path, got ", $ns_path.node_type);
 	NOTE("Entering scope of namespace ", $ns_path);
 	my $nsp := self._fetch_namespace_of($ns_path);
 	my $ns_scope := Slam::Scope::NamespaceDefinition.new($nsp);
@@ -106,16 +109,23 @@ method _fetch_namespace_of($symbol) {
 	ASSERT($symbol.isa(Slam::Symbol::Name),
 		'$symbol parameter must be a symbol name');
 	NOTE("Fetching namespace of ", $symbol);
+	DUMP($symbol);
 
 	my $result;
 	
 	if $symbol.is_rooted {
 		NOTE("Fetching absolute namespace");
-		$result := self.namespace_root.fetch_child($symbol);
+		
+		unless $symbol.hll {
+			NOTE("Using current hll.");  # NB: Should I use default_hll instead?
+			$symbol.hll(self.current_namespace.hll);
+		}
+		
+		$result := self.namespace_root.fetch_namespace($symbol);
 	}
 	else {
 		NOTE("Fetching relative namespace");
-		$result := self.current_namespace.fetch_child($symbol);
+		$result := self.current_namespace.fetch_namespace($symbol);
 	}
 	
 	NOTE("done");
@@ -123,9 +133,11 @@ method _fetch_namespace_of($symbol) {
 	return $result;
 }
 
-method init(*@children, *%attributes) {
+#method init(*@children, *%attributes) {
+method init(@children, %attributes) {
 	NOTE("Doing basic INIT");
-	Slam::Node::init_(self, @children, %attributes);
+	#Slam::Node::init_(self, @children, %attributes);
+	Class::BaseBehavior::init(self, @children, %attributes);
 
 	NOTE("Initializing scope stack");
 	self.stack(Array::empty());
@@ -134,7 +146,7 @@ method init(*@children, *%attributes) {
 	self.pervasive_scope(Slam::Scope::Pervasive.new());
 		
 	NOTE("Installing namespace root");
-	self.namespace_root(Slam::Scope::Namespace::root());
+	self.namespace_root(Slam::Scope::GlobalRoot.new());
 	
 	return self;
 }
@@ -167,7 +179,7 @@ method lookup($reference, :&satisfies?) {
 	}
 	elsif $reference.is_rooted {
 		NOTE("Looking up rooted name");
-		if my $nsp := self.namespace_root.query_child($reference.path) {
+		if my $nsp := self.namespace_root.query_namespace($reference.path) {
 			$result := $nsp.lookup($reference, :satisfies(&satisfies));
 		}
 	}

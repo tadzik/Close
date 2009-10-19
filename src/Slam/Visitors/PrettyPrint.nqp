@@ -21,7 +21,7 @@ module Slam::Visitor::PrettyPrint {
 	################################################################
 	
 	method append(*@parts) {
-		Array::append(self.output, @parts);
+		self.output.append(@parts);
 	}
 
 	method declarator(*@value)	{ self._ATTR('declarator', @value); }
@@ -63,7 +63,7 @@ module Slam::Visitor::PrettyPrint {
 	
 	method leader()			{ return String::repeat(' ', self.indent_level); }
 	method output(*@value)		{ self._ATTR_ARRAY('output', @value); }
-	method result()			{ return Array::join('', self.output); }
+	method result()			{ return self.output.join; }
 	method specifier(*@value)		{ self._ATTR('specifier', @value); }
 
 	method undent($value?) { 

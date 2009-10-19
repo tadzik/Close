@@ -14,6 +14,7 @@ module Slam::Node {
 .namespace [ 'Slam' ; 'Node' ]
 .sub 'get_string' :vtable :method
 	$S0 = self.'display_name'()
+	concat $S0, '(slam-node)'
 	.return ($S0)
 .end";
 		Parrot::compile($get_string);
@@ -21,12 +22,13 @@ module Slam::Node {
 		my $base_name := 'Slam::Node';
 		
 		NOTE("Creating class ", $base_name);
-		Class::SUBCLASS($base_name, 'PAST::Node', 'Visitor::Visitable');
+		# Class::SUBCLASS($base_name, 'PAST::Node', 'Visitor::Visitable');
+		Class::SUBCLASS($base_name, 'Class::HashBased', 'Visitor::Visitable');
 
 		for ('Block', 'Control', 'Op', 'Stmts', 'Val', 'Var', 'VarList') {
 			my $subclass := 'Slam::' ~ $_;
 			NOTE("Creating subclass ", $subclass);
-			Class::SUBCLASS($subclass, 'PAST::' ~ $_, 'Slam::Node');
+			Class::SUBCLASS($subclass, $base_name, 'PAST::' ~ $_);
 		}
 		
 		NOTE("done");
@@ -34,57 +36,6 @@ module Slam::Node {
 
 	################################################################
 
-=method _ABSTRACT
-
-Single point of failure for abstract methods.
-
-=cut
-
-	method _ABSTRACT() {
-		DUMP(self);
-		DIE("Subclass(es) must override abstract methods.");
-	}
-	
-=method _ATTR
-
-This is the backstop method for a good number of accessor methods. If the 
-attribute being accessed is just a get/set attr, with no special handling, then
-a direct call to this method is all that is needed. For example:
-
-	method foo(*@value)	{ self._ATTR('foo', @value); }
-
-=cut
-
-	method _ATTR($name, @value) {
-		if +@value {
-			self{$name} := @value.shift;
-		}
-
-		return self{$name};
-	}
-
-	method _ATTR_ARRAY($name, @value) {
-		if +@value { 
-			self{$name} := @value.shift;
-		}
-		elsif ! Scalar::defined(self{$name}) {
-			self{$name} := Array::empty();
-		}
-		
-		return self{$name};
-	}
-	
-	method _ATTR_HASH($name, @value) {
-		if +@value {
-			self{$name} := @value.shift;
-		}
-		elsif ! Scalar::defined(self{$name}) {
-			self{$name} := Hash::empty();
-		}
-		
-		return self{$name};
-	}
-	
 	method __dump($dumper, $label) {
 		my $subindent;
 		my $indent;
@@ -153,29 +104,6 @@ a direct call to this method is all that is needed. For example:
 		$dumper.deleteIndent();
 	}
 	
-=method INIT
-
-This method just PIR-calls the PCT::Node::init method, but with arg 
-flattening. So I don't have to copy this PIR into every subclass that wants 
-an init() method.
-
-=cut
-
-	method INIT(@children, %attributes) {
-		Q:PIR {
-			.local pmc children, attributes
-			
-			children = find_lex '@children'
-			attributes = find_lex '%attributes'
-			
-			$P0 = get_hll_global [ 'PCT' ; 'Node' ], 'init'
-			
-			self.$P0(children :flat, attributes :named :flat)
-		};
-
-		return self;
-	}
-
 	################################################################
 
 	method accept($visitor) {
@@ -252,14 +180,17 @@ an init() method.
 		return $id;
 	}
 
-	method init(*@children, *%attributes) {
+	method init(@children, %attributes) {
 		return self.init_(@children, %attributes);
 	}
 	
 	# Init method callable from other NQP init subs.
 	method init_(@children, %attributes) {
 		self.id;	# Force it
-		return self.INIT(@children, %attributes);
+		return Class::call_method_(self,
+			PCT::Node::init,
+			@children,
+			%attributes);
 	}
 	
 	method is_statement()		{ return 0; }
@@ -316,7 +247,7 @@ an init() method.
 		return self.message(
 			Slam::Warning.new(
 				:node(%options<node>),
-				:message(Array::join('', @message)),
+				:message(@message.join),
 			)
 		);
 	}

@@ -1,68 +1,8 @@
 # $Id$
 
-class Array;
+module Array;
 
-sub ASSERTold($condition, *@message) {
-	Dumper::ASSERTold(Dumper::info(), $condition, @message);
-}
-
-sub BACKTRACE() {
-	Q:PIR {{
-		backtrace
-	}};
-}
-
-sub DIE(*@msg) {
-	Dumper::DIE(Dumper::info(), @msg);
-}
-
-sub DUMPold(*@pos, *%what) {
-	Dumper::DUMPold(Dumper::info(), @pos, %what);
-}
-
-sub NOTEold(*@parts) {
-	Dumper::NOTEold(Dumper::info(), @parts);
-}
-
-################################################################
-
-sub append(@dest, @append) {
-	for @append {
-		@dest.push($_);
-	}
-	
-	return @dest;
-}
-
-method contains($item) {
-say("Checking containment");
-	for self {
-		if $_ =:= $item {
-			return 1;
-		}
-	}
-	
-	return 0;
-}
-
-sub delete(@array, $index) {
-	Q:PIR {
-		$P0 = find_lex '@array'
-		$P1 = find_lex '$index'
-		$I0 = $P1
-		delete $P0[$I0]
-	};
-}
-
-sub _get_function($name) {
-	my $sub := Q:PIR {
-		$P0 = find_lex '$name'
-		$S0 = $P0
-		%r = get_global $S0
-	};
-
-	return $sub;
-}
+Parrot::IMPORT('Dumper');
 
 sub cmp_numeric($a, $b) { return $b - $a; }
 sub cmp_numeric_R($a, $b) { return $a - $b; }
@@ -70,10 +10,10 @@ sub cmp_string($a, $b) { if $a lt $b { return -1; } else { return 1; } }
 sub cmp_string_R($a, $b) { if $b lt $a { return -1; } else { return 1; } }
 
 our %Bsearch_compare_func;
-%Bsearch_compare_func{'<=>'}	:= _get_function('cmp_numeric');
-%Bsearch_compare_func{'R<=>'}	:= _get_function('cmp_numeric_R');
-%Bsearch_compare_func{'cmp'}	:= _get_function('cmp_string');
-%Bsearch_compare_func{'Rcmp'}	:= _get_function('cmp_string_R');
+%Bsearch_compare_func{'<=>'}	:= Array::cmp_numeric;
+%Bsearch_compare_func{'R<=>'}	:= Array::cmp_numeric_R;
+%Bsearch_compare_func{'cmp'}	:= Array::cmp_string;
+%Bsearch_compare_func{'Rcmp'}	:= Array::cmp_string_R;
 
 =sub bsearch(@array, $value, ...)
 
@@ -108,15 +48,15 @@ at the start of the array.
 =cut
 
 sub bsearch(@array, $value, *%adverbs) {
-	DUMPold(:array(@array));
-	NOTEold("bsearch: for value ", $value);
+	DUMP(:array(@array));
+	NOTE("bsearch: for value ", $value);
 	my $low := 0 + %adverbs<low>;
 
 	if $low < 0 {
 		$low := $low + @array;
 	}
 	
-	NOTEold("low end: ", $low);
+	NOTE("low end: ", $low);
 	
 	my $high := +@array + %adverbs<high>;
 	
@@ -124,7 +64,7 @@ sub bsearch(@array, $value, *%adverbs) {
 		$high := %adverbs<high>;
 	}
 
-	NOTEold("high end: ", $high);
+	NOTE("high end: ", $high);
 	
 	my $top := $high;
 	
@@ -139,7 +79,7 @@ sub bsearch(@array, $value, *%adverbs) {
 		&compare := %adverbs<cmp>;
 	}
 	
-	NOTEold("Compare function is: ", &compare);
+	NOTE("Compare function is: ", &compare);
 	
 	my $mid;
 	while $low < $high {
@@ -172,15 +112,17 @@ sub bsearch(@array, $value, *%adverbs) {
 		$result := $low;
 	}
 	
-	NOTEold("Returning ", $result);
+	NOTE("Returning ", $result);
 	return $result;
 }
 
 sub clone(@original) {
-	my @clone := empty();
+	my @clone := Array::empty();
 	
-	for @original {
-		@clone.push($_);
+	if +@original {
+		for @original {
+			@clone.push($_);
+		}
 	}
 	
 	return @clone;
@@ -198,12 +140,32 @@ sub concat(*@sources) {
 	return @result;
 }
 	
+method contains($item) {
+	for self {
+		if $_ =:= $item {
+			return 1;
+		}
+	}
+	
+	return 0;
+}
+
+sub delete(@array, $index) {
+	Q:PIR {
+		$P0 = find_lex '@array'
+		$P1 = find_lex '$index'
+		$I0 = $P1
+		delete $P0[$I0]
+	};
+}
+
 sub empty() {
 	my @empty := Q:PIR { %r = new 'ResizablePMCArray' };
 	return @empty;
 }
 
 sub join($_delim, @parts) {
+	BACKTRACE();
 	my $result := '';
 	my $delim := '';
 
@@ -253,14 +215,8 @@ sub unique(@original) {
 ################################################################
 
 module ResizablePMCArray {
-sub append(@dest, @append) {
-	for @append {
-		@dest.push($_);
-	}
+	# method append(@other) - built in
 	
-	return @dest;
-}
-
 	method clone() {
 		my @clone := Q:PIR {
 			$P0 = find_lex 'self'
@@ -268,6 +224,28 @@ sub append(@dest, @append) {
 		};
 		
 		return @clone;
+	}
+
+	method contains($what) {
+		my $result := Q:PIR {
+			.local pmc it, what
+			$P0	= find_lex 'self'
+			it	= iter $P0
+			%r	= box 0
+			what	= find_lex '$what'
+			
+		foreach:
+			unless it goto done
+			
+			$P0	= shift it
+			ne_addr $P0, what, foreach
+			
+			%r	= box 1
+		
+		done:
+		};
+		
+		return $result;
 	}
 
 	method elements(*@value) {
@@ -292,8 +270,7 @@ sub append(@dest, @append) {
 		}
 		
 		return $elements;
-	}
-			
+	}			
 			
 	method join(*@delim) {
 		@delim.push('');
@@ -316,6 +293,10 @@ sub append(@dest, @append) {
 ################################################################
 
 module ResizableStringArray {
+	method append() {
+		Dumper::DIE("Didn't think this would be needed.");
+	}
+
 	method clone() {
 		my @clone := Q:PIR {
 			$P0 = find_lex 'self'
@@ -323,6 +304,30 @@ module ResizableStringArray {
 		};
 		
 		return @clone;
+	}
+
+	method contains($what) {
+		my $result := Q:PIR {
+			.local pmc it
+			$P0	= find_lex 'self'
+			it	= iter $P0
+			
+			%r	= box 0
+			
+			.local string what
+			$P0	= find_lex '$what'
+			what	= $P0
+			
+		foreach:
+			unless it goto done
+			$S0	= shift it
+			unless $S0 == what goto foreach
+			%r	= box 1
+		
+		done:
+		};
+		
+		return $result;
 	}
 
 	method elements(*@value) {

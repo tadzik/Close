@@ -112,7 +112,7 @@ method builtin_isa($/) {
 		$nsp.unshift(Slam::Scopes::fetch_current_hll());
 	}
 		
-	my $class_key := Array::join('::', $nsp);
+	my $class_key := $nsp.join('::');
 	my $class := PAST::Op.new(
 		:node($<class>),
 		:pasttype('inline'),

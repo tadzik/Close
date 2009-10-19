@@ -57,7 +57,7 @@ sub ASSERT($condition, *@message, :$caller_level?) {
 	my $message;
 	
 	if +@message {
-		$message := Array::join('', @message);
+		$message := @message.join;
 	}
 	else {
 		$message := "ASSERTION FAILED";
@@ -85,7 +85,7 @@ sub DIE(*@msg) {
 	if %Already_in<DIE> { return 0; }
 	%Already_in<DIE>++;
 
-	my $message := 'DIE: ' ~ Array::join('', @msg);
+	my $message := 'DIE: ' ~ @msg.join;
 		
 	Q:PIR {
 		$P0 = find_lex '$message'
@@ -153,14 +153,14 @@ sub NOTE(*@parts, :$caller_level?, :@info?) {
 	
 	if @info[0] && @info[0] % 2 {
 		$Prefix := make_named_prefix(@info);
-		say($Prefix, ': ', Array::join('', @parts));
+		say($Prefix, ': ', @parts.join);
 	}
 	
 	%Already_in<NOTE>--;
 }
 
 sub NOTEold(@info, @parts) {
-	NOTE(Array::join('', @parts), 
+	NOTE(@parts.join, 
 		:caller_level(+1), 
 		:info(@info));
 }
@@ -332,7 +332,7 @@ sub get_config(*@key) {
 	my $result;
 
 	if Registry<CONFIG> {
-		$result := Registry<CONFIG>.query(Array::join('::', @key));
+		$result := Registry<CONFIG>.query(@key.join('::'));
 	}
 
 	return $result;
@@ -348,12 +348,12 @@ sub get_dumper_config($named_caller, :$starting) {
 	unless my @config := %_dumper_config_cache{$addr} {
 		my $name := ~ $named_caller;
 		
-		my @namespace := Array::clone($named_caller.get_namespace.get_name);
+		my @namespace := $named_caller.get_namespace.get_name.clone;
 		# Replace hll 'parrot' with 'Dump' for dumper config settings.
 		@namespace[0] := 'Dump';
 		@namespace.push($name);
 		
-		my $key := Array::join('::', @namespace);
+		my $key := @namespace.join('::');
 
 		@config := Array::new(
 			get_config($key),
@@ -454,7 +454,7 @@ sub stack_depth(:$starting) {
 		if $stack_root {
 			my @parts	:= String::split('::', $stack_root);
 			$Root_sub	:= @parts.pop();
-			$Root_nsp	:= Array::join('::', @parts);
+			$Root_nsp	:= @parts.join('::');
 		}
 	}
 	
