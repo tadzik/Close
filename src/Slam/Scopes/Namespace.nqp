@@ -79,7 +79,7 @@ module Slam::Scope::Namespace {
 		my $nsp	:= self;
 		
 		for @path {
-			$nsp := $nsp.fetch_child($name);
+			$nsp := $nsp.fetch_child(~ $_);
 		}
 		
 		NOTE("done");
@@ -96,7 +96,12 @@ module Slam::Scope::Namespace {
 	}
 	
 	method format_namespace() {
-		return '::' ~ self.namespace.join('::');
+		my $result := self.namespace.join('::');
+		if $result {
+			$result := '::' ~ $result;
+		}
+		
+		return $result;
 	}
 
 	method has_child($name) {
@@ -169,8 +174,10 @@ module Slam::Scope::GlobalRoot {
 		my $child := Slam::Scope::HllRoot.new(
 			:name($name),
 		);
-		
-		return $child;
+
+		NOTE("Added child: ", $name);
+		DUMP($child);
+		return self.child($name, $child);
 	}
 	
 	method build_display_name() {
@@ -185,6 +192,9 @@ module Slam::Scope::GlobalRoot {
 		self._ATTR('hll',		Array::new(Scalar::undef()));
 		self._ATTR('name',		Array::new('<GLOBAL ROOT>'));
 		self._ATTR('namespace',	Array::new(Scalar::undef()));
+		
+		DUMP(self);
+		return self;
 	}
 	
 	method new(*@children, *%attributes) {

@@ -200,7 +200,7 @@ TEST_CLEANUPS := \
 	"t/language/*_[0-9][0-9].pir" \
 
 # the default target
-build: $(CLOSE_OPS) $(CLOSE_GROUP) close.pbc #$(CLOSE_LIB_PBC)
+build: close.cfg close.pbc
 	@echo "Build complete"
 
 
@@ -248,6 +248,10 @@ classes: $(CLASS_LIST).new
 
 build/slam_classes.new:
 	$(PERL) ./build/class_hierarchy.pl --list > $@
+
+close.cfg:
+#IF(win32):	IF NOT EXIST close.cfg $(CP) close_cfg.tmpl close.cfg
+#IF(not(win32)):	if [ ! -f close.cfg ]; then $(CP) close_cfg.tmpl close.cfg ; fi
 
 close.pbc: $(SOURCES)
 	$(PARROT) $(PARROT_ARGS) -o close.pbc close.pir

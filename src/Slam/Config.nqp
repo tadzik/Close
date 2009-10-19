@@ -46,26 +46,11 @@ method file($filename?) {
 	return self<_filename>;
 }
 
-method init(*@children, *%attributes) {
+method init(@children, %attributes) {
 	self<_filename> := '<no filename set>';
 	
 	# There is no parent .init
 	return self;
-}
-
-method new(*@children, *%attributes) {
-	my $new := Q:PIR { 
-		.local pmc attributes, children
-		attributes = find_lex '%attributes'
-		children = find_lex '@children'
-		
-		$P0 = self.'HOW'()
-		$P0 = getattribute $P0, 'parrotclass'
-		$P0 =  new $P0
-		%r = $P0.'init'(children :flat, attributes :flat :named)
-	};
-	
-	return $new;
 }
 
 method parse_config($data) {

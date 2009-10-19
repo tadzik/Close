@@ -63,27 +63,25 @@ method alias(*@value) {
 	return self._ATTR('alias', @value);
 }
 
-# Function def, CUES sub-symbol block
+# Function def, or CUES sub-symbol block
 method definition(*@value)		{ self._ATTR('definition', @value); }
 
-method init(*@children, *%attributes) {
-	%attributes := @children.shift;
-	
+method init(@children, %attributes) {
 	if %attributes<parts> {
+		ASSERT( ! %attributes<name>,
+			'Cannot use :name() with :parts()');
+		
 		my @part_values := Array::empty();
 		
 		for %attributes<parts> {
 			@part_values.push($_.value());
 		}
 		
-		ASSERT( ! %attributes<name>,
-			'Cannot use :name() with :parts()');
-		
 		%attributes<name> := @part_values.pop;
 
 		# If rooted, use exactly @parts as namespace. 
-		# If not rooted, use @parts as partial namespace only
-		# if it is not empty. (An empty ns would mean rooted symbol).
+		# If not rooted, use @parts as partial namespace only if
+		# it is not empty. (An empty ns would mean rooted symbol).
 		if %attributes<is_rooted> || +@part_values {
 			%attributes<namespace> := @part_values;
 		}

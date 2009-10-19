@@ -1,0 +1,30 @@
+# $Id: $
+#
+# close.cfg -- configuration settings for the Close compiler
+#
+
+# DUMP/NOTE settings
+
+Dump::Stack::Root					= parrot::PCT::HLLCompiler::eval
+Dump::Stack::Root_offset				= 3
+
+Dump::Bits::NOTE					= 1
+Dump::Bits::DUMP					= 2
+Dump::Bits::ASSERT				= 4
+# Setting ASSERT causes "assert passed" message to print
+
+# Dump::Slam::Node::init			= 1
+
+##############################################
+
+Slam::Visitor::PrettyPrint::enabled			= 0
+
+Slam::Visitor::SymbolResolution::disabled		= 0
+Slam::Visitor::TypeResolution::disabled			= 0
+
+# Swap out compiled code for faketree() results?
+Compiler::faketree					= 0
+#Compiler::PastCleanupVisitor::disabled		= 1
+#Compiler::ScopeAssignmentVisitor::disabled	= 1
+#Compiler::TreeRewriteVisitor::disabled		= 1
+

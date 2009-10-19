@@ -151,8 +151,11 @@ sub clean_up_heredoc($past, @lines) {
 }
 
 sub global_setup() {
+	NOTE("Checking if already run");
+	
 	unless our $init_done {
 		$init_done := 1;
+		NOTE("Not run before - running setup one time.");
 		
 		NOTE("Creating function list");
 		Registry<FUNCLIST> := Slam::Stmts.new(

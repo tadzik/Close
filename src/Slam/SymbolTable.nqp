@@ -90,6 +90,7 @@ method enter_namespace_definition_scope($ns_path) {
 	ASSERT($ns_path.isa(Slam::Symbol::Namespace),
 		"$ns_path parameter must be a namespace path, got ", $ns_path.node_type);
 	NOTE("Entering scope of namespace ", $ns_path);
+	DUMP($ns_path);
 	my $nsp := self._fetch_namespace_of($ns_path);
 	my $ns_scope := Slam::Scope::NamespaceDefinition.new($nsp);
 	DUMP($ns_scope);
@@ -133,7 +134,6 @@ method _fetch_namespace_of($symbol) {
 	return $result;
 }
 
-#method init(*@children, *%attributes) {
 method init(@children, %attributes) {
 	NOTE("Doing basic INIT");
 	#Slam::Node::init_(self, @children, %attributes);
@@ -219,10 +219,11 @@ method lookup_type($reference) {
 method namespace_root(*@value)		{ self._ATTR('namespace_root', @value); }
 method pervasive_scope(*@value)		{ self._ATTR('pervasive_scope', @value); }
 method print_stack() {
-	NOTE("Scope stack:");
+	NOTE("Scope stack (0 is 'top'):");
 	my $index := 0;
 	for self.stack {
 		NOTE($index, ": ", $_);
+		$index++;
 	}
 }
 		

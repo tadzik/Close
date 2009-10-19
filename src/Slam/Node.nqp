@@ -10,15 +10,6 @@ module Slam::Node {
 		
 		Parrot::IMPORT('Dumper');
 		
-		my $get_string := "
-.namespace [ 'Slam' ; 'Node' ]
-.sub 'get_string' :vtable :method
-	$S0 = self.'display_name'()
-	concat $S0, '(slam-node)'
-	.return ($S0)
-.end";
-		Parrot::compile($get_string);
-		
 		my $base_name := 'Slam::Node';
 		
 		NOTE("Creating class ", $base_name);
@@ -55,7 +46,8 @@ module Slam::Node {
 		
 		my @keys;
 		
-		# Remember that for HashBased, self is a Hash.
+		# Remember that for HashBased, self is a Hash. But for PAST nodes,
+		# self is a capture - part hash, part array.
 		for self.hash {
 			@keys.push(~$_);
 		}
@@ -165,6 +157,8 @@ module Slam::Node {
 		);
 	}
 
+	method get_string()		{ return self.display_name; }
+	
 	method id(*@value) {
 		my $id := self<id>;
 		
@@ -202,7 +196,7 @@ module Slam::Node {
 			%id_counter{$type} := 0;
 		}
 		
-		my $id := '_' ~ $type ~ %id_counter{$type}++;
+		my $id := '_' ~ $type ~ '#' ~ %id_counter{$type}++;
 		return $id;
 	}
 

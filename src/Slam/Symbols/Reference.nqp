@@ -21,7 +21,7 @@ method accept($visitor) {
 	return $visitor.visit_SlamSymbolReference(self);
 }
 
-method init(*@children, *%attributes) {
+method init(@children, %attributes) {
 	if %attributes<parts> {
 		my @part_values := Array::empty();
 		

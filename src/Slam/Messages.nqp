@@ -10,8 +10,9 @@ module Slam::Message {
 		
 		Parrot::IMPORT('Dumper');
 		
-		NOTE("Creating Slam::Message");
-		Class::SUBCLASS('Slam::Message', 'Slam::Var');
+		my $class_name := 'Slam::Message';
+		NOTE("Creating class ", $class_name);
+		Class::SUBCLASS($class_name, 'Slam::Var');
 	}
 
 	method format() {
@@ -22,7 +23,7 @@ module Slam::Message {
 		return $result;
 	}
 	
-	method init(*@children, *%attributes) {
+	method init(@children, %attributes) {
 		Slam::Node::init_(self, @children, %attributes);
 		self.position(self<source>, self<pos>);
 		return self;

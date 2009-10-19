@@ -27,7 +27,7 @@ sub _ONLOAD() {
 	NOTE("done");
 }
 
-method init(*@children, *%attributes) {
+method init(@children, %attributes) {
 	ASSERT(@children == 2,
 		'Two parameters - test and action - must be provided');
 	my $test	:= @children.shift;

@@ -137,12 +137,7 @@ method _translation_unit_close($/) {
 }
 
 method _translation_unit_open($/) {
-	NOTE("Running global setup");
 	global_setup();
-	
-	unless Slam::IncludeFile::in_include_file() {
-		NOTE("Not in an include file");
-	}
 }
 
 # NQP currently generates get_hll_global for functions. So qualify them all.

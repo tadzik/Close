@@ -440,7 +440,7 @@ module Class::ArrayBased {
 		#Class::SUBCLASS('Class::ArrayBased', 'Array', 'Class::BaseBehavior');
 	}
 	
-	method init(*@children, *%attributes) {
+	method init(@children, %attributes) {
 		DIE("NOT IMPLEMENTED. This class is but a shell.");
 	}
 
@@ -467,7 +467,6 @@ module Class::BaseBehavior {
 		my $get_string := "
 .namespace [ 'Class' ; 'BaseBehavior' ]
 .sub '__get_string' :vtable('get_string') :method
-	say 'basic get_string'
 	$S0 = self.'get_string'()
 	.return ($S0)
 .end";

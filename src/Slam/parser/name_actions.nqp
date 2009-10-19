@@ -10,8 +10,13 @@ resulting PAST::Var is not resolved.
 
 method declarator_name($/) {
 	NOTE("Creating declarator_name for ", $<path>[-1].ast.value);
-	my %attrs := assemble_qualified_path($/);
-	my $past := Slam::Symbol::Declaration.new(%attrs);
+	my $past := Slam::Symbol::Declaration.new(
+		:hll($<hll_name> && ~ $<hll_name>[0]),
+		:is_rooted($<root>),
+		:node($/),
+		:parts(ast_array($<path>)),
+	);
+
 	MAKE($past);
 }
 
