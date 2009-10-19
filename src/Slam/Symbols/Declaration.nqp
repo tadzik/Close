@@ -20,13 +20,6 @@ sub _ONLOAD() {
 	NOTE("done");
 }
 
-method _attach_Slam_Scope_Function($definition) {
-	self.definition($definition);
-	$definition.hll(self.hll);
-	$definition.namespace(self.namespace);
-	$definition.name(self.name);
-}
-
 method _attach_Slam_Type($type) {
 	NOTE("Attaching type info: ", $type, " to symbol: ", self);
 	

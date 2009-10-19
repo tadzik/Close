@@ -14,27 +14,19 @@ method contains($key) {
 }
 	
 method delete($key) {
-	Q:PIR {{
+	Q:PIR {
 		$P0 = find_lex 'self'
 		$P1 = find_lex '$key'
 		delete $P0[$P1]
-	}};
-}
-
-sub delete(%hash, $key) {
-	Q:PIR {{
-		$P0 = find_lex '%hash'
-		$P1 = find_lex '$key'
-		delete $P0[$P1]
-	}};
+	};
 }
 
 sub elements(%hash) {
-	my %results := Q:PIR {{
+	my %results := Q:PIR {
 		$P0 = find_lex '%hash'
 		$I0 = elements $P0
 		%r = box $I0
-	}};
+	};
 	
 	return %results;
 }
@@ -55,6 +47,16 @@ sub exists(%hash, $key) {
 	}
 	
 	return $result;	
+}
+
+method keys() {
+	my @keys := Array::empty();
+	
+	for self {
+		@keys.push(~ $_);
+	}
+	
+	return @keys;
 }
 
 sub merge(%first, *@hashes, :%into?, :$use_last?) {
@@ -132,13 +134,5 @@ sub new(*@pos, *%pairs) {
 }
 
 sub sorted_keys(%hash) {
-	my @keys := Array::empty();
-	
-	for %hash {
-		@keys.push(~$_);
-	}
-	
-	@keys.sort;
-	return @keys;
+	return %hash.keys.sort;
 }
-

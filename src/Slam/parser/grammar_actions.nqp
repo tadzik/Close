@@ -16,13 +16,14 @@ method TOP($/, $key) {
 			Slam::Visitor::TypeResolution,
 			Slam::Visitor::SymbolResolution,
 			Slam::Visitor::Message,
+			Slam::Visitor::FunctionMarshalling
 		) {
 			my $visitor := $_.new();
 			NOTE("Considering ", Class::name_of($visitor));
 			
 			if $visitor.is_enabled {
 				NOTE($visitor.description);
-				$visitor.visit($past);
+				$past := $visitor.visit($past);
 				$visitor.finish;
 			}
 			else {

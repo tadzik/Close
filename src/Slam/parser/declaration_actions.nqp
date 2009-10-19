@@ -138,8 +138,8 @@ method _declarator_part_block_close($/) {
 	if $declarator.type.isa(Slam::Type::Function) {
 		NOTE("Closing function-definition block");
 		my $block := $Symbols.leave_scope('Slam::Scope::Function');
-		$declarator.attach($block);
 		$block.attach($<body>[0].ast);
+		$declarator.type.attach($block);
 	}
 	else {
 		# Currently no support for aggregate types.
@@ -281,7 +281,8 @@ method _parameter_list_close($/) {
 	$params.arity(+@($params));
 	
 	NOTE("Creating function-returning declarator");
-	my $past := Slam::Type::Function.new(:node($/), 
+	my $past := Slam::Type::Function.new(
+		:node($/), 
 		:parameter_scope($params),
 	);
 	MAKE($past);

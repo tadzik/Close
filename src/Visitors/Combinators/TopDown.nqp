@@ -18,8 +18,8 @@ sub _ONLOAD() {
 	if our $onload_done { return 0; }
 	$onload_done := 1;
 
-	#Parrot::IMPORT('Dumper', 'ASSERT DIE DUMP DUMP_ NOTE');
-	Parrot::IMPORT('Visitor::Combinator');
+	Parrot::IMPORT('Dumper');
+	Parrot::IMPORT('Visitor::Combinator::Factory');
 	
 	my $class_name := 'Visitor::Combinator::TopDown';
 	Dumper::NOTE("Creating class ", $class_name);
@@ -33,6 +33,6 @@ method init(@children, %attributes) {
 	my $v := @children.shift;
 	
 	self.definition(
-		Sequence_($v, All_(self))
+		Sequence($v,  All(self)),
 	);
 }

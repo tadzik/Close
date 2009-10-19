@@ -156,7 +156,7 @@ sub get_overridden_methods {
 	my $visit_method_re = qr{
 		^ \s* 			# Optional indentation
 		method \s+ 		# 'method' space
-		_* visit_(\S+) 	# _visit_Foo
+		_visit_(\S+) 		# _visit_Foo
 		\s* \( 			# (
 	}mox;
 
@@ -167,7 +167,7 @@ sub get_overridden_methods {
 	if (keys %overrides) {
 		print scalar(keys %overrides),
 			" methods overridden. These will not be generated.\n";
-		print "\t" . join("\n\t", keys %overrides) . "\n";
+		print "\t" . join("\n\t", sort keys %overrides) . "\n";
 	}
 	
 	return %overrides;

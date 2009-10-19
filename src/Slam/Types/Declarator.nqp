@@ -55,7 +55,8 @@ module Slam::Type::Array {
 		
 		my $class_name := 'Slam::Type::Array';
 		NOTE("Creating class ", $class_name);
-		my $base := Class::SUBCLASS($class_name, 'Slam::Type::Declarator');
+		my $base := Class::SUBCLASS($class_name,
+			'Slam::Type::Declarator');
 
 		NOTE("done");
 	}
@@ -93,8 +94,10 @@ module Slam::Type::Function {
 		
 		my $class_name := 'Slam::Type::Function';
 		NOTE("Creating class ", $class_name);
-		my $base := Class::SUBCLASS($class_name, 'Slam::Type::Declarator');
-
+		my $base := Class::SUBCLASS($class_name, 
+			'Slam::Type::Declarator');
+		Class::MULTISUB($class_name, 'attach', :starting_with('_attach_'));
+		
 		NOTE("done");
 	}
 
@@ -102,6 +105,10 @@ module Slam::Type::Function {
 
 	method accept($visitor) {
 		return $visitor.visit_SlamTypeFunction(self);
+	}
+
+	method _attach_Slam_Scope_Function($scope) {
+		self.definition($scope);
 	}
 	
 	method can_merge($other) {
@@ -124,6 +131,7 @@ module Slam::Type::Function {
 		return self.nominal.can_merge($other.nominal);
 	}
 	
+	method definition(*@value)	{ self._ATTR('definition', @value); }
 	method is_function()		{ return 1; }
 	method is_method(*@value)	{ self._ATTR('is_method', @value); }
 	method parameter_scope(*@value) { self._ATTR('parameter_scope', @value); }

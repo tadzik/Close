@@ -40,18 +40,18 @@ Node.
 ################################################################
 
 module Slam::Literal::Float {
-	method returns()				{ return 'Float'; }
+	method returns()			{ return 'Float'; }
 }
 
 ################################################################
 
 module Slam::Literal::Integer {
-	method returns()				{ return 'Integer'; }
+	method returns()			{ return 'Integer'; }
 }
 
 ################################################################
 
 module Slam::Literal::String {
-	method returns()				{ return 'String'; }
+	method returns()			{ return 'String'; }
 }
 

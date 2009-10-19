@@ -27,8 +27,7 @@ Parrot::IMPORT('Dumper');
 	
 ################################################################
 
-our $Config;
-our $Symbols;
+our $Symbols;	# Easier to type than Registry<SYMTAB> all the time
 
 ################################################################
 
@@ -60,46 +59,7 @@ sub PASSTHRU($/, $key, :$caller_level?) {
 	MAKE($past, :caller_level($caller_level));
 }
 
-=sub PAST::Var assemble_qualified_path($/)
-
-Creates and returns a Hash populated by the contents of a Match object.
-The named captures used are:
-
-=item * $<hll_name> - the language name found after the 'hll:' prefix (optional). 
-Stored into %hash<hll>.
-
-=item * $<root> - the '::' indicating the name is rooted (optional). Stored into
-%hash<is_rooted>.
-
-=item * $<path> - the various path (namespace + name) elements (optional). 
-Stored into %hash<parts>.
-
-Returns a new PAST::Var with C<node>, C<name>, C<is_rooted>, and 
-C<hll> set (or not) appropriately.
-
-=cut
-
-sub assemble_qualified_path($/) {
-	NOTE("Assembling qualified path");
-	
-	my %attributes := Hash::new(:node($/),
-		:parts(ast_array($<path>)));
-		
-	NOTE("Got ", +%attributes<parts>, " parts");
-	
-	if $<hll_name> {
-		%attributes<hll> := ~ $<hll_name>[0];
-		NOTE("HLL: ", %attributes<hll>);
-	}
-
-	if $<root> {
-		NOTE("This name is rooted.");
-		%attributes<is_rooted> := 1;
-	}
-	
-	DUMP(%attributes);
-	return %attributes;
-}
+################################################################
 
 =sub ast_array($capture)
 
@@ -163,8 +123,6 @@ sub global_setup() {
 		);
 		
 		NOTE("Initializing global variables");
-		$Config := Registry<CONFIG>;
-		
 		my $hll := 'close';
 		$Symbols := Slam::SymbolTable.new(:default_hll($hll));
 		Registry<SYMTAB> := $Symbols;

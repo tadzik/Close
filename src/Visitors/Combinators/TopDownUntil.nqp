@@ -20,7 +20,7 @@ sub _ONLOAD() {
 	$onload_done := 1;
 
 	Parrot::IMPORT('Dumper', 'DUMP DUMP_ NOTE');
-	Parrot::IMPORT('Visitor::Combinator');
+	Parrot::IMPORT('Visitor::Combinator::Factory');
 
 	my $class_name := 'Visitor::Combinator::TopDownUntil';
 	Dumper::NOTE("Creating class ", $class_name);
@@ -34,6 +34,6 @@ method init(@children, %attributes) {
 	my $v := @children.shift;
 	
 	self.definition(
-		Choice_($v, All_(self))
+		Choice($v, All(self))
 	);
 }

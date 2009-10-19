@@ -19,13 +19,19 @@ sub _ONLOAD() {
 	Class::MULTISUB($class_name, 'attach', :starting_with('_attach_'));
 }
 
+method _attach_Slam_Scope_Local($scope) {
+	NOTE("Attaching body (compound-statement) block");
+	self.push($scope);
+}
+
+# Not used - code calls init with :parameter_scope instead.
 method _attach_Slam_Scope_Parameter($scope) {
+	NOTE("Attaching parameter scope");
 	self.parameter_scope($scope);
 }
 
 method init(@children, %attributes) {
 	self.init_(@children, %attributes);
-	Registry<FUNCLIST>.attach(self);
 }
 
 method lookup($reference, :&satisfies) {

@@ -70,7 +70,14 @@ sub IMPORT($namespace, $names?) {
 		}
 	}
 	
+	# say("Exporting ", +@new_names, " functions from ", $from_nsp, " to ", $caller_nsp);
+	# if $from_nsp{'DIE'} {
+		# say("Die info: ", $from_nsp{'DIE'}.get_namespace.get_name.join('::'));
+	# }
+	# say(@new_names.join(", "));
+	# Dumper::BACKTRACE();
 	$from_nsp.export_to($caller_nsp, @names);
+	# say("done");
 }
 
 sub call_onload($nsp) {

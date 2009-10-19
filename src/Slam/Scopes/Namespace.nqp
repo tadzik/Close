@@ -53,13 +53,13 @@ module Slam::Scope::Namespace {
 
 	method child($name, *@value) {
 		if +@value {
-			self.child_nsp{$name} := @value.shift;
+			self.child_namespaces{$name} := @value.shift;
 		}
 		
-		return self.child_nsp{$name};
+		return self.child_namespaces{$name};
 	}
 
-	method child_nsp(*@value)		{ self._ATTR_HASH('child_nsp', @value); }
+	method child_namespaces(*@value)	{ self._ATTR_HASH('child_namespaces', @value); }
 	method default_storage_class()		{ return 'extern'; }
 
 	method fetch_child($name) {
@@ -117,6 +117,20 @@ module Slam::Scope::Namespace {
 		return self.init_(@children, %attributes);
 	}
 
+	method initload(*@value) {
+		my $initload := self._ATTR('initload', @value);
+		
+		unless $initload {
+			$initload := self.initload(
+				Slam::Scope::Function.new(
+					:name('_namespace_initload'),
+				)
+			);
+		}
+		
+		return $initload;
+	}
+	
 	method is_namespace()		{ return 1; }
 
 	method query_namespace($name) {

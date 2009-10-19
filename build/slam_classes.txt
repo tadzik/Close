@@ -1,4 +1,4 @@
-Found 36 classes
+Found 38 classes
 Slam_Adverb
 Slam_Adverb_Flat
 Slam_Adverb_Multi
@@ -15,6 +15,8 @@ Slam_Literal_String
 Slam_Lookups
 Slam_Message
 Slam_Scope_Function
+Slam_Scope_GlobalRoot
+Slam_Scope_HllRoot
 Slam_Scope_Local
 Slam_Scope_Namespace
 Slam_Scope_NamespaceDefinition
