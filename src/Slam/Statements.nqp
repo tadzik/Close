@@ -23,7 +23,7 @@ This code runs at initload time, creating subclasses.
 
 		my %statement_classes := Hash::new(
 			:Null(			'Slam::Stmts'),
-			:Return(		'Slam::Op'),
+			:Return(		'Slam::Operator'),
 			:SymbolDeclarationList('Slam::VarList'),
 			:UsingNamespace(	'Slam::Stmts'),
 		);

@@ -13,9 +13,12 @@ sub _ONLOAD() {
 	my $class_name := 'Slam::Symbol::Declaration';
 	NOTE("Creating class ", $class_name);
 	Class::SUBCLASS($class_name, 
-		'Slam::Var', 'Slam::Symbol::Name');
+		'Slam::Var', 
+		'Slam::Symbol::Name',
+		#'Slam::Mixin::HasType',
+		);
 	
-	Class::MULTISUB($class_name, 'attach', :starting_with('_attach_'));
+	Class::multi_method($class_name, 'attach', :starting_with('_attach_'));
 	
 	NOTE("done");
 }
@@ -146,59 +149,22 @@ method scope() {
 	return %scopes{self.storage_class};
 }
 
-method specifier(*@value)		{ self._ATTR('specifier', @value); }
 method storage_class(*@value)	{ self._ATTR('storage_class', @value); }
-method type(*@value)		{ self._ATTR('type', @value); }
 
 
 
 
 
-# Make a symbol reference from a declarator.
-sub make_reference_to($node) {
-	ASSERT($node.node_type eq 'declarator_name', 
-		'You can only make a reference to a declarator');
-		
-	my $past := Slam::Node::create('qualified_identifier', 
-		:declarator($node),
-		:hll($node<hll>),
-		:is_rooted($node<is_rooted>),
-		:name($node<name>),
-		:namespace($node<namespace>),
-		:node($node),
-		:scope($node.scope()),
-	);
 
-	return $past;
-}
 
-sub print_aggregate($agg) {
-	say(substr($agg<kind> ~ "        ", 0, 8),
-		substr($agg<tag> ~ "                  ", 0, 18));
-	
-	for $agg<symtable> {
-		# FIXME: No more .symbols
-		print_symbol($agg.symbol($_)<decl>);
-	}
-}
 
-sub print_symbol($sym) {
-	NOTE("Printing symbol: ", $sym.name());
-	if $sym<is_alias> {
-		say(substr($sym.name() ~ "                  ", 0, 18),
-			" ",
-			substr("is an alias for: " ~ "                  ", 0, 18),
-			" ",
-			substr($sym<alias_for><block> ~ '::' 
-				~ $sym<alias_for>.name() ~ "                              ", 0, 30));
-	}
-	else {
-		say(substr($sym.name() ~ "                  ", 0, 18),
-			" ",
-			substr($sym<pir_name> ~ "                  ", 0, 18),
-			" ",
-			$sym<block>, 
-			" ",
-			Slam::Type::type_to_string($sym<type>));
-	}
-}
+
+
+
+
+
+
+
+
+
+

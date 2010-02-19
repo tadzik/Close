@@ -16,7 +16,7 @@ module Slam::Visitor::ScopeTracker::Enter {
 		Class::SUBCLASS($class_name, 
 			'Visitor::Combinator');
 
-		Class::MULTISUB($class_name, 'visit', :starting_with('_visit_'));
+		Class::multi_method($class_name, 'visit', :starting_with('_visit_'));
 		NOTE("done");
 	}
 
@@ -50,7 +50,7 @@ module Slam::Visitor::ScopeTracker::Leave {
 		Class::SUBCLASS($class_name, 
 			'Visitor::Combinator');
 		
-		Class::MULTISUB($class_name, 'visit', :starting_with('_visit_'));
+		Class::multi_method($class_name, 'visit', :starting_with('_visit_'));
 		NOTE("done");
 	}
 

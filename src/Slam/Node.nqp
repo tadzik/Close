@@ -16,7 +16,7 @@ module Slam::Node {
 		# Class::SUBCLASS($base_name, 'PAST::Node', 'Visitor::Visitable');
 		Class::SUBCLASS($base_name, 'Class::HashBased', 'Visitor::Visitable');
 
-		for ('Block', 'Control', 'Op', 'Stmts', 'Val', 'Var', 'VarList') {
+		for ('Block', 'Control', 'Stmts', 'Val', 'Var', 'VarList') {
 			my $subclass := 'Slam::' ~ $_;
 			NOTE("Creating subclass ", $subclass);
 			Class::SUBCLASS($subclass, $base_name, 'PAST::' ~ $_);
@@ -254,99 +254,7 @@ module Slam::Block {
 	Parrot::IMPORT('Dumper');
 }
 
-
 ################################################################
-
-module Slam::Op {
-	
-	Parrot::IMPORT('Dumper');
-		
-	method inline(*@value)	{ self._ATTR('inline', @value); }
-	method lvalue(*@value)	{ self._ATTR('lvalue', @value); }
-	method opattr(%hash)	{ Slam::Op.opattr(self, %hash); }
-	method pasttype(*@value)	{ self._ATTR('pasttype', @value); }
-	method pirop(*@value)	{ self._ATTR('pirop', @value); }
-	
-	our %binary_pastops;
-	%binary_pastops{'&&'}	:= "if";
-	%binary_pastops{'and'}	:= "if";
-	%binary_pastops{'||'}	:= "unless";
-	%binary_pastops{'or'}	:= "unless";
-	%binary_pastops{'xor'}	:= "xor";
-	%binary_pastops{'+'}	:= "pirop";
-	%binary_pastops{'-'}	:= "pirop";
-	%binary_pastops{'*'}	:= "pirop";
-	%binary_pastops{'/'}	:= "pirop";
-	%binary_pastops{'%'}	:= "pirop";
-	%binary_pastops{'<<'}	:= "pirop";
-	%binary_pastops{'>>'}	:= "pirop";
-	%binary_pastops{'&'}	:= "pirop";
-	%binary_pastops{'band'}	:= "pirop";
-	%binary_pastops{'|'}	:= "pirop";
-	%binary_pastops{'bor'}	:= "pirop";
-	%binary_pastops{'^'}	:= "pirop";
-	%binary_pastops{'bxor'}	:= "pirop";
-	%binary_pastops{'=='}	:= "inline";
-	%binary_pastops{'!='}	:= "inline";
-	%binary_pastops{'<'}	:= "inline";
-	%binary_pastops{'<='}	:= "inline";
-	%binary_pastops{'>'}	:= "inline";
-	%binary_pastops{'>='}	:= "inline";
-
-	our %binary_pirops;
-	%binary_pirops{'+'}		:= "add";
-	%binary_pirops{'-'}		:= "sub";
-	%binary_pirops{'*'}		:= "mul";
-	%binary_pirops{'/'}		:= "div";
-	%binary_pirops{'%'}		:= "mod";
-	%binary_pirops{'<<'}	:= "shl";
-	%binary_pirops{'>>'}	:= "shr";
-	%binary_pirops{'&'}		:= "band";
-	%binary_pirops{'band'}	:= "band";
-	%binary_pirops{'|'}		:= "bor";
-	%binary_pirops{'bor'}	:= "bor";
-	%binary_pirops{'^'}		:= "bxor";
-	%binary_pirops{'bxor'}	:= "bxor";
-
-	our %binary_inline;
-	%binary_inline{'=='}	:= "iseq";
-	%binary_inline{'!='}		:= "isne";
-	%binary_inline{'<'}		:= "islt";
-	%binary_inline{'<='}	:= "isle";
-	%binary_inline{'>'}		:= "isgt";
-	%binary_inline{'>='}	:= "isge";
-
-	sub _create_expr_binary($node, %attributes) {
-		NOTE("Creating expr_binary node: ", $oper);
-		my $oper	:= %attributes<operator>;
-		ASSERT($oper, 'Expr_binary must have an :operator()');
-		my $left	:= %attributes<left>;
-		ASSERT($left, 'Expr_binary must have a :left()');
-		my $right	:= %attributes<right>;
-		ASSERT($right, 'Expr_binary must have a :right()');
-
-		%attributes<name> := $oper;
-		
-		my $pasttype := %binary_pastops{$oper};
-		
-		ASSERT($pasttype, 'Binary operators must be in the pastops table.');
-		
-		%attributes<pasttype> := $pasttype;
-		
-		if $pasttype eq 'pirop' {
-			ASSERT(%binary_pirops{$oper},
-				'Operators marked pirop must appear in %binary_pirops table');
-			%attributes<pirop> := %binary_pirops{$oper};
-		}
-		elsif $pasttype eq 'inline' {
-			%attributes<inline> := "\t$I0 = " ~ %binary_inline{$oper} ~ " %0, %1\n"
-				~ "\t%r = box $I0\n";
-		}
-
-		$node.push($left);
-		$node.push($right);
-	}
-}
 
 module Slam::Stmts {
 	

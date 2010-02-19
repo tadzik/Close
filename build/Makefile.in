@@ -16,7 +16,7 @@ O             := @o@
 
 # Various paths
 PERL6GRAMMAR  := $(LIB_DIR)/library/PGE/Perl6Grammar.pbc
-NQP           := $(LIB_DIR)/languages/nqp/nqp.pbc
+#NQP           := $(LIB_DIR)/languages/nqp/nqp.pbc
 PCT           := $(LIB_DIR)/library/PCT.pbc
 PMC_DIR       := src/pmc
 OPS_DIR       := src/ops
@@ -33,6 +33,7 @@ RM_RF         := @rm_rf@
 POD2MAN       := pod2man
 #IF(parrot_is_shared and not(cygwin or win32)):export LD_RUN_PATH := @blib_dir@:$(LD_RUN_PATH)
 PARROT        := $(BIN_DIR)/parrot@exe@
+PARROT_NQP	:= $(BIN_DIR)/parrot_nqp@exe@
 PBC_TO_EXE    := $(BIN_DIR)/pbc_to_exe@exe@
 STRIP_PIRA	:= grep -v '^.annotate'
 #IF(darwin):
@@ -49,6 +50,7 @@ ACTIONS_PM := \
 BUILTINS_PIR := \
 	src/builtins/grammar_utils.pir \
 	src/builtins/literals.pir \
+	src/builtins/load_bytecode.pir \
 	src/builtins/optable.pir \
 	src/builtins/say.pir \
 	src/builtins/strings.pir
@@ -56,27 +58,17 @@ BUILTINS_PIR := \
 CLASS_DEPENDENT_SOURCES := \
 	src/Visitors/Combinators/All.nqp	\
 	src/Visitors/Combinators/Combinator.nqp
-	
+
 COMPILER_LIBS_PIR := \
-	src/Array.pir		\
-	src/Class.pir		\
-	src/Config.pir	\
-	src/Dumper.pir	\
-	src/File.pir		\
-	src/Hash.pir		\
-	src/OS.pir		\
-	src/Parrot.pir 	\
-	src/Registry.pir 	\
-	src/Scalar.pir 	\
-	src/String.pir		\
-	src/Slam/_INIT.pir	\
+	src/Slam/_INIT.pir				\
 	src/Slam/Adverbs.pir			\
-	src/Slam/Config.pir				\
 	src/Slam/IncludeFile.pir			\
 	src/Slam/Literal.pir				\
 	src/Slam/Lookups.pir			\
 	src/Slam/Messages.pir			\
 	src/Slam/Node.pir				\
+	src/Slam/Operators/Factory.pir		\
+	src/Slam/Operators/Operator.pir		\
 	src/Slam/Scopes/Function.pir		\
 	src/Slam/Scopes/Local.pir			\
 	src/Slam/Scopes/Namespace.pir		\
@@ -93,6 +85,7 @@ COMPILER_LIBS_PIR := \
 	src/Slam/Types/Type.pir			\
 	src/Slam/Types/Declarator.pir		\
 	src/Slam/Types/Specifier.pir		\
+	src/Slam/Value.pir				\
 	src/Slam/Visitors/DeclarationCollectionVisitor.pir	\
 	src/Slam/Visitors/FunctionMarshalling.pir \
 	src/Slam/Visitors/Message.pir		\
@@ -119,9 +112,8 @@ COMPILER_LIBS_PIR := \
 	src/Visitors/Combinators/TopDown.pir	\
 	src/Visitors/Combinators/TopDownUntil.pir	\
 	src/Visitors/Combinators/VisitOnce.pir	\
-	src/Visitors/Visitable.pir	\
-	src/Visitors/Visitor.pir	\
-	
+	src/Visitors/Visitable.pir			\
+	src/Visitors/Visitor.pir
 
 DOCS := README
 
@@ -139,7 +131,7 @@ LIBRARY_SRC := \
 	library/close/print.cl \
 	library/close/ok.cl \
 	library/close/string.cl
-	
+
 GEN_SOURCES :=				\
 	src/gen_grammar.pir		\
 	src/gen_actions.pir			\
@@ -151,21 +143,15 @@ GEN_SOURCES :=				\
 	src/Slam/parser/statement_actions.pir	\
 	src/Slam/parser/token_actions.pir	\
 	src/gen_builtins.pir			\
-	src/gen_library.pir
+	src/gen_slam_lib.pir		\
+	src/gen_util_lib.pir
 
-SOURCES := $(GEN_SOURCES) \
+SOURCES :=	\
+	$(GEN_SOURCES)	\
 	close.pir
 
 LANGUAGE_TESTS := "t/language/*.t"
-XLANGUAGE_TESTS := \
-	t/language/00-sanity.t \
-	t/language/01-literals.t \
-	t/language/02-adverbs.t \
-	t/language/03-arithmetic-expr.t \
-	t/language/05-comparison-expr.t \
-	t/language/06-bitwise-expr.t \
-	t/language/07-logical-expr.t
-	
+
 BUILD_CLEANUPS := \
 	close.pbc 			\
 	$(GEN_SOURCES) 		\
@@ -183,24 +169,38 @@ BUILD_CLEANUPS := \
 	"src/Slam/Visitors/*.pira"	\
 	"src/Slam/parser/*.pir"	\
 	"src/Slam/parser/*.pira"	\
-	close@exe@ \
-#IF(win32):  parrot-close.exe \
-#IF(win32):  parrot-close.iss \
-#IF(win32):  "setup-parrot-*.exe" \
+	close@exe@			\
+#IF(win32):  parrot-close.exe	\
+#IF(win32):  parrot-close.iss	\
+#IF(win32):  "setup-parrot-*.exe"	\
 	installable_close@exe@
 
 LIB_CLEANUPS := \
-	$(COMPILER_LIBS_PIR)
-	
+	$(COMPILER_LIBS_PIR)	\
+	$(UTILITY_LIBS_PIR)
+
 TEST_CLEANUPS := \
-	"t/*.bak" \
-	"t/*.c=" \
-	"t/*_[0-9].pir" \
-	"t/*_[0-9][0-9].pir" \
-	"t/language/*.bak" \
-	"t/language/*.c=" \
-	"t/language/*_[0-9].pir" \
-	"t/language/*_[0-9][0-9].pir" \
+	"t/*.bak"			\
+	"t/*.c="			\
+	"t/*_[0-9].pir"		\
+	"t/*_[0-9][0-9].pir"		\
+	"t/language/*.bak"		\
+	"t/language/*.c="		\
+	"t/language/*_[0-9].pir"	\
+	"t/language/*_[0-9][0-9].pir"
+
+UTILITY_LIBS_PIR := \
+	src/Array.pir		\
+	src/Class.pir		\
+	src/Config.pir	\
+	src/Dumper.pir	\
+	src/File.pir		\
+	src/Hash.pir		\
+	src/OS.pir		\
+	src/Parrot.pir 	\
+	src/Registry.pir 	\
+	src/Slam/Config.pir	\
+	src/String.pir
 
 # the default target
 build: close.cfg close.pbc
@@ -216,30 +216,32 @@ CLext := .c=
 $(CLext).pira:
 	@echo "*** Compiling to PIRA: $<"
 	cl --target=pir --output=$@ $<
-	
+
 .pg.pira:
 	@echo "*** Compiling to PIRA: $<"
 	$(PARROT) $(PARROT_ARGS) $(PERL6GRAMMAR) --output=$@ $<
 
 .nqp.pira: 
 	@echo "*** Compiling to PIRA: $<"
-	$(PARROT) $(PARROT_ARGS) $(NQP) --target=pir --output=$@ $<
+	$(PARROT_NQP) --target=pir --output=$@  $<
+
+# $(PARROT) $(PARROT_ARGS) $(NQP) --target=pir --output=$@ $<
 
 .pira.pir:
 	@echo "*** Strip annotations PIRA->PIR: $<"
 	$(STRIP_PIRA) $< > $@
-	
+
 .pira.pbc:
 	@echo "*** Compiling to PBC: $<"
 	$(PARROT) $(PARROT_ARGS) -o $@ $<
 
-	
+
 all: build close@exe@ installable
 
 CLASS_LIST = build/slam_classes
 
 classes: FORCE
-	$(PERL) ./build/class_hierarchy.pl --list > $@
+	$(PERL) ./build/class_hierarchy.pl --list > $(CLASS_LIST).new
 #IF(win32):	fc $(CLASS_LIST).new $(CLASS_LIST).txt >NUL \
 #IF(win32):	|| ( $(CP) $(CLASS_LIST).new $(CLASS_LIST).txt ) & \
 #IF(win32):	     $(PERL) $(UPDATE_CLASSES) $(CLASS_DEPENDENT_SOURCES) \
@@ -273,11 +275,16 @@ src/gen_builtins.pir: $(BUILTINS_PIR)
 src/gen_grammar.pg: $(GRAMMARS_PG) Makefile
 	@echo "**** Collecting gen_grammar.pg"
 	$(CAT) $(GRAMMARS_PG) > src/gen_grammar.pg
-	
-src/gen_library.pir: $(COMPILER_LIBS_PIR) Makefile
-	@echo "**** Assembling gen_library.pir from compiler libs"
+
+src/gen_slam_lib.pir: $(COMPILER_LIBS_PIR) Makefile
+	@echo "**** Assembling $@ from compiler libs"
 	@echo "Files: " $(COMPILER_LIBS_PIR)
-	$(CAT) $(COMPILER_LIBS_PIR) > src/gen_library.pir
+	$(CAT) $(COMPILER_LIBS_PIR) > $@
+
+src/gen_util_lib.pir: $(UTILITY_LIBS_PIR) Makefile
+	@echo "**** Assembling $@ from compiler libs"
+	@echo "Files: " $(UTILITY_LIBS_PIR)
+	$(CAT) $(UTILITY_LIBS_PIR) > $@
 
 $(CLOSE_LIB_PIR): $(LIBRARY_SRC)
 	$(PARROT) -r close.pbc --combine --target=pir --output=$(CLOSE_LIB_PIR) \
@@ -395,7 +402,7 @@ doc2wiki:
 
 PCT_NODE_LIB_DIRS := \
 	-Llibrary/pct
-	
+
 PCT_NODE_DIR := library/pct/PCT
 PCT_NODE_T_DIR := t/library/pct/PCT/Node
 PCTNODE_CLEAN_RM_FILES := $(PCT_NODE_DIR)/Node.pir
@@ -408,7 +415,7 @@ pctnode_test: pctnode
 	do \
 		cl $(PCT_NODE_LIB_DIRS) --combine library/close/crt0.cl $$tf; \
 	done
-	
+
 pctnode_clean:
 	$(RM_F) $(PCTNODE_CLEAN_RM_FILES)
 
@@ -422,7 +429,7 @@ pastnode_test: pastnode
 	do \
 		cl $(PCT_NODE_LIB_DIRS) --combine library/close/crt0.cl $$tf; \
 	done
-	
+
 pastnode_clean:
 	$(RM_F) $(PASTNODE_CLEAN_RM_FILES)
 
@@ -436,7 +443,7 @@ postnode_test: postnode
 	do \
 		cl $(PCT_NODE_LIB_DIRS) --combine library/close/crt0.cl $$tf; \
 	done
-	
+
 postnode_clean:
 	$(RM_F) $(POSTNODE_CLEAN_RM_FILES)
 
@@ -448,30 +455,17 @@ HLL_CLOSE_PIR := \
 	 src/Namespace.pir
 HLL_CLOSE_CLEAN_RM_FILES := \
 	$(HLL_CLOSE_PIR)
-	
+
 hll_close: $(HLL_CLOSE_PIR)
 
 hll_close_clean: 
 	$(RM_F) $(HLL_CLOSE_CLEAN_RM_FILES)
 
-CLASSTEST_LIBS_PIR := \
-	src/Array.pir		\
-	src/Class.pir		\
-	src/Config.pir	\
-	src/Dumper.pir	\
-	src/Hash.pir		\
-	src/Parrot.pir 	\
-	src/Scalar.pir 	\
-	src/String.pir 	\
-	src/gen_builtins.pir	\
-	src/test.pir
-	
-classtest: classtest.pbc
-	@echo "Running classtest.pbc"
-	$(PARROT) $(PARROT_ARGS) classtest.pbc
+TEST_LIBS := \
+	src/gen_util_lib.pir \
+	src/gen_builtins.pir \
+	src/Matcher.pir	\
+	src/Testcase.pir
 
-classtest.pbc: $(CLASSTEST_LIBS_PIR) Makefile
-	@echo "**** Assembling gen_library.pir from compiler libs"
-	@echo "Files: " $(CLASSTEST_LIBS_PIR)
-	$(CAT) $(CLASSTEST_LIBS_PIR) > src/gen_classtest.pir
-	$(PARROT) $(PARROT_ARGS) -o classtest.pbc src/gen_classtest.pir
+tvalues: $(TEST_LIBS) t/Slam/Values.pir src/Slam/Value.pir
+	$(PARROT) $(PARROT_ARGS) t/Slam/Values.pir

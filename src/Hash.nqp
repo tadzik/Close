@@ -1,6 +1,6 @@
 # $Id$
 
-class Hash;
+module Hash;
 
 method contains($key) {
 	my $result := Q:PIR {
@@ -63,10 +63,10 @@ sub merge(%first, *@hashes, :%into?, :$use_last?) {
 	
 	@hashes.unshift(%first);	# Ensure at least one element.
 
-	unless Scalar::defined(%into) {
+	unless Parrot::defined(%into) {
 		%into := @hashes.shift();
 		
-		unless Scalar::defined(%into) {
+		unless Parrot::defined(%into) {
 			%into := Hash::new();
 		}
 	}
@@ -95,10 +95,10 @@ sub merge(%first, *@hashes, :%into?, :$use_last?) {
 sub merge_keys(%first, *@hashes, :@keys!, :%into?, :$use_last?) {
 	@hashes.unshift(%first);
 	
-	unless Scalar::defined(%into) {
+	unless Parrot::defined(%into) {
 		%into := @hashes.shift();
 		
-		unless Scalar::defined(%into) {
+		unless Parrot::defined(%into) {
 			%into := Hash::new();
 		}
 	}

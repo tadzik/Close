@@ -69,8 +69,8 @@ module Slam::Type::Array {
 	
 	method can_merge($other) {
 		if ! $other.isa(Slam::Type::Array)
-			|| (Scalar::defined(self.elements)
-				&& Scalar::defined($other.elements)
+			|| (Parrot::defined(self.elements)
+				&& Parrot::defined($other.elements)
 				&& self.elements != $other.elements) {
 			return 0;
 		}
@@ -96,7 +96,7 @@ module Slam::Type::Function {
 		NOTE("Creating class ", $class_name);
 		my $base := Class::SUBCLASS($class_name, 
 			'Slam::Type::Declarator');
-		Class::MULTISUB($class_name, 'attach', :starting_with('_attach_'));
+		Class::multi_method($class_name, 'attach', :starting_with('_attach_'));
 		
 		NOTE("done");
 	}

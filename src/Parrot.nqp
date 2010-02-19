@@ -32,7 +32,7 @@ sub IMPORT($namespace, $names?) {
 	my @names;
 	
 	if $names {
-		@names := String::split(' ', $names);
+		@names := $names.split(' ');
 	}
 	else {
 		for $from_nsp {
@@ -120,6 +120,30 @@ sub compile($string) {
 	return $result;
 }
 
+our $do_note;
+IMPORT('Dumper');
+$do_note := 0;
+sub do_note() {
+	$do_note := 1;
+}
+
+sub defined(*@what) {
+	if $do_note && Registry<CONFIG> {
+	say("do note is true");
+		NOTE("Checking if something is defined");
+		DUMP(@what);
+	}
+	
+	my $result := Q:PIR {{
+		$P0 = find_lex '@what'
+		$I0 = defined $P0[0]
+		%r = box $I0
+	}};
+	
+	#NOTE("Returning ", $result);
+	return $result;
+}
+
 sub die($message) {
 	Q:PIR {
 		$P0 = find_lex '$message'
@@ -162,7 +186,7 @@ sub get_class($pmc) {
 }
 
 sub get_namespace($name) {
-	my @namespace := String::split('::', $name);
+	my @namespace := $name.split('::');
 	my $namespace := get_hll_namespace(@namespace);
 	return $namespace;
 }
@@ -177,7 +201,7 @@ sub get_hll_namespace(@parts) {
 }
 
 sub get_sub($path) {
-	my @parts := String::split('::', $path);
+	my @parts := $path.split('::');
 	my $name := @parts.pop;
 	my $namespace := get_hll_namespace(@parts);
 	my $sub;
@@ -199,6 +223,21 @@ sub inspect($pmc, $key) {
 	return $result;
 }
 
+sub is_null(*@what) {
+	my $result := 0;
+	
+	if +@what {
+		$result := Q:PIR {
+			$P0 = find_lex '@what'
+			$P1 = shift $P0
+			$I0 = isnull $P1
+			%r = box $I0
+		};
+	}
+	
+	return $result;
+}
+		
 sub isa($pmc, $class) {
 	my $result := Q:PIR {
 		$P0 = find_lex '$pmc'
@@ -210,6 +249,7 @@ sub isa($pmc, $class) {
 
 	return $result;
 }
+
 sub load_bytecode($file) {
 	Q:PIR {
 		$P0 = find_lex '$file'

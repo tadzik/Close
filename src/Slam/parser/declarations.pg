@@ -115,7 +115,7 @@ array, or hash.
 =cut
 
 rule declarator {
-	# * const	->	myvar		-> (int x, string y)
+	# * const	->	foo	-> (int x, string y)
 	<dclr_pointer>* <dclr_atom> <dclr_postfix>*
 	{*}
 }

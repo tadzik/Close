@@ -54,7 +54,7 @@ module Slam::Visitor::FunctionMarshalling::Impl {
 		Class::SUBCLASS($class_name, 
 			'Visitor::Combinator');
 		NOTE("Creating multisub 'visit'");
-		Class::MULTISUB($class_name, 'visit', :starting_with('_visit_'));
+		Class::multi_method($class_name, 'visit', :starting_with('_visit_'));
 		NOTE("done");
 	}
 

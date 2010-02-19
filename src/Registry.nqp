@@ -2,17 +2,13 @@
 
 module Registry;
 
-#Parrot::IMPORT('Dumper');
-	
-################################################################
-
 _ONLOAD();
 
 sub _ONLOAD() {
 	if our $onload_done { return 0; }
 	$onload_done := 1;
 	
-	say("Registry::_onload");
+	#say("Registry::_onload");
 	
 	Registry := Hash::new();
 }

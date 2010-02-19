@@ -1,5 +1,5 @@
 # $Id$
-class Slam::Grammar::Actions;
+module Slam::Grammar::Actions;
 
 method ADV_ANON($/) {
 	my $past := Slam::Adverb.new(:name(~ $/), :node($/));

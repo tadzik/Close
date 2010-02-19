@@ -1,7 +1,9 @@
 # $Id$
-class Slam::Grammar::Actions;
+module Slam::Grammar::Actions;
 
 method additive_expr($/) { binary_expr_l2r($/); }
+method bitwise_expr($/, $key) { binary_expr_l2r($/); }
+method compare_expr($/) { binary_expr_l2r($/); }
 
 method arg_adverb($/) {
 	NOTE("Creating parameter adverb from: ", $/);
@@ -103,14 +105,19 @@ method asm_expr($/) {
 # Assembly routine for a whole bunch of left-to-right associative binary ops.
 sub binary_expr_l2r($/) {
 	NOTE("Assembling binary left-associative expression");
-	my $past := $<term>.shift().ast;
-
-	for $<op> {
-		$past := Slam::Node::create('expr_binary', 
-			:operator(~$_),
+	my @terms	:= ast_array($<term>);
+	my $past	:= @terms.shift;
+	my $index	:= 0;
+	
+	while @terms {
+		$past := Slam::Operator::Binary.new(
 			:left($past),
-			:right($<term>.shift().ast),
-			:node($_));
+			:name(~ $<op>[$index]),
+			:node($<op>[$index]),
+			:right(@terms.shift),
+		);
+		
+		$index++;
 	}
 
 	NOTE("done");
@@ -119,10 +126,9 @@ sub binary_expr_l2r($/) {
 }
 
 method constant($/, $key)               { PASSTHRU($/, $key); }
-
-method expression($/, $key) { PASSTHRU($/, $key); }
-
-method mult_expr($/) { binary_expr_l2r($/); }
+method expression($/, $key) 	{ PASSTHRU($/, $key); }
+method logical_expr($/)		{ binary_expr_l2r($/); }
+method mult_expr($/)		{ binary_expr_l2r($/); }
 
 method postfix_expr($/) {
 	my $past := $<term>.ast;
@@ -237,7 +243,6 @@ method postfix_index($/) {
 	make $past;
 }
 
-
 our %prefix_opcode;
 %prefix_opcode{'++'} := 'inc 0*';
 %prefix_opcode{'--'} := 'dec 0*';
@@ -273,9 +278,6 @@ method prefix_expr($/, $key)      {
 	make $past;
 }
 
-method bitwise_expr($/, $key) { binary_expr_l2r($/); }
-method compare_expr($/) { binary_expr_l2r($/); }
-method logical_expr($/) { binary_expr_l2r($/); }
 
 method conditional_expr($/) {
 	my $past;

@@ -110,7 +110,7 @@ module Slam::Scope::Namespace {
 	}
 	
 	method init(@children, %attributes) {
-		unless %attributes<hll> && Scalar::defined(%attributes<namespace>) {
+		unless %attributes<hll> && Parrot::defined(%attributes<namespace>) {
 			DIE("Namespaces must be created with :hll() and :namespace()");
 		}
 		
@@ -203,9 +203,9 @@ module Slam::Scope::GlobalRoot {
 	method init(@children, %attributes) {
 		self.init_(@children, %attributes);
 		
-		self._ATTR('hll',		Array::new(Scalar::undef()));
+		self._ATTR('hll',		Array::new(Parrot::undef()));
 		self._ATTR('name',		Array::new('<GLOBAL ROOT>'));
-		self._ATTR('namespace',	Array::new(Scalar::undef()));
+		self._ATTR('namespace',	Array::new(Parrot::undef()));
 		
 		DUMP(self);
 		return self;

@@ -31,7 +31,7 @@ module Slam::Visitor::PrettyPrint {
 	method expressions(*@value)	{ self._ATTR_ARRAY('expressions', @value); }
 	
 	method indent($value?) {
-		unless Scalar::defined($value) { $value := 4; }
+		unless Parrot::defined($value) { $value := 4; }
 		self.indent_level(self.indent_level + $value); 
 	}
 
@@ -92,7 +92,7 @@ module Slam::Visitor::PrettyPrint {
 	}
 	
 	method undent($value?) { 
-		unless Scalar::defined($value) { $value := 4; }
+		unless Parrot::defined($value) { $value := 4; }
 		self.indent_level(self.indent_level - $value); 
 	}
 
@@ -117,7 +117,7 @@ module Slam::Visitor::PrettyPrint::BeginVisitor {
 		Class::SUBCLASS($class_name, 
 			'Visitor::Combinator');
 		NOTE("Creating multisub 'visit'");
-		Class::MULTISUB($class_name, 'visit', :starting_with('_visit_'));
+		Class::multi_method($class_name, 'visit', :starting_with('_visit_'));
 		NOTE("done");
 	}
 
@@ -253,7 +253,7 @@ module Slam::Visitor::PrettyPrint::BeginVisitor {
 	method _visit_Slam_Type_Array($node) {
 		my $elements := $node.elements;
 		
-		unless Scalar::defined($elements) {
+		unless Parrot::defined($elements) {
 			$elements := ' ';
 		}
 		
@@ -326,7 +326,7 @@ module Slam::Visitor::PrettyPrint::EndVisitor {
 		Class::SUBCLASS($class_name, 
 			'Visitor::Combinator');
 		NOTE("Creating multisub 'visit'");
-		Class::MULTISUB($class_name, 'visit', :starting_with('_visit_'));
+		Class::multi_method($class_name, 'visit', :starting_with('_visit_'));
 		NOTE("done");
 	}
 

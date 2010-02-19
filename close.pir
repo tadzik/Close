@@ -52,6 +52,7 @@ to the close compiler.
     exit 0
 .end
 
+.include 'library/kakapo.pir'
 .include 'src/gen_builtins.pir'
 .include 'src/gen_grammar.pir'
 .include 'src/gen_actions.pir'
@@ -62,7 +63,8 @@ to the close compiler.
 .include 'src/Slam/parser/action_utils.pir'
 .include 'src/Slam/parser/statement_actions.pir'
 .include 'src/Slam/parser/token_actions.pir'
-.include 'src/gen_library.pir'
+#.include 'src/gen_util_lib.pir'
+.include 'src/gen_slam_lib.pir'
 
 =back
 

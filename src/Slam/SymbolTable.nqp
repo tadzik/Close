@@ -57,8 +57,8 @@ method declare($symbol) {
 			NOTE("Error: qualified name not allowed in pervasive scope");
 			$symbol.error(:message(
 				"A qualified name may not be a builtin."));
-			$symbol.hll(Scalar::undef());
-			$symbol.namespace(Scalar::undef());
+			$symbol.hll(Parrot::undef());
+			$symbol.namespace(Parrot::undef());
 		}
 	}
 	else {
@@ -237,7 +237,7 @@ method query_type_name($name) {
 	DUMP($symbol);
 	unless $symbol && $symbol.is_typedef {
 		NOTE("Found something not a type.");
-		$symbol := Scalar::undef();
+		$symbol := Parrot::undef();
 	}
 	
 	return $symbol;

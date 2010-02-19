@@ -118,7 +118,7 @@ sub parse_include_file($node) {
 	get_file_contents($node);
 	my $contents := $node<contents>;
 
-	if Scalar::defined($contents) {
+	if Parrot::defined($contents) {
 		push($node.name());
 		Slam::Scopes::push($node);
 		

@@ -16,7 +16,7 @@ sub _ONLOAD() {
 	Class::SUBCLASS($class_name, 
 		'Slam::Scope::Local');
 		
-	Class::MULTISUB($class_name, 'attach', :starting_with('_attach_'));
+	Class::multi_method($class_name, 'attach', :starting_with('_attach_'));
 }
 
 method _attach_Slam_Scope_Local($scope) {

@@ -4,7 +4,7 @@ class OS;
 sub _get_pmc() {
 	our $_Pmc;
 
-	unless Scalar::defined($_Pmc) {
+	unless Parrot::defined($_Pmc) {
 		$_Pmc := Q:PIR {
 			%r = root_new [ 'parrot' ; 'OS' ]
 		};

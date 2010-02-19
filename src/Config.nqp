@@ -26,7 +26,7 @@ sub NOTEold(*@parts) {
 our $_Pmc;
 
 sub _get_pmc() {
-	unless Scalar::defined($_Pmc) {
+	unless Parrot::defined($_Pmc) {
 		$_Pmc := Q:PIR {
 			load_bytecode "config.pbc"
 			%r = _config()

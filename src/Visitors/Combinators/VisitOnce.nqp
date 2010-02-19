@@ -27,7 +27,7 @@ method visit($node) {
 	self.PASS;
 	my $result := self.visit_cache{Parrot::get_address_of($node)};
 	
-	if Scalar::defined($result) {
+	if Parrot::defined($result) {
 		NOTE("Already visited. Skipping.");
 	}
 	else {

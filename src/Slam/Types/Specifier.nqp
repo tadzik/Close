@@ -54,7 +54,7 @@ method is_register()				{ return self.storage_class eq 'register'; }
 method is_specifier()			{ return 1; }
 method is_static()				{ return self.storage_class eq 'static'; }
 method is_typedef()				{ return self.storage_class eq 'typedef'; }
-method is_typename_specifier()		{ return Scalar::defined(self.typename); }
+method is_typename_specifier()		{ return Parrot::defined(self.typename); }
 method is_volatile(*@value)		{ self._ATTR('is_volatile', @value); }
 
 method merge_with($from) {
@@ -176,6 +176,6 @@ method update_symbol($symbol) {
 	if self.storage_class {
 		NOTE("Setting storage class: ", self.storage_class);
 		$symbol.storage_class(self.storage_class);
-		self.storage_class(Scalar::undef());
+		self.storage_class(Parrot::undef());
 	}
 }

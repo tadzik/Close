@@ -15,7 +15,7 @@ sub _ONLOAD() {
 	Class::SUBCLASS($class_name, 
 		'Slam::Block');
 		
-	Class::MULTISUB($class_name, 'attach', :starting_with('_attach_'));
+	Class::multi_method($class_name, 'attach', :starting_with('_attach_'));
 }
 
 method add_symbol($symbol) {
@@ -88,7 +88,7 @@ method contains($reference, :&satisfies) {
 		&& self.symbol($reference.name)<declaration>;
 	
 	unless &satisfies($result) {
-		$result := Scalar::undef();
+		$result := Parrot::undef();
 	}
 	
 	return $result;

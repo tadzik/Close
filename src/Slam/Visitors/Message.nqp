@@ -52,7 +52,7 @@ module Slam::Visitor::Message::Impl {
 		Class::SUBCLASS($class_name,
 			'Visitor::Combinator::Forward');
 		
-		Class::MULTISUB($class_name, 'visit', :starting_with('_visit_'));
+		Class::multi_method($class_name, 'visit', :starting_with('_visit_'));
 		NOTE("done");
 	}
 

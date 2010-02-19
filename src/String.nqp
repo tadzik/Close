@@ -1,6 +1,6 @@
 # $Id$
 
-class String;
+module String;
 
 Parrot::IMPORT('Dumper');
 
@@ -236,13 +236,13 @@ sub is_cclass($class_name, $str, *%opts) {
 	return $result;
 }
 
-sub length($str, *%opts) {
+method length(*%opts) {
 	my $offset	:= 0 + %opts<offset>;
 	#NOTE("Computing length of string beyond offset ", $offset);
-	#DUMP($str);
+	#DUMP(self);
 	
 	my $result	:= Q:PIR {
-		$P0 = find_lex '$str'
+		$P0 = find_lex 'self'
 		$S0 = $P0
 		$I0 = length $S0
 		%r = box $I0
@@ -326,9 +326,9 @@ sub ltrim_indent($str, $indent) {
 	return substr($str, $i);
 }
 
-sub repeat($str, $times) {
+method repeat($times) {
 	my $result := Q:PIR {
-		$P0 = find_lex '$str'
+		$P0 = find_lex 'self'
 		$S0 = $P0
 		$P0 = find_lex '$times'
 		$I0 = $P0
@@ -339,23 +339,22 @@ sub repeat($str, $times) {
 	return $result;
 }
 
-sub split($delim, $str) {
-	#NOTE("delim = '", $delim, "', str = ", $str);
+method split($delim?) {
+	unless $delim { $delim := ' '; }
 	
 	my @array := Q:PIR {
 		$P0 = find_lex '$delim'
 		$S0 = $P0
-		$P1 = find_lex '$str'
+		$P1 = find_lex 'self'
 		$S1 = $P1
 		%r = split $S0, $S1
 	};
 	
-	#DUMP(@array);
 	return @array;
 }
 
-sub substr($str, $start, *@rest) {
-	my $len	:= length($str);
+method substr($start, *@rest) {
+	my $len	:= length(self);
 	
 	if $start < 0 {
 		$start := $start + $len;
@@ -382,7 +381,7 @@ sub substr($str, $start, *@rest) {
 	}
 
 	my $result := Q:PIR {
-		$P0 = find_lex '$str'
+		$P0 = find_lex 'self'
 		$S0 = $P0
 		$P0 = find_lex '$start'
 		$I0 = $P0
@@ -395,25 +394,25 @@ sub substr($str, $start, *@rest) {
 	return $result;
 }
 
-sub trim($str) {
+method trim() {
 	my $result	:= '';
-	my $left	:= find_not_cclass('WHITESPACE', $str);
+	my $left	:= find_not_cclass('WHITESPACE', self);
 	#NOTE("$left : ", $left);
 	
-	my $len	:= length($str);
+	my $len	:= length(self);
 	#NOTE("$len  : ", $len);
 	
 	if $left < $len {
 		my $right := $len - 1;
 		
-		while is_cclass('WHITESPACE', $str, :offset($right)) {
+		while is_cclass('WHITESPACE', self, :offset($right)) {
 			$right --;
 		}
 		
 		#NOTE("$right: ", $right);
 		
 		# NB: +1 below to re-include non-ws that broke while.
-		$result := substr($str, $left, $right - $left + 1);
+		$result := substr(self, $left, $right - $left + 1);
 	}
 	
 	#NOTE("result: ", $result);

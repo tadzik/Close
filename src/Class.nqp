@@ -56,48 +56,6 @@ module Class {
 		}
 	}
 	
-	sub MULTISUB($class_name, $multi_name, :$starting_with) {
-		NOTE("Creating new multisub '", $multi_name, 
-			"' for class ", $class_name,
-			", out of methods starting with ", 
-			$starting_with);
-		
-		my $class_info := _class_info($class_name);
-		unless $class_info<created> {
-			DIE("Class '", $class_name, "' has not been created yet.");
-		}
-		
-		DUMP($class_info);
-		
-		my $nsp := Parrot::get_namespace($class_name);
-		my $prefix_len := String::length($starting_with);
-		
-		unless Scalar::defined($class_info<multisubs>{$multi_name}) {
-			Class::compile_default_multi($class_name, $multi_name);
-		}
-
-		for $nsp {
-			my $name := ~ $_;
-			
-			if String::substr($name, 0, $prefix_len) eq $starting_with {
-				my $param_class := String::substr($name, $prefix_len);
-				my $param1_class := String::split('_', $param_class).join('::');
-				# Compile multisub for class name
-				NOTE("Compiling '", $multi_name, "' handler for (_, ", 
-					$param1_class, ")");
-				Class::compile_multi($class_name,
-					$multi_name,
-					$param1_class,
-					$name);
-			}
-		}
-	
-		NOTE("All matching trampolines built. Adding method to class.");
-		my $multi_sub := $nsp{$multi_name};
-		get_meta().add_method($class_name, $multi_name, $multi_sub);
-		NOTE("done");
-	}
-	
 	sub NEW_CLASS($class_name) {
 		my $class_info := _class_info($class_name);
 		
@@ -212,31 +170,11 @@ module Class {
 		return %Class_info{$class_name};
 	}
 
-	sub compile_default_multi($class_name, $multi_name) {
-		NOTE("Compiling default multi for: ", $class_name,
-			" :: ", $multi_name);
-	
-		my $class_info := _class_info($class_name);
-		
-		if $class_info<multisubs>{$multi_name}<_> {
-			NOTE("Already compiled.");
-			return 0;
-		}
-		else {
-			NOTE("Constructing a default multi");
-			$class_info<multisubs>{$multi_name}<_> := 1;
-		}
-		
-		my $namespace_name := "'" 
-			~ String::split('::', $class_name).join(q<' ; '>) 
-			~ "'";
+	sub compile_default_multi($class_name, $multi_name, :$is_method) {
+		my $kind := $is_method ?? 'multimethod' !! 'multisub';
 
-		my @trampoline := Array::new(
-			".namespace [ " ~ $namespace_name ~ " ]\n",
-			".sub '" ~ $multi_name ~ "' :method :multi(_)",
-			"\t" ~ ".param pmc pos :slurpy",
-			"\t" ~ ".param pmc adv :slurpy :named",
-		);
+		NOTE("Compiling default ", $kind, " for: ", 
+			$class_name, " :: ", $multi_name);
 
 		NOTE("Looking for fallback method in parent class(es)");
 		my $default_method := Class::find_method_named($class_name, $multi_name);
@@ -245,40 +183,20 @@ module Class {
 			NOTE("I don't think nesting multisubs is possible, but...");
 			$default_method := $default_method[0];
 		}
+
+		my @actions;
+		
+		unless $default_method {
+			@actions.push(
+				"die 'No method available that will accept the parameters given'",
+			);
+		}
 	
-		if Scalar::defined($default_method) {
-			NOTE("Default multi will call ", $multi_name,
-				" method from parent class ", 
-				$default_method.get_namespace.get_name.join('::'));
-			my @parts := $default_method.get_namespace.get_name;
-			@parts.shift;
-		
-			my $method_namespace_name := "'" ~ @parts.join(q<' ; '>) ~ "'";
-			
-			@trampoline.push(
-				"\t" ~ "$P0 = get_hll_global [ " 
-					~ $method_namespace_name 
-					~ " ], '" 
-					~ $multi_name
-					~ "'"
-			);
-			@trampoline.push(
-				"\t" ~ ".tailcall $P0(self, pos :flat, adv :flat :named)"
-			);
-		}
-		else {
-			NOTE("Could not find a ", $multi_name, 
-				" method in any parent class.");
-			@trampoline.push(
-				"\t" ~ "die 'No method available that will accept the parameters given'",
-			);
-		}
-		
-		@trampoline.push(".end");
-		my $trampoline := @trampoline.join("\n");
-		NOTE("Trampoline is:\n", $trampoline);
-		Parrot::compile($trampoline);
-		NOTE("Trampoline compiled okay.");
+		compile_multi($class_name, $multi_name,
+			:actions(@actions),
+			:is_method($is_method),
+			:target($default_method),
+		);
 	}
 	
 =sub compile_multi
@@ -302,47 +220,37 @@ resolves.
 
 =cut
 
-	sub compile_multi($class_name, $multi_name, $param1_type, $actual_method_name) {
-		NOTE("Compiling multisub trampoline [", $class_name, "::", 
-			$multi_name, "(", $param1_type, ", ...) -> ",
-			$actual_method_name);
+	sub compile_multi($class_name, $multi_name, *@param_types,
+		:$target, :@actions?, :$is_method?) 
+	{
+		my $kind := $is_method ?? 'multimethod' !! 'multisub';
+
+		NOTE("Compiling ", $kind, " trampoline [", 
+			$class_name, "::", $multi_name, 
+			"(", @param_types.join(', '), ", ...) -> ",
+			$target);
+
+		if $is_method {
+			@param_types.unshift('_');
+		}
 		
 		my $class_info := _class_info($class_name);
-
-		unless $class_info<multisubs>{$multi_name}<_> {
-			compile_default_multi($class_name, $multi_name);
-		}
-
-		my $param1_namespace := "'" 
-			~ String::split('::', $param1_type).join(q<' ; '>)
-			~ "'";
-
-		my $signature := '_, [ ' ~ $param1_namespace ~ ' ]';
-
+		my $signature  := signature(@param_types);
+		
 		if $class_info<multisubs>{$multi_name}{$signature} {
+			NOTE("This trampoline has already been compiled.");
 			return 0;
 		}
 		
 		$class_info<multisubs>{$multi_name}{$signature} := 1;
 		
-		my $namespace_name := "'" 
-			~ String::split('::', $class_name).join("' ; '")
-			~ "'";
-		
-		my @trampoline := Array::new(
-			".namespace [ " ~ $namespace_name ~ " ]",
-			".sub '" ~ $multi_name ~ "' :method "
-				~ ":multi(" ~ $signature ~ ")",
-			"\t" ~ ".param pmc pos :slurpy",
-			"\t" ~ ".param pmc adv :slurpy :named",
-			"\t" ~ ".tailcall '" ~ $actual_method_name 
-				~ "'(self, pos :flat, adv :named :flat)",
-			".end",
+		trampoline($class_name, $multi_name, 
+			:actions(@actions),
+			:adverbs(":multi(" ~ $signature ~ ")"
+				~ ($is_method ?? ' :method' !! '')),
+			:is_method($is_method),
+			:target($target),
 		);
-		my $trampoline := @trampoline.join("\n");
-		NOTE("Trampoline is:\n", $trampoline);
-		Parrot::compile($trampoline);
-		NOTE("Trampoline compiled okay.");
 	}
 	
 	sub dispatch_method($object, %dispatch, @args, %opts) {
@@ -370,7 +278,7 @@ resolves.
 	sub find_class_named($class_name) {
 		my $class := Parrot::get_class($class_name);
 		
-		unless Scalar::defined($class) {
+		unless Parrot::defined($class) {
 			$class := Parrot::get_class(
 				Parrot::get_namespace($class_name)
 			);
@@ -400,31 +308,179 @@ resolves.
 	sub get_meta() {
 		our $meta;
 		
-		unless Scalar::defined($meta) {
+		unless Parrot::defined($meta) {
 			$meta := Q:PIR { %r = new 'P6metaclass' };
 		}
 
 		return $meta;
 	}
 
+	sub get_method_list($obj) {
+		my $class := Class::of($obj);
+
+		unless Parrot::defined($class) {
+			die("No class. Don't know what to do.");
+		}
+
+		my @methods := $class.methods.keys;
+		return @methods;
+	}
+	
+	sub multi_method($class_name, $multi_name, :$starting_with) {
+		multi_sub($class_name, $multi_name, 
+			:starting_with($starting_with), :is_method(1));
+	}
+	
+	sub multi_sub($class_name, $multi_name, :$starting_with, :$is_method?) {
+		my $kind := $is_method ?? 'multimethod' !! 'multisub';
+		
+		NOTE("Creating new ", $kind, " '", $multi_name, 
+			"' for class ", $class_name,
+			", out of methods starting with ", 
+			$starting_with);
+		
+		my $class_info := _class_info($class_name);
+		unless $class_info<created> {
+			DIE("Class '", $class_name, "' has not been created yet.");
+		}
+		
+		DUMP($class_info);
+		
+		my $nsp := Parrot::get_namespace($class_name);
+		my $prefix_len := $starting_with.length;
+		
+		unless Parrot::defined($class_info<multisubs>{$multi_name}) {
+			Class::compile_default_multi($class_name, 
+				$multi_name, :is_method($is_method));
+		}
+
+		for $nsp {
+			my $name := ~ $_;
+			
+			if $name.substr(0, $prefix_len) eq $starting_with {
+				my $param_class := $name.substr($prefix_len);
+				my $param1_class := $param_class.split('_').join('::');
+				
+				NOTE("Compiling '", $multi_name, "' handler for (_, ", 
+					$param1_class, ")");
+				Class::compile_multi($class_name,
+					$multi_name,
+					$param1_class,
+					:is_method($is_method),
+					:target($name),
+				);
+			}
+		}
+	
+		NOTE("All matching trampolines built. Adding method to class.");
+		my $multi_sub := $nsp{$multi_name};
+		
+		if $is_method {
+			get_meta().add_method($class_name, $multi_name, $multi_sub);
+		}
+		
+		NOTE("done");
+	}
+	
 	sub name_of($object, :$delimiter?) {
-		unless Scalar::defined($delimiter) {
+		unless Parrot::defined($delimiter) {
 			$delimiter := '::';
 		}
 		
-		my $class := Class::of($object);
-		$class := String::split(';', $class).join($delimiter);
+		my $class := ~ Class::of($object);
+		$class := $class.split(';').join($delimiter);
 		return $class;
 	}
 
 	sub of($object) {
-		my $class := Q:PIR {
-			$P0 = find_lex '$object'
-			%r = typeof $P0
-		};
+		my $class;
+		
+		if Parrot::isa($object, 'P6object') {
+			$class := Parrot::get_attribute($object.HOW, 'parrotclass');
+		}
+		else {
+			$class := Parrot::typeof($object);
+		}
 		
 		return $class;
 	}
+
+	sub signature(@types) {
+		my @sig_names;
+		
+		for @types {
+			my $type := ~ $_;
+			my $type_sig := $type eq '_'
+				?? $type
+				!! "['" ~ $type.split('::').join(q<';'>) ~ "']";
+			@sig_names.push($type_sig);
+		}
+
+		return @sig_names.join(", ");
+	}
+	
+	sub trampoline($namespace, $name, :$target, 
+		:@actions?, :$adverbs?, :$is_method?) 
+	{
+		NOTE("Building trampoline [", $namespace, "::", $name, "] -> ", $target);
+		NOTE("is_method? ", $is_method);
+		NOTE("With adverbs: ", $adverbs);
+
+		unless +@actions {
+			@actions := Array::empty();
+			my $target_nsp := $namespace;
+			
+			if ! Parrot::isa($target, 'String') {
+				my @parts := $target.get_namespace.get_name;
+				@parts.shift;
+				$target_nsp := @parts.join('::');
+			
+				if $target_nsp ne $namespace {
+					my $load_p0 := "\t"
+						~ "$P0 = get_hll_global ";	
+					$load_p0 := $load_p0
+						~ "[ '" 
+						~ @parts.join(q<' ; '>)
+						~ "' ], '"
+						~ $target
+						~ "'";
+					
+					@actions.push($load_p0);
+					$target := '$P0';
+				}
+			}
+			else {
+				$target := "'" ~ $target ~ "'";
+			}
+			
+			@actions.push(
+				"\t" ~ ".tailcall " ~ $target
+					~ "("
+					~ ($is_method ?? 'self, ' !! '')
+					~ "pos :flat, adv :flat :named)"
+			);
+			
+		}
+		
+		my @code := Array::new(
+			".namespace [ '" 
+				~ $namespace.split('::').join(q<' ; '>)
+				~ "' ]",
+			".sub '" ~ $name ~ "' " ~ $adverbs,
+			"\t" ~ ".param pmc pos :slurpy",
+			"\t" ~ ".param pmc adv :slurpy :named",
+		);
+		
+		@code.append(@actions);
+		@code.push(
+			".end",
+		);
+		
+		my $trampoline := @code.join("\n");
+		NOTE("Trampoline is:\n", $trampoline);
+		Parrot::compile($trampoline);
+		NOTE("Trampoline compiled okay.");
+	}	
 }
 
 ################################################################
@@ -450,6 +506,8 @@ module Class::ArrayBased {
 
 module Class::BaseBehavior {
 
+	our @empty;
+	
 	_ONLOAD();
 	
 	sub _ONLOAD() {
@@ -472,7 +530,6 @@ module Class::BaseBehavior {
 .end";
 		Parrot::compile($get_string);
 		
-		
 		Parrot::IMPORT('Dumper');
 		Class::NEW_CLASS('Class::BaseBehavior');
 	}
@@ -486,9 +543,9 @@ module Class::BaseBehavior {
 	method _ATTR_ARRAY($name, @value) {
 		my $result := self._ATTR($name, @value);
 		
-		if ! Scalar::defined($result) {
+		if ! Parrot::defined($result) {
 			$result := self._ATTR($name, 
-				Array::new(Array::empty())
+				Array::new(Array::empty()) # Not @empty!
 			);
 		}
 		
@@ -498,7 +555,7 @@ module Class::BaseBehavior {
 	method _ATTR_DEFAULT($name, @value, $default) {
 		my $result := self._ATTR($name, @value);
 		
-		if ! Scalar::defined($result) {
+		if ! Parrot::defined($result) {
 			$result := self._ATTR($name,
 				Array::new($default)
 			);
@@ -508,8 +565,9 @@ module Class::BaseBehavior {
 	}
 	
 	method _ATTR_CONST($name, @value) {
-		if +@value {
-			DIE("You cannot set the value of the '", $name, "' attribute.");
+		if +@value && Parrot::defined(
+			self._ATTR($name, @empty)) {
+			DIE("You cannot reset the value of the '", $name, "' attribute.");
 		}
 		
 		return self._ATTR($name, @value);
@@ -518,10 +576,21 @@ module Class::BaseBehavior {
 	method _ATTR_HASH($name, @value) {
 		my $result := self._ATTR($name, @value);
 		
-		if ! Scalar::defined($result) {
+		if ! Parrot::defined($result) {
 			$result := self._ATTR($name, 
 				Array::new(Hash::empty())
 			);
+		}
+		
+		return $result;
+	}
+
+	method _ATTR_SETBY($name, $method_name) {
+		my $result := self._ATTR($name, @empty);
+		
+		if ! Parrot::defined($result) {
+			Class::call_method(self, $method_name);
+			$result := self._ATTR($name, @empty);
 		}
 		
 		return $result;

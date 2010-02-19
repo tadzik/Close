@@ -14,7 +14,7 @@ sub _ONLOAD() {
 	$onload_done := 1;
 
 	Parrot::_ONLOAD();
-	say("Dumper::_ONLOAD");
+	#say("Dumper::_ONLOAD");
 	
 	%Already_in<ASSERTold>	:= 0;
 	%Already_in<ASSERT>	:= 0;
@@ -114,12 +114,14 @@ sub DUMP(*@pos, :$caller_level?, :@info?, *%named) {
 		
 		if +@pos {
 			print($Prefix);
-			PCT::HLLCompiler.dumper(@pos, @info[2]);
+			_dumper(@pos, @info[2]);
+			#PCT::HLLCompiler.dumper(@pos, @info[2]);
 		}
 		
 		if +%named {
 			print($Prefix);
-			PCT::HLLCompiler.dumper(%named, @info[2]);
+			_dumper(@pos, @info[2]);
+			#PCT::HLLCompiler.dumper(%named, @info[2]);
 		}
 	}
 	
@@ -200,6 +202,8 @@ sub caller_depth_below($namespace, $name, :$starting, :$limit?) {
 		.local pmc key, namespace, caller
 		.local string caller_name
 		
+		push_eh handler
+		
 	while_not_root:
 		
 		inc depth
@@ -229,8 +233,15 @@ sub caller_depth_below($namespace, $name, :$starting, :$limit?) {
 		$S0 = join '::', $P0
 
 		unless $S0 == nsp_name goto while_not_root
+	
+		goto done
+
+	handler:
+		say "Suppressed exception in caller_depth_below"
+		backtrace
 		
 	done:
+		pop_eh
 		# Done: depth indicates depth from "parrot::Slam::main" to present.
 		%r = box show_depth
 	};
@@ -284,7 +295,7 @@ sub find_named_caller(:$nth?, :$starting?) {
 		if num_found < how_many goto done
 		
 	done:		
-		# Cache the caller depth for stack_depth
+		# Remember the caller depth for stack_depth
 		$P0 = get_global '$Caller_depth'
 		$P0 = depth
 		
@@ -452,7 +463,7 @@ sub stack_depth(:$starting) {
 		$Stack_root_offset := 0 + get_config('Dump', 'Stack', 'Root_offset');
 
 		if $stack_root {
-			my @parts	:= String::split('::', $stack_root);
+			my @parts	:= $stack_root.split('::');
 			$Root_sub	:= @parts.pop();
 			$Root_nsp	:= @parts.join('::');
 		}
@@ -461,6 +472,7 @@ sub stack_depth(:$starting) {
 	# If config doesn't know Root yet, we're probably in the early stages,
 	# before the config file loads. Return 0.
 	if $Root_sub {
+	say("Root sub: ", $Root_nsp, " :: ", $Root_sub);
 		$depth := caller_depth_below($Root_nsp, $Root_sub, 
 			:starting($starting + 2));
 		$depth := $depth - $Stack_root_offset;

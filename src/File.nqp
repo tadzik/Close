@@ -8,7 +8,7 @@ Parrot::IMPORT('Dumper');
 our $_Pmc;
 
 sub _get_pmc() {
-	unless Scalar::defined($_Pmc) {
+	unless Parrot::defined($_Pmc) {
 		$_Pmc := Q:PIR {
 			%r = root_new [ 'parrot' ; 'File' ]
 		};

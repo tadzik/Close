@@ -1,5 +1,5 @@
 # $Id$
-class Slam::Grammar::Actions;
+module Slam::Grammar::Actions;
 
 method built_in($/, $key)                { PASSTHRU($/, $key); }
 

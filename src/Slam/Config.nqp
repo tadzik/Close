@@ -17,13 +17,14 @@ sub _ONLOAD() {
 	my $config := Slam::Config.new();
 	Registry<CONFIG> := $config;
 	
-	$config.store('Dump::File::slurp', 1);
+	#$config.store('Dump::File::slurp', 1);
 	
 	$config.store('Dump::Slam::Config::_onload', 0);
-	$config.store('Dump::Slam::Config::file', 1);
+	#$config.store('Dump::Slam::Config::file', 1);
 	$config.store('Dump::Slam::Config::parse_config', 0);
 	$config.store('Dump::Slam::Config::query', 0);
-	$config.store('Dump::Slam::Config::store', 1);
+	#$config.store('Dump::Slam::Config::store', 1);
+	$config.store('Dump::Parrot::defined', 7);
 	
 	$config.store('Dump::Stack::Root', 'parrot::close::Compiler::main');
 	
@@ -54,7 +55,7 @@ method init(@children, %attributes) {
 }
 
 method parse_config($data) {
-	my @lines := String::split("\n", $data);
+	my @lines := $data.split("\n");
 	DUMP(@lines);
 	
 	my $line_number := 0;
@@ -65,7 +66,7 @@ method parse_config($data) {
 		my $line := String::trim($_);
 		
 		if $line && $line[0] ne '#' {
-			my @kv := String::split('=', $line);
+			my @kv := $line.split('=');
 			my $key := String::trim(@kv.shift);
 			
 			if String::length($key) == 0 {
