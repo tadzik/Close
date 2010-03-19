@@ -1,43 +1,42 @@
 # $Id$
+#~ =VERSION 
 
-=VERSION 
+#~ $ Rev: $
 
-$ Rev: $
+#~ =cut
 
-=cut
+#~ grammar Slam::Grammar is PCT::Grammar;
 
-grammar Slam::Grammar is PCT::Grammar;
+#~ =rule TOP
 
-=rule TOP
+#~ Top is the PGE-mandated top-level entry. In this implementation, it matches a 
+#~ single C<translation_unit> and returns the PAST of that rule.
 
-Top is the PGE-mandated top-level entry. In this implementation, it matches a 
-single C<translation_unit> and returns the PAST of that rule.
-
-=cut
+#~ =cut
 
 rule TOP {
 	<translation_unit> {*} #= translation_unit
 }
 
-=rule declaration_sequence 
+#~ =rule declaration_sequence 
 
-A I<declaration_sequence> is a sequence of L<declarative_statement>s. This is a
-convenience target for namespace and translation unit definitions.
+#~ A I<declaration_sequence> is a sequence of L<declarative_statement>s. This is a
+#~ convenience target for namespace and translation unit definitions.
 
-=cut
+#~ =cut
 
 rule declaration_sequence {
 	<decl=declarative_statement>*
 }
 
-=rule declarative_statement
+#~ =rule declarative_statement
 
-A I<declarative_statement> is a statement that declares or defines a symbol, 
-defines a namespace, or include another source file containing declarations
-and/or definitions. This includes L<declaration_statement>s, as well as 
-L<include_file>s and L<using_namespace_directive>s. 
+#~ A I<declarative_statement> is a statement that declares or defines a symbol, 
+#~ defines a namespace, or include another source file containing declarations
+#~ and/or definitions. This includes L<declaration_statement>s, as well as 
+#~ L<include_file>s and L<using_namespace_directive>s. 
 
-=cut
+#~ =cut
 
 rule declarative_statement {
 	[ <include_directive>	{*} #= include_directive
@@ -46,11 +45,11 @@ rule declarative_statement {
 	]
 }
 
-=rule include_directive
+#~ =rule include_directive
 
-Includes a system or user header file.
+#~ Includes a system or user header file.
 
-=cut
+#~ =cut
 
 rule include_directive {
 	<.SINGLE_HASH> <.INCLUDE> 
@@ -58,16 +57,16 @@ rule include_directive {
 	{*}
 }
 
-=rule namespace_definition
+#~ =rule namespace_definition
 
-A namespace definition is a block that assigns a namespace path to all the
-declarations contained in the block.
+#~ A namespace definition is a block that assigns a namespace path to all the
+#~ declarations contained in the block.
 
-    namespace Foo {
-        void bark();	// Defines Foo::bark();
-    }
+    #~ namespace Foo {
+        #~ void bark();	// Defines Foo::bark();
+    #~ }
 
-=cut
+#~ =cut
 
 rule namespace_definition {
 	<is_extern=EXTERN>? <.NAMESPACE> <namespace=namespace_path> 
@@ -76,17 +75,17 @@ rule namespace_definition {
 	'}'	{*} #= close
 }
 
-=head5 C<translation_unit>
+#~ =head5 C<translation_unit>
 
-A I<translation unit> is a compiled file, with all of the ancillary included 
-bits that may appear. Essentially, whatever is needed to produce a C<.pbc>
-file as output.
+#~ A I<translation unit> is a compiled file, with all of the ancillary included 
+#~ bits that may appear. Essentially, whatever is needed to produce a C<.pbc>
+#~ file as output.
 
-In Close, a translation unit is defined as a sequence of zero or more 
-C<extern_statement> items. These may be plain old code, namespace blocks,
-variables, classes, or functions.
+#~ In Close, a translation unit is defined as a sequence of zero or more 
+#~ C<extern_statement> items. These may be plain old code, namespace blocks,
+#~ variables, classes, or functions.
 
-=cut
+#~ =cut
 
 rule translation_unit {
 	{*} #= open
