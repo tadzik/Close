@@ -6,11 +6,11 @@ module Slam::SymbolTable;
 	
 ################################################################
 
-=sub _onload
+=begin sub _onload
 
 This code runs at initload time, creating subclasses.
 
-=cut
+=end sub
 
 _ONLOAD();
 
@@ -249,7 +249,7 @@ method stack(*@value)		{ self._ATTR('stack', @value); }
 
 sub current_file() {
 	my $filename := Q:PIR {
-		%r = find_dynamic_lex '$?FILES'
+		%r = find_dynamic_lex '$*FILES'
 	};
 	
 	return $filename;

@@ -4,11 +4,11 @@
 	.return ()
 .end
 
-=method ERROR
+=begin method ERROR
 
 Inserts an <ERROR> token into the stream, so parser rules can recover from them.
 
-=cut
+=end method
 
 .sub 'ERROR' :method
 	.param string message

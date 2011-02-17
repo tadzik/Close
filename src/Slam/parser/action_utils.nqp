@@ -61,12 +61,12 @@ sub PASSTHRU($/, $key, :$caller_level?) {
 
 ################################################################
 
-=sub ast_array($capture)
+=begin sub ast_array($capture)
 
 Returns an array of the ast nodes associated with the elements of an array
 capture. (As with a <subrule>* or <subrule>+ match.)
 
-=cut
+=end sub
 
 sub ast_array($capture) {
 	my @results := Array::empty();
@@ -79,13 +79,13 @@ sub ast_array($capture) {
 }
 
 		
-=sub void clean_up_heredoc($past, @lines)
+=begin sub void clean_up_heredoc($past, @lines)
 
 Chops off leading whitespace, as determined by the final line. Concatenates all
 but the last line of C<@lines> and sets the C<value()> attribute of the C<$past>
 value. 
 
-=cut
+=end sub
 
 sub clean_up_heredoc($past, @lines) {
 	my $closing	:= @lines.pop();

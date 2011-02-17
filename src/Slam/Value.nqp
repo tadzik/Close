@@ -234,14 +234,14 @@ Thus: string s1, s2; s1  = s2;   becomes:
 
 Because rvalue and lvalue for basic types gets the same treatment.
 
-=cut
+=end notes
 
 
-=class Slam::Value
+=begin class Slam::Value
 
 See L<t/Slam/Values.nqp> for documentation.
 
-=cut
+=end class
 
 module Slam::Value {
 
@@ -263,16 +263,16 @@ sub _ONLOAD() {
 	NOTE("done");
 }
 
-=method is_lvalue()
+=begin method is_lvalue()
 
 Returns a boolean indicating whether this value can be used as an I<lvalue>. 
 This version always returns false. An lvalue-capable subclass may override this.
 
-=cut
+=end method
 
 	method is_lvalue()		{ return 0; }
 
-=method load()
+=begin method load()
 
 Returns an array of ops that will cause the C<value()> to be correct. For
 constants, this is generally nothing - value() will return an immediate value
@@ -281,11 +281,11 @@ may be necessary to fetch the value from storage. For expressions, it may be
 necessary to compute the value. The steps returned by C<load()> must do
 whatever is needed.
 
-=cut
+=end method
 
 	method load()		{ return Array::empty(); }
 	
-=method value($value?)
+=begin method value($value?)
 
 Returns, and may optionally set, the value of this node. A node's value is 
 either a literal usable directly in PIR, such as a quoted string or a number,
@@ -293,7 +293,7 @@ or it is a register name, like C<$P0> or C<foo>, that can be assigned.
 
 C<value()> is always used in an I<rvalue> context.
 
-=cut
+=end method
 
 	method value(*@value)	{ self._ATTR('value', @value); }
 

@@ -47,12 +47,12 @@ method is_namespace()		{ return 0; }
 method is_rooted(*@value)		{ self._ATTR('is_rooted', @value); }
 method parts(*@value)		{ return 'parts'; }
 
-=method path
+=begin method path
 
 Returns an array containing the hll and namespace elements, for use by the 
 namespace functions.
 
-=cut
+=end method
 
 method path(*@value) {
 	my @path := Array::clone(self.namespace);

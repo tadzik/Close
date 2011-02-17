@@ -1,12 +1,12 @@
 # $Id$
 module Slam::Grammar::Actions;
 
-=method declarator_name
+=begin method declarator_name
 
 Creates a PAST::Var node, and sets whatever attributes are provided. The 
 resulting PAST::Var is not resolved.
 
-=cut
+=end method
 
 method declarator_name($/) {
 	NOTE("Creating declarator_name for ", $<path>[-1].ast.value);

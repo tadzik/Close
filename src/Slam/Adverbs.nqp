@@ -6,12 +6,12 @@ module Slam::Adverb {
 		
 	################################################################
 
-=sub _onload
+=begin sub _onload
 
 This code runs at initload, and explicitly creates this class as a subclass of
 Slam::Val.
 
-=cut
+=end sub
 
 	_ONLOAD();
 

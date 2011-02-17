@@ -35,7 +35,7 @@ sub get_search_list_of($qualified_identifier) {
 	return @search_list;
 }
 
-=sub Slam::Node[] lookup_qualified_identifier($ident)
+=begin sub Slam::Node[] lookup_qualified_identifier($ident)
 
 Given a qualified identifier -- a name that may or may not be prefixed with type
 or namespace names -- looks up the possible matches for the identifier using the
@@ -47,7 +47,7 @@ not share a namespace, any path, no matter how explicit, can potentially resolve
 to both a namespace and a symbol. (Perl6 uses this to create a proto-object with
 the same name as the namespace.)
 
-=cut
+=end sub
 
 sub query_relative_scopes_matching_path($root, @path) {
 	NOTE("Querying scopes relative to ", $root.name(), " that match path ", @path.join('::'));

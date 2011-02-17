@@ -30,10 +30,10 @@ sub dump_stack() {
 }
 
 sub get_FILES() {
-	NOTE("Getting open file info from $?FILES");
+	NOTE("Getting open file info from $*FILES");
 	
 	my $filename := Q:PIR {
-		%r = find_dynamic_lex '$?FILES'
+		%r = find_dynamic_lex '$*FILES'
 	};
 	
 	my $info := Array::new($filename);
@@ -188,12 +188,12 @@ sub push($filename) {
 
 sub set_FILES($value) {
 	Q:PIR {
-		$P0 = find_dynamic_lex '$?FILES'
+		$P0 = find_dynamic_lex '$*FILES'
 		if null $P0 goto skip
 			
 		$P0 = find_lex '$value'
 		$P1 = shift $P0
-		store_dynamic_lex '$?FILES', $P1
+		store_dynamic_lex '$*FILES', $P1
 
 		$P1 = shift $P0
 		set_hll_global '$!ws', $P1

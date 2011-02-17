@@ -1,5 +1,7 @@
 # $Id$
 
+=begin pod
+
 =head1 PastCleanupVisitor
 
 Transforms the PAST tree into a shape suitable for PAST->POST compilation. This 
@@ -13,7 +15,7 @@ an array of bits to be encapsulated. If a node does not directly represent such
 a bit, it should pass back the result array of its children, otherwise append 
 itself to the child results.
 
-=cut
+=end pod
 
 class Slam::PastCleanupVisitor;
 
@@ -95,11 +97,11 @@ method name() {
 	return $Visitor_name;
 }
 
-=method visit($node)
+=begin method visit($node)
 
 Delegates to SUPER.visit. This method should be copied unchanged into the new code.
 
-=cut
+=end method
 
 method visit($node) {
 	my @results;
@@ -119,12 +121,12 @@ method visit($node) {
 	return @results;
 }
 
-=method visit_children($node)
+=begin method visit_children($node)
 
 Delegates to SUPER.visit_children. This method should be copied unchanged into 
 the new code.
 
-=cut
+=end method
 
 method visit_children($node) {
 	NOTEold("Visiting ", +@($node), " children of ", NODE_TYPE($node), " node: ", $node.name());
@@ -148,11 +150,11 @@ method visit_child_syms($node) {
 	
 ################################################################
 
-=method _cleanup_past_UNKNOWN($node)
+=begin method _cleanup_past_UNKNOWN($node)
 
 Does nothing at all with the node.
 
-=cut 
+=end method
 
 our @Child_attribute_names := (
 	'alias_for',
@@ -201,12 +203,12 @@ method _cleanup_past_UNKNOWN($node) {
 
 ################################################################
 	
-=sub cleanup_past($past)
+=begin sub cleanup_past($past)
 
 The entry point. In general, you create a new object of this class, and use it
 to visit the PAST node that is passed from the compiler.
 
-=cut
+=end sub
 
 sub cleanup_past($past) {
 	NOTEold("Cleaning up PAST tree");

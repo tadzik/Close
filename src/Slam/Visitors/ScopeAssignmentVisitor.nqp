@@ -1,10 +1,12 @@
 # $Id$
 
+=begin pod
+
 =head1 ScopeAssignmentVisitor
 
 Sets identifier scopes in PAST.
 
-=cut
+=end pod
 
 class Slam::ScopeAssignmentVisitor;
 
@@ -62,11 +64,11 @@ method name() {
 	return $Visitor_name;
 }
 
-=method visit($node)
+=begin method visit($node)
 
 Delegates to SUPER.visit. This method should be copied unchanged into the new code.
 
-=cut
+=end method
 
 method visit($node) {
 	my @results := $SUPER.visit(self, $node);
@@ -79,7 +81,7 @@ method visit($node) {
 	
 ################################################################
 
-=method _assign_scope_UNKNOWN($node)
+=begin method _assign_scope_UNKNOWN($node)
 
 This method -- starting with the prefix returned by C<get_method_prefix()>, 
 above, and ending with 'UNKNOWN', is the default method invoked by 
@@ -102,7 +104,7 @@ indent them, etc.
 
 Figure out your own approach.
 
-=cut 
+=end method
 
 our @Child_attribute_names := (
 	'alias_for',
@@ -187,12 +189,12 @@ method _assign_scope_qualified_identifier($node) {
 
 ################################################################
 	
-=sub assign_scopes($past)
+=begin sub assign_scopes($past)
 
 The entry point. In general, you create a new object of this class, and use it
 to visit the PAST node that is passed from the compiler.
 
-=cut
+=end sub
 
 sub assign_scopes($past) {
 	NOTEold("Assigning scopes in PAST tree");

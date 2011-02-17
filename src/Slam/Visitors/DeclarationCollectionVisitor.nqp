@@ -20,11 +20,11 @@ method name() {
 	return $Visitor_name;
 }
 
-=method visit($node)
+=begin method visit($node)
 
 Delegates to SUPER.visit. This method should be copied unchanged into the new code.
 
-=cut
+=end method
 
 method visit($node) {
 	my @results := $SUPER.visit(self, $node);
@@ -36,9 +36,11 @@ method visit($node) {
 
 ################################################################
 
+=begin pod
+
 =head3 Declaration Collection Visitor
 
-=cut
+=end pod
 
 our @Child_attribute_names := (
 	'type',
@@ -77,11 +79,11 @@ method _collect_declarations_function_definition($node) {
 
 ################################################################
 	
-=sub collect_declarations($past)
+=begin sub collect_declarations($past)
 
 Visit all symbol declarations and record them in the backing namespace blocks.
 
-=cut
+=end sub
 
 sub collect_declarations($past) {
 	NOTE("Collecting declarations in PAST tree");

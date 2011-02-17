@@ -2,33 +2,33 @@
 
 module Slam::Grammar::Actions;
 
-=method access_qualifier
+=begin method access_qualifier
 
 Creates a type-specifier entry, to be attached to a declarator or specifier.
 
-=cut
+=end method
 
 method access_qualifier($/, $key)	{ PASSTHRU($/, $key); }
 
 method dclr_adverb($/, $key)	{ PASSTHRU($/, $key); }
 
-=method dclr_alias
+=begin method dclr_alias
 
 Just another kind of declarator.
 
-=cut
+=end method
 
 method dclr_alias($/) {
 	my $past := Slam::Type::new_dclr_alias($<alias>.ast);
 	DUMP($past);
 	make $past;
 }
-=method dclr_array_or_hash
+=begin method dclr_array_or_hash
 
 Constructs an immediate token to represent the type-declarator,
 and attaches any attributes required (array #elements).
 
-=cut
+=end method
 
 method dclr_array_or_hash($/, $key) {
 	my $past;
@@ -52,12 +52,12 @@ method dclr_array_or_hash($/, $key) {
 
 method dclr_atom($/, $key) { PASSTHRU($/, $key); }
 	
-=method dclr_pointer
+=begin method dclr_pointer
 
 Creates a token around the '*' in the pointer declarator, and attaches
 any qualifiers as children of the node.
 
-=cut
+=end method
 
 method dclr_pointer($/) {
 	NOTE("Creating pointer declarator");
@@ -68,11 +68,11 @@ method dclr_pointer($/) {
 	make $past;
 }
 
-=method dclr_postfix
+=begin method dclr_postfix
 
 Passes through the array, hash, or function declarator.
 
-=cut
+=end method
 
 method dclr_postfix($/, $key) { PASSTHRU($/, $key); }
 
@@ -196,12 +196,12 @@ our %_decl_part;
 
 method declarator_part($/, $key) { self.DISPATCH($/, $key, %_decl_part); }
 
-=method namespace_alias_declaration
+=begin method namespace_alias_declaration
 
 Edits the enclosing block of this node, creating an alias for the namespace
 name given.
 
-=cut
+=end method
 
 method namespace_alias_declaration($/) {
 	my $ns_name := $<namespace>.ast;
@@ -217,7 +217,7 @@ method namespace_alias_declaration($/) {
 
 method param_adverb($/, $key)	{ PASSTHRU($/, $key); }
 
-=method parameter_declaration
+=begin method parameter_declaration
 
 Matches the declaration of a I<single> declarator, with a limited set of 
 specifiers. When completed, pushes the declared symbol on to the current
@@ -228,7 +228,7 @@ constructed from the C<declarator> node returned by the C<declarator_name> rule.
 Supports the adverbs appropriate to parameters, including C<named>, C<slurpy>,
 and C<optional>.
 
-=cut
+=end method
 
 method parameter_declaration($/) {
 	NOTE("Assembling parameter_declaration");
@@ -255,13 +255,13 @@ method parameter_declaration($/) {
 	make $past;
 }
 
-=method parameter_list
+=begin method parameter_list
 
 Creates a function-returning declarator, which is set as the PAST result of 
 the rule. The declarator contains a PAST::Block to represent the function's 
 parameter scope.
 
-=cut
+=end method
 
 method _parameter_list_close($/) {
 	our $Symbols;
@@ -316,12 +316,12 @@ method specifier_list($/) {
 	MAKE($past);
 }
 
-=method symbol_declaration_list
+=begin method symbol_declaration_list
 
 Attaches specifier_list to each symbol's declarator. Declares symbols
 within their respective scopes.
 
-=cut
+=end method
 
 method symbol_declaration_list($/) {
 	my $past	:= Slam::Statement::SymbolDeclarationList.new();
@@ -374,11 +374,11 @@ method tspec_builtin($/) {
 }
 
 
-=method tspec_function_attr
+=begin method tspec_function_attr
 
 Creates a type specifier around the keyword.
 
-=cut
+=end method
 
 method tspec_function_attr($/) {
 	my $name := ~ $<token>;
@@ -394,11 +394,11 @@ method tspec_function_attr($/) {
 
 method tspec_not_type($/, $key) { PASSTHRU($/, $key); }
 
-=method tspec_storage_class
+=begin method tspec_storage_class
 
 Creates a token around the keyword.
 
-=cut
+=end method
 
 method tspec_storage_class($/) {
 	my $name := ~ $<token>;

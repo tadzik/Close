@@ -33,7 +33,7 @@ RM_RF         := @rm_rf@
 POD2MAN       := pod2man
 #IF(parrot_is_shared and not(cygwin or win32)):export LD_RUN_PATH := @blib_dir@:$(LD_RUN_PATH)
 PARROT        := $(BIN_DIR)/parrot@exe@
-PARROT_NQP	:= $(BIN_DIR)/parrot_nqp@exe@
+PARROT_NQP	:= $(BIN_DIR)/parrot-nqp@exe@
 PBC_TO_EXE    := $(BIN_DIR)/pbc_to_exe@exe@
 STRIP_PIRA	:= grep -v '^.annotate'
 #IF(darwin):
@@ -50,7 +50,6 @@ ACTIONS_PM := \
 BUILTINS_PIR := \
 	src/builtins/grammar_utils.pir \
 	src/builtins/literals.pir \
-	src/builtins/load_bytecode.pir \
 	src/builtins/optable.pir \
 	src/builtins/say.pir \
 	src/builtins/strings.pir

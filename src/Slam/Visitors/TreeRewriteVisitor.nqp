@@ -1,5 +1,7 @@
 # $Id$
 
+=begin pod
+
 =head1 TreeRewriteVisitor
 
 Transforms the PAST tree into a shape suitable for PAST->POST compilation. This 
@@ -13,7 +15,7 @@ an array of bits to be encapsulated. If a node does not directly represent such
 a bit, it should pass back the result array of its children, otherwise append 
 itself to the child results.
 
-=cut
+=end pod
 
 class Slam::TreeRewriteVisitor;
 
@@ -51,11 +53,11 @@ method name() {
 	return $Visitor_name;
 }
 
-=method visit($node)
+=begin method visit($node)
 
 Delegates to SUPER.visit. This method should be copied unchanged into the new code.
 
-=cut
+=end method
 
 method visit($node) {
 	my @results;
@@ -77,11 +79,11 @@ method visit($node) {
 
 ################################################################
 
-=method _rewrite_tree_UNKNOWN($node)
+=begin method _rewrite_tree_UNKNOWN($node)
 
 Does nothing at all with the node.
 
-=cut 
+=end method
 
 our @Child_attribute_names := (
 	'alias_for',
@@ -117,12 +119,12 @@ method _rewrite_tree_initload_sub($node) {
 
 ################################################################
 	
-=sub rewrite_tree($past)
+=begin sub rewrite_tree($past)
 
 The entry point. In general, you create a new object of this class, and use it
 to visit the PAST node that is passed from the compiler.
 
-=cut
+=end sub
  
 sub rewrite_tree($past) {
 	NOTE("Rewriting PAST tree into POSTable shape");

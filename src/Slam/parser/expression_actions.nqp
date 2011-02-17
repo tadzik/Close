@@ -160,7 +160,7 @@ method postfix_expr($/) {
 sub postfixup($past) {
 	#say("Fixup: ", $past.WHAT, ": ", $past.name());
 
-	if $past.isa('PAST::Op') and $past.pasttype() eq 'call' {
+	if $past.isa('PAST::Op') && $past.pasttype() eq 'call' {
 		#DUMP($past);
 		my $func := $past[0];
 

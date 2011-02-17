@@ -6,12 +6,12 @@ module Slam::Literal {
 		
 	################################################################
 
-=sub _onload
+=begin sub _onload
 
 This code runs at initload, and explicitly creates this class as a subclass of
 Node.
 
-=cut
+=end sub
 
 	_ONLOAD();
 
